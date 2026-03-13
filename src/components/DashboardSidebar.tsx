@@ -1,24 +1,33 @@
-import { Activity, BarChart3, Bot, LineChart, Settings, LogOut, TrendingUp, Wallet, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Activity, BarChart3, Bot, LineChart, LogOut, TrendingUp, Wallet, ChevronLeft, ChevronRight, BookOpen, Copy, Shield, Lightbulb, Gift, Wrench } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { setUser, getSettings } from '@/lib/store';
+import { setUser, getSettings, getUser } from '@/lib/store';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
+import { derivWS } from '@/lib/deriv-ws';
 
 const navItems = [
-  { label: 'Trading', icon: TrendingUp, path: '/dashboard' },
+  { label: 'Dashboard', icon: TrendingUp, path: '/dashboard' },
+  { label: 'Bot Builder', icon: Wrench, path: '/dashboard/bot-builder' },
+  { label: 'Free Bots', icon: Gift, path: '/dashboard/free-bots' },
   { label: 'DBots', icon: Bot, path: '/dashboard/bots' },
   { label: 'Analysis', icon: BarChart3, path: '/dashboard/analysis' },
-  { label: 'Portfolio', icon: Wallet, path: '/dashboard/portfolio' },
+  { label: 'Strategy', icon: Lightbulb, path: '/dashboard/strategy' },
   { label: 'Charts', icon: LineChart, path: '/dashboard/charts' },
+  { label: 'Portfolio', icon: Wallet, path: '/dashboard/portfolio' },
+  { label: 'Copy Trading', icon: Copy, path: '/dashboard/copy-trading' },
+  { label: 'Risk Mgmt', icon: Shield, path: '/dashboard/risk' },
+  { label: 'Tutorial', icon: BookOpen, path: '/dashboard/tutorial' },
 ];
 
 export const DashboardSidebar = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const settings = getSettings();
+  const user = getUser();
   const [collapsed, setCollapsed] = useState(false);
 
   const handleLogout = () => {
+    derivWS.disconnect();
     setUser(null);
     navigate('/');
   };
@@ -37,7 +46,15 @@ export const DashboardSidebar = () => {
         )}
       </div>
 
-      <nav className="flex-1 p-2 space-y-1">
+      {/* Account info */}
+      {!collapsed && user?.activeAccount && (
+        <div className="px-4 py-2 border-b border-border">
+          <p className="text-xs text-muted-foreground truncate">{user.activeAccount.acct}</p>
+          <p className="text-xs text-primary font-mono">{user.activeAccount.cur?.toUpperCase()}</p>
+        </div>
+      )}
+
+      <nav className="flex-1 p-2 space-y-0.5 overflow-y-auto">
         {navItems.map((item) => {
           const active = location.pathname === item.path;
           return (
@@ -45,7 +62,7 @@ export const DashboardSidebar = () => {
               key={item.path}
               onClick={() => navigate(item.path)}
               className={cn(
-                "w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-sm transition-colors",
+                "w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors",
                 active
                   ? "bg-primary/10 text-primary font-medium"
                   : "text-muted-foreground hover:text-foreground hover:bg-accent"

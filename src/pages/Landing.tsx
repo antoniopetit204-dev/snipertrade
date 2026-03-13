@@ -1,0 +1,244 @@
+import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
+import { getSettings, getUser, getDerivOAuthUrl } from '@/lib/store';
+import { Activity, TrendingUp, Bot, BarChart3, Shield, Zap, ArrowRight, ChevronDown } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+
+const HFTLoader = () => (
+  <div className="relative w-24 h-24">
+    {/* Outer rotating ring */}
+    <motion.div
+      className="absolute inset-0 rounded-full border-2 border-primary/30"
+      animate={{ rotate: 360 }}
+      transition={{ duration: 8, repeat: Infinity, ease: 'linear' }}
+    />
+    {/* Middle pulsing ring */}
+    <motion.div
+      className="absolute inset-2 rounded-full border border-primary/50"
+      animate={{ scale: [1, 1.1, 1], opacity: [0.5, 1, 0.5] }}
+      transition={{ duration: 2, repeat: Infinity }}
+    />
+    {/* Inner ring counter-rotate */}
+    <motion.div
+      className="absolute inset-4 rounded-full border-2 border-dashed border-primary/60"
+      animate={{ rotate: -360 }}
+      transition={{ duration: 5, repeat: Infinity, ease: 'linear' }}
+    />
+    {/* Center candlestick symbol */}
+    <div className="absolute inset-0 flex items-center justify-center">
+      <motion.div className="flex items-end gap-[3px]"
+        animate={{ y: [0, -2, 0] }}
+        transition={{ duration: 1.5, repeat: Infinity }}
+      >
+        {[28, 20, 32, 16, 26, 22, 30].map((h, i) => (
+          <motion.div
+            key={i}
+            className="w-[3px] rounded-full bg-primary"
+            initial={{ height: 4 }}
+            animate={{ height: h }}
+            transition={{ duration: 0.6, delay: i * 0.1, repeat: Infinity, repeatType: 'reverse' }}
+          />
+        ))}
+      </motion.div>
+    </div>
+    {/* Orbiting dots */}
+    {[0, 1, 2].map(i => (
+      <motion.div
+        key={i}
+        className="absolute w-2 h-2 rounded-full bg-primary"
+        style={{ top: '50%', left: '50%' }}
+        animate={{
+          x: [0, Math.cos((i * 2 * Math.PI) / 3) * 44, 0],
+          y: [0, Math.sin((i * 2 * Math.PI) / 3) * 44, 0],
+          opacity: [0, 1, 0],
+        }}
+        transition={{ duration: 3, delay: i * 1, repeat: Infinity }}
+      />
+    ))}
+  </div>
+);
+
+const features = [
+  { icon: Zap, title: 'High Frequency Trading', desc: 'Execute thousands of trades per second with our advanced algorithms' },
+  { icon: Bot, title: 'Automated Bots', desc: 'Deploy pre-built or custom trading bots on Deriv markets' },
+  { icon: BarChart3, title: 'Advanced Analysis', desc: 'Real-time technical indicators and AI-powered signals' },
+  { icon: Shield, title: 'Risk Management', desc: 'Protect your capital with advanced risk controls' },
+  { icon: TrendingUp, title: 'Copy Trading', desc: 'Follow and copy successful traders automatically' },
+  { icon: Activity, title: 'Live Charts', desc: 'Real-time Deriv charts with full trading symbol coverage' },
+];
+
+const Landing = () => {
+  const navigate = useNavigate();
+  const settings = getSettings();
+  const user = getUser();
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    // Show loader for 2.5 seconds
+    const timer = setTimeout(() => setLoading(false), 2500);
+    return () => clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    if (!loading && user?.derivAccounts?.length) {
+      navigate('/dashboard');
+    }
+  }, [loading, user, navigate]);
+
+  const handleLogin = () => {
+    const url = getDerivOAuthUrl();
+    if (url) {
+      window.location.href = url;
+    } else {
+      navigate('/login');
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-background">
+      <AnimatePresence>
+        {loading && (
+          <motion.div
+            className="fixed inset-0 z-50 bg-background flex flex-col items-center justify-center gap-6"
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.5 }}
+          >
+            <HFTLoader />
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.5 }}
+              className="text-center"
+            >
+              <h1 className="text-2xl font-bold text-foreground">{settings.siteName || 'HFT Pro'}</h1>
+              <motion.p
+                className="text-sm text-muted-foreground mt-2"
+                animate={{ opacity: [0.5, 1, 0.5] }}
+                transition={{ duration: 2, repeat: Infinity }}
+              >
+                Initializing trading systems...
+              </motion.p>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {!loading && (
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.5 }}>
+          {/* Announcement Bar */}
+          {settings.announcementBar && (
+            <div className="bg-primary/10 border-b border-primary/20 text-center py-2 px-4">
+              <p className="text-xs text-primary font-medium">{settings.announcementBar}</p>
+            </div>
+          )}
+
+          {/* Header */}
+          <header className="border-b border-border bg-card/80 backdrop-blur-sm sticky top-0 z-40">
+            <div className="max-w-7xl mx-auto px-6 py-3 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Activity className="h-7 w-7 text-primary" />
+                <span className="font-bold text-lg text-foreground">{settings.siteName || 'HFT Pro'}</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <Button variant="ghost" size="sm" onClick={() => navigate('/login')} className="text-muted-foreground hover:text-foreground">
+                  Admin
+                </Button>
+                <Button size="sm" onClick={handleLogin} className="bg-primary text-primary-foreground hover:bg-primary/90 font-semibold">
+                  Start Trading <ArrowRight className="h-4 w-4 ml-1" />
+                </Button>
+              </div>
+            </div>
+          </header>
+
+          {/* Hero */}
+          <section className="relative overflow-hidden">
+            <div className="geometric-bg absolute inset-0 opacity-50" />
+            <div className="max-w-7xl mx-auto px-6 py-24 relative z-10">
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.6 }}
+                className="text-center max-w-3xl mx-auto"
+              >
+                <div className="inline-flex items-center gap-2 bg-primary/10 border border-primary/20 rounded-full px-4 py-1.5 mb-6">
+                  <span className="h-2 w-2 rounded-full bg-profit animate-pulse" />
+                  <span className="text-xs text-primary font-medium">Live Trading Active</span>
+                </div>
+                <h1 className="text-4xl md:text-6xl font-bold text-foreground mb-6 leading-tight">
+                  Trade Smarter with <br />
+                  <span className="text-primary">High Frequency</span> Algorithms
+                </h1>
+                <p className="text-lg text-muted-foreground mb-8 max-w-2xl mx-auto">
+                  {settings.metaDescription || 'Deploy automated trading bots on Deriv markets. Advanced analysis tools, real-time charts, and professional risk management.'}
+                </p>
+                <div className="flex items-center justify-center gap-4">
+                  <Button size="lg" onClick={handleLogin} className="bg-primary text-primary-foreground hover:bg-primary/90 font-bold text-base px-8">
+                    <Zap className="h-5 w-5 mr-2" /> Login with Deriv
+                  </Button>
+                </div>
+              </motion.div>
+            </div>
+            <div className="flex justify-center pb-8">
+              <motion.div animate={{ y: [0, 8, 0] }} transition={{ duration: 2, repeat: Infinity }}>
+                <ChevronDown className="h-6 w-6 text-muted-foreground" />
+              </motion.div>
+            </div>
+          </section>
+
+          {/* Features */}
+          <section className="max-w-7xl mx-auto px-6 py-20">
+            <motion.h2
+              initial={{ opacity: 0 }}
+              whileInView={{ opacity: 1 }}
+              viewport={{ once: true }}
+              className="text-2xl font-bold text-foreground text-center mb-12"
+            >
+              Everything You Need to Trade
+            </motion.h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {features.map((f, i) => (
+                <motion.div
+                  key={f.title}
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: i * 0.1 }}
+                  className="bg-card border border-border rounded-lg p-6 hover:border-primary/30 transition-colors group"
+                >
+                  <f.icon className="h-8 w-8 text-primary mb-4 group-hover:scale-110 transition-transform" />
+                  <h3 className="text-base font-semibold text-foreground mb-2">{f.title}</h3>
+                  <p className="text-sm text-muted-foreground">{f.desc}</p>
+                </motion.div>
+              ))}
+            </div>
+          </section>
+
+          {/* CTA */}
+          <section className="border-t border-border bg-card/50">
+            <div className="max-w-7xl mx-auto px-6 py-16 text-center">
+              <h2 className="text-2xl font-bold text-foreground mb-4">Ready to Start Trading?</h2>
+              <p className="text-muted-foreground mb-8">Connect your Deriv account and start deploying bots in minutes.</p>
+              <Button size="lg" onClick={handleLogin} className="bg-primary text-primary-foreground hover:bg-primary/90 font-bold">
+                Get Started Now <ArrowRight className="h-5 w-5 ml-2" />
+              </Button>
+            </div>
+          </section>
+
+          {/* Footer */}
+          <footer className="border-t border-border py-8 px-6">
+            <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
+              <p className="text-xs text-muted-foreground">{settings.footerText || '© 2026 HFT Pro. All rights reserved.'}</p>
+              <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                {settings.contactEmail && <span>{settings.contactEmail}</span>}
+                {settings.telegramLink && <a href={settings.telegramLink} className="hover:text-primary transition-colors">Telegram</a>}
+              </div>
+            </div>
+          </footer>
+        </motion.div>
+      )}
+    </div>
+  );
+};
+
+export default Landing;
