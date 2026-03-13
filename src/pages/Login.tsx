@@ -4,7 +4,7 @@ import { motion } from 'framer-motion';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { DEMO_ACCOUNTS, setUser, getSettings } from '@/lib/store';
+import { ADMIN_ACCOUNT, setUser, getSettings } from '@/lib/store';
 import { Activity, Shield, Lock } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
@@ -21,16 +21,12 @@ const Login = () => {
     setLoading(true);
 
     setTimeout(() => {
-      const account = DEMO_ACCOUNTS.find(
-        (a) => a.email === email && a.password === password
-      );
-
-      if (account) {
-        setUser({ email: account.email, role: account.role });
-        toast({ title: 'Welcome back!', description: `Logged in as ${account.role}` });
-        navigate(account.role === 'admin' ? '/admin' : '/dashboard');
+      if (email === ADMIN_ACCOUNT.email && password === ADMIN_ACCOUNT.password) {
+        setUser({ email: ADMIN_ACCOUNT.email, role: 'admin' });
+        toast({ title: 'Welcome back, Admin!', description: 'Logged in successfully' });
+        navigate('/adminking');
       } else {
-        toast({ title: 'Login failed', description: 'Invalid credentials', variant: 'destructive' });
+        toast({ title: 'Login failed', description: 'Invalid admin credentials', variant: 'destructive' });
       }
       setLoading(false);
     }, 600);
@@ -53,7 +49,7 @@ const Login = () => {
           </div>
 
           <p className="text-center text-muted-foreground text-sm mb-6">
-            High Frequency Trading Platform
+            Admin Panel Login
           </p>
 
           <form onSubmit={handleLogin} className="space-y-4">
@@ -66,7 +62,7 @@ const Login = () => {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="Enter your email"
+                placeholder="Enter admin email"
                 className="bg-secondary border-border text-foreground placeholder:text-muted-foreground"
                 required
               />
@@ -81,7 +77,7 @@ const Login = () => {
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="Enter your password"
+                placeholder="Enter admin password"
                 className="bg-secondary border-border text-foreground placeholder:text-muted-foreground"
                 required
               />
@@ -92,23 +88,19 @@ const Login = () => {
               className="w-full bg-primary text-primary-foreground hover:bg-primary/90 font-semibold"
               disabled={loading}
             >
-              {loading ? 'Authenticating...' : 'Sign In'}
+              {loading ? 'Authenticating...' : 'Sign In as Admin'}
             </Button>
           </form>
 
           <div className="mt-6 p-4 bg-secondary/50 rounded-lg border border-border">
-            <p className="text-xs text-muted-foreground mb-2 flex items-center gap-1.5">
-              <Shield className="h-3 w-3" /> Demo Accounts
+            <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+              <Shield className="h-3 w-3" /> This login is for administrators only. Users should login via Deriv OAuth from the landing page.
             </p>
-            <div className="space-y-1 text-xs font-mono">
-              <p className="text-foreground">Admin: admin@hftpro.com / admin123</p>
-              <p className="text-foreground">User: user@hftpro.com / user123</p>
-            </div>
           </div>
 
           <div className="mt-4 flex items-center justify-center gap-1.5 text-xs text-muted-foreground">
             <Lock className="h-3 w-3" />
-            <span>Secured with end-to-end encryption</span>
+            <span>Secured admin access</span>
           </div>
         </div>
       </motion.div>
