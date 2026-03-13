@@ -1,45 +1,80 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { DashboardSidebar } from '@/components/DashboardSidebar';
-import { getUser, getBots, type Bot } from '@/lib/store';
-import { TrendingUp, TrendingDown, Activity, DollarSign, BarChart3, Zap } from 'lucide-react';
+import { getUser, getSettings } from '@/lib/store';
+import { useDerivConnection } from '@/hooks/useDerivWS';
+import { derivWS } from '@/lib/deriv-ws';
+import { TrendingUp, TrendingDown, Activity, DollarSign, BarChart3, Zap, Wallet } from 'lucide-react';
 import { motion } from 'framer-motion';
-
-const marketData = [
-  { pair: 'EUR/USD', price: 1.0873, change: 0.15 },
-  { pair: 'GBP/USD', price: 1.2654, change: -0.08 },
-  { pair: 'BTC/USD', price: 67432.50, change: 2.34 },
-  { pair: 'ETH/USD', price: 3521.80, change: 1.87 },
-  { pair: 'XAU/USD', price: 2341.60, change: 0.42 },
-  { pair: 'USD/JPY', price: 157.23, change: -0.12 },
-];
 
 const Dashboard = () => {
   const navigate = useNavigate();
   const user = getUser();
-  const bots = getBots();
-  const activeBots = bots.filter((b) => b.enabled);
-  const [prices, setPrices] = useState(marketData);
+  const settings = getSettings();
+  const { connected, authorized, balance, currency, error } = useDerivConnection();
+  const [symbols, setSymbols] = useState<any[]>([]);
+  const [ticks, setTicks] = useState<Record<string, { quote: number; change: number }>>({});
+  const [openContracts, setOpenContracts] = useState<any[]>([]);
+  const [profitTable, setProfitTable] = useState<any[]>([]);
 
   useEffect(() => {
     if (!user) { navigate('/'); return; }
   }, [user, navigate]);
 
-  // Simulate live price ticks
+  // Fetch active symbols once authorized
   useEffect(() => {
-    const interval = setInterval(() => {
-      setPrices((prev) =>
-        prev.map((p) => ({
-          ...p,
-          price: p.price * (1 + (Math.random() - 0.5) * 0.001),
-          change: p.change + (Math.random() - 0.5) * 0.1,
-        }))
-      );
-    }, 2000);
-    return () => clearInterval(interval);
-  }, []);
+    if (!connected) return;
+    const fetchData = async () => {
+      try {
+        const resp = await derivWS.getActiveSymbols();
+        if (resp.active_symbols) {
+          // Show top traded symbols
+          const top = resp.active_symbols.slice(0, 8);
+          setSymbols(top);
+          
+          // Subscribe to ticks for these symbols
+          for (const sym of top) {
+            derivWS.subscribeTicks(sym.symbol).catch(() => {});
+          }
+        }
+      } catch (err) {
+        console.error('Failed to get symbols:', err);
+      }
 
-  const totalPnL = bots.reduce((s, b) => s + b.profitLoss, 0);
+      if (authorized) {
+        try {
+          const portfolio = await derivWS.getOpenContracts();
+          if (portfolio.portfolio?.contracts) {
+            setOpenContracts(portfolio.portfolio.contracts);
+          }
+        } catch {}
+        
+        try {
+          const profits = await derivWS.getProfitTable(5);
+          if (profits.profit_table?.transactions) {
+            setProfitTable(profits.profit_table.transactions);
+          }
+        } catch {}
+      }
+    };
+    fetchData();
+
+    const unsub = derivWS.subscribe('tick', (data) => {
+      if (data.tick) {
+        setTicks(prev => ({
+          ...prev,
+          [data.tick.symbol]: {
+            quote: data.tick.quote,
+            change: prev[data.tick.symbol]
+              ? ((data.tick.quote - prev[data.tick.symbol].quote) / prev[data.tick.symbol].quote) * 100
+              : 0,
+          },
+        }));
+      }
+    });
+
+    return () => { unsub(); };
+  }, [connected, authorized]);
 
   if (!user) return null;
 
@@ -50,11 +85,18 @@ const Dashboard = () => {
         <header className="border-b border-border px-6 py-3 flex items-center justify-between">
           <div>
             <h1 className="text-lg font-semibold text-foreground">Trading Dashboard</h1>
-            <p className="text-xs text-muted-foreground">Welcome, {user.email}</p>
+            <p className="text-xs text-muted-foreground">
+              {user.activeAccount ? `Account: ${user.activeAccount.acct}` : user.email}
+            </p>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="h-2 w-2 rounded-full bg-profit animate-pulse-profit" />
-            <span className="text-xs text-profit font-medium">Live</span>
+          <div className="flex items-center gap-4">
+            {error && <span className="text-xs text-loss">{error}</span>}
+            <div className="flex items-center gap-2">
+              <span className={`h-2 w-2 rounded-full ${connected ? 'bg-profit animate-pulse-profit' : 'bg-loss'}`} />
+              <span className={`text-xs font-medium ${connected ? 'text-profit' : 'text-loss'}`}>
+                {connected ? (authorized ? 'Connected' : 'Not Authorized') : 'Disconnected'}
+              </span>
+            </div>
           </div>
         </header>
 
@@ -62,10 +104,10 @@ const Dashboard = () => {
           {/* Stats Row */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             {[
-              { label: 'Total P&L', value: `$${totalPnL.toFixed(2)}`, icon: DollarSign, positive: totalPnL >= 0 },
-              { label: 'Active Bots', value: activeBots.length.toString(), icon: Zap, positive: true },
-              { label: 'Total Trades', value: bots.reduce((s, b) => s + b.trades, 0).toString(), icon: BarChart3, positive: true },
-              { label: 'Avg Win Rate', value: `${(bots.reduce((s, b) => s + b.winRate, 0) / bots.length).toFixed(1)}%`, icon: Activity, positive: true },
+              { label: 'Balance', value: balance !== null ? `${balance.toFixed(2)} ${currency}` : '—', icon: Wallet, positive: true },
+              { label: 'Open Positions', value: openContracts.length.toString(), icon: Zap, positive: true },
+              { label: 'Active Symbols', value: symbols.length.toString(), icon: BarChart3, positive: true },
+              { label: 'Connection', value: connected ? 'Live' : 'Offline', icon: Activity, positive: connected },
             ].map((stat, i) => (
               <motion.div
                 key={stat.label}
@@ -86,96 +128,101 @@ const Dashboard = () => {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Market Watch */}
+            {/* Market Watch - Live from Deriv */}
             <div className="lg:col-span-2 bg-card border border-border rounded-lg">
               <div className="px-4 py-3 border-b border-border">
-                <h2 className="text-sm font-semibold text-foreground">Market Watch</h2>
+                <h2 className="text-sm font-semibold text-foreground">Market Watch (Live)</h2>
               </div>
               <div className="divide-y divide-border">
-                {prices.map((item) => (
-                  <div key={item.pair} className="px-4 py-3 flex items-center justify-between hover:bg-accent/50 transition-colors">
-                    <span className="text-sm font-medium text-foreground">{item.pair}</span>
-                    <div className="flex items-center gap-4">
-                      <span className="text-sm font-mono text-foreground">
-                        {item.price < 100 ? item.price.toFixed(4) : item.price.toFixed(2)}
-                      </span>
-                      <span className={`text-xs font-mono flex items-center gap-1 ${item.change >= 0 ? 'text-profit' : 'text-loss'}`}>
-                        {item.change >= 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
-                        {item.change >= 0 ? '+' : ''}{item.change.toFixed(2)}%
-                      </span>
+                {symbols.map((sym) => {
+                  const tick = ticks[sym.symbol];
+                  return (
+                    <div key={sym.symbol} className="px-4 py-3 flex items-center justify-between hover:bg-accent/50 transition-colors">
+                      <div>
+                        <span className="text-sm font-medium text-foreground">{sym.display_name}</span>
+                        <span className="text-xs text-muted-foreground ml-2">{sym.market_display_name}</span>
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <span className="text-sm font-mono text-foreground">
+                          {tick ? tick.quote.toFixed(sym.pip ? String(sym.pip).length - 2 : 2) : '—'}
+                        </span>
+                        {tick && (
+                          <span className={`text-xs font-mono flex items-center gap-1 ${tick.change >= 0 ? 'text-profit' : 'text-loss'}`}>
+                            {tick.change >= 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+                            {tick.change >= 0 ? '+' : ''}{tick.change.toFixed(3)}%
+                          </span>
+                        )}
+                      </div>
                     </div>
+                  );
+                })}
+                {symbols.length === 0 && (
+                  <div className="px-4 py-8 text-center text-muted-foreground text-sm">
+                    {connected ? 'Loading symbols...' : 'Connect to Deriv to see live data'}
                   </div>
-                ))}
+                )}
               </div>
             </div>
 
-            {/* Active Bots */}
+            {/* Open Contracts */}
             <div className="bg-card border border-border rounded-lg">
               <div className="px-4 py-3 border-b border-border">
-                <h2 className="text-sm font-semibold text-foreground">Active Bots</h2>
+                <h2 className="text-sm font-semibold text-foreground">Open Positions</h2>
               </div>
               <div className="p-4 space-y-3">
-                {bots.map((bot) => (
-                  <div key={bot.id} className="p-3 bg-secondary/50 rounded-lg border border-border">
+                {openContracts.length > 0 ? openContracts.map((c: any, i: number) => (
+                  <div key={i} className="p-3 bg-secondary/50 rounded-lg border border-border">
                     <div className="flex items-center justify-between mb-1">
-                      <span className="text-sm font-medium text-foreground">{bot.name}</span>
-                      <span className={`text-xs px-2 py-0.5 rounded-full ${bot.enabled ? 'bg-profit/20 text-profit' : 'bg-muted text-muted-foreground'}`}>
-                        {bot.enabled ? 'Running' : 'Stopped'}
+                      <span className="text-sm font-medium text-foreground">{c.symbol}</span>
+                      <span className={`text-xs font-mono ${c.payout > c.buy_price ? 'text-profit' : 'text-loss'}`}>
+                        {c.payout > c.buy_price ? '+' : ''}{(c.payout - c.buy_price).toFixed(2)}
                       </span>
                     </div>
-                    <p className="text-xs text-muted-foreground mb-2">{bot.strategy}</p>
-                    <div className="flex items-center justify-between text-xs font-mono">
-                      <span className={bot.profitLoss >= 0 ? 'text-profit' : 'text-loss'}>
-                        {bot.profitLoss >= 0 ? '+' : ''}${bot.profitLoss.toFixed(2)}
-                      </span>
-                      <span className="text-muted-foreground">{bot.winRate}% WR</span>
-                    </div>
+                    <p className="text-xs text-muted-foreground">{c.contract_type} • Buy: {c.buy_price}</p>
                   </div>
-                ))}
+                )) : (
+                  <p className="text-sm text-muted-foreground text-center py-4">No open positions</p>
+                )}
               </div>
             </div>
           </div>
 
-          {/* Trading Log */}
-          <div className="bg-card border border-border rounded-lg">
-            <div className="px-4 py-3 border-b border-border">
-              <h2 className="text-sm font-semibold text-foreground">Recent Trades</h2>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-border text-xs text-muted-foreground uppercase tracking-wider">
-                    <th className="text-left px-4 py-3">Time</th>
-                    <th className="text-left px-4 py-3">Pair</th>
-                    <th className="text-left px-4 py-3">Type</th>
-                    <th className="text-right px-4 py-3">Entry</th>
-                    <th className="text-right px-4 py-3">Exit</th>
-                    <th className="text-right px-4 py-3">P&L</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {[
-                    { time: '14:32:05', pair: 'EUR/USD', type: 'BUY', entry: 1.0865, exit: 1.0878, pnl: 13.40 },
-                    { time: '14:28:12', pair: 'BTC/USD', type: 'SELL', entry: 67500, exit: 67320, pnl: 18.00 },
-                    { time: '14:15:33', pair: 'GBP/USD', type: 'BUY', entry: 1.2640, exit: 1.2635, pnl: -5.20 },
-                    { time: '14:02:47', pair: 'XAU/USD', type: 'BUY', entry: 2338.50, exit: 2342.10, pnl: 36.00 },
-                    { time: '13:55:19', pair: 'ETH/USD', type: 'SELL', entry: 3530, exit: 3518, pnl: 12.00 },
-                  ].map((trade, i) => (
-                    <tr key={i} className="hover:bg-accent/30 transition-colors">
-                      <td className="px-4 py-3 font-mono text-muted-foreground">{trade.time}</td>
-                      <td className="px-4 py-3 font-medium text-foreground">{trade.pair}</td>
-                      <td className={`px-4 py-3 font-medium ${trade.type === 'BUY' ? 'text-profit' : 'text-loss'}`}>{trade.type}</td>
-                      <td className="px-4 py-3 font-mono text-right text-foreground">{trade.entry}</td>
-                      <td className="px-4 py-3 font-mono text-right text-foreground">{trade.exit}</td>
-                      <td className={`px-4 py-3 font-mono text-right font-medium ${trade.pnl >= 0 ? 'text-profit' : 'text-loss'}`}>
-                        {trade.pnl >= 0 ? '+' : ''}${trade.pnl.toFixed(2)}
-                      </td>
+          {/* Recent Profit/Loss */}
+          {profitTable.length > 0 && (
+            <div className="bg-card border border-border rounded-lg">
+              <div className="px-4 py-3 border-b border-border">
+                <h2 className="text-sm font-semibold text-foreground">Recent Trades</h2>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-border text-xs text-muted-foreground uppercase tracking-wider">
+                      <th className="text-left px-4 py-3">Time</th>
+                      <th className="text-left px-4 py-3">Contract</th>
+                      <th className="text-right px-4 py-3">Buy Price</th>
+                      <th className="text-right px-4 py-3">Sell Price</th>
+                      <th className="text-right px-4 py-3">P&L</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {profitTable.map((t: any, i: number) => (
+                      <tr key={i} className="hover:bg-accent/30 transition-colors">
+                        <td className="px-4 py-3 font-mono text-muted-foreground text-xs">
+                          {new Date(t.purchase_time * 1000).toLocaleString()}
+                        </td>
+                        <td className="px-4 py-3 font-medium text-foreground">{t.shortcode || t.contract_id}</td>
+                        <td className="px-4 py-3 font-mono text-right text-foreground">{t.buy_price}</td>
+                        <td className="px-4 py-3 font-mono text-right text-foreground">{t.sell_price}</td>
+                        <td className={`px-4 py-3 font-mono text-right font-medium ${parseFloat(t.profit) >= 0 ? 'text-profit' : 'text-loss'}`}>
+                          {parseFloat(t.profit) >= 0 ? '+' : ''}{t.profit}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </main>
     </div>
