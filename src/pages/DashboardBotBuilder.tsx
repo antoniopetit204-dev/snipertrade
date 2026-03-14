@@ -100,8 +100,14 @@ const DashboardBotBuilder = () => {
       }
 
       // Check stop loss / take profit
-      if (stopLoss && totalProfit <= -parseFloat(stopLoss)) break;
-      if (takeProfit && totalProfit >= parseFloat(takeProfit)) break;
+      if (stopLoss && totalProfit <= -parseFloat(stopLoss)) {
+        tradeNotifications.notify({ type: 'stop_loss', title: 'Stop Loss Hit!', message: `Total loss: $${totalProfit.toFixed(2)}`, profit: totalProfit });
+        break;
+      }
+      if (takeProfit && totalProfit >= parseFloat(takeProfit)) {
+        tradeNotifications.notify({ type: 'take_profit', title: 'Take Profit Hit!', message: `Total profit: $${totalProfit.toFixed(2)}`, profit: totalProfit });
+        break;
+      }
 
       // Wait between rounds
       await new Promise(r => setTimeout(r, 2000));
