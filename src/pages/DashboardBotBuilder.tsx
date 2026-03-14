@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { DashboardSidebar } from '@/components/DashboardSidebar';
 import { getUser, getBots, type Bot } from '@/lib/store';
 import { useDerivConnection, useActiveSymbols } from '@/hooks/useDerivWS';
 import { derivWS } from '@/lib/deriv-ws';
+import { tradeNotifications } from '@/lib/trade-notifications';
 import { Wrench, Play, Square, Settings, Plus, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
