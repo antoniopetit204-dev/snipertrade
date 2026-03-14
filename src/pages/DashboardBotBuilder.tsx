@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { DashboardSidebar } from '@/components/DashboardSidebar';
 import { getUser, getBots, type Bot } from '@/lib/store';
 import { useDerivConnection, useActiveSymbols } from '@/hooks/useDerivWS';
 import { derivWS } from '@/lib/deriv-ws';
+import { tradeNotifications } from '@/lib/trade-notifications';
 import { Wrench, Play, Square, Settings, Plus, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -79,13 +80,19 @@ const DashboardBotBuilder = () => {
         });
 
         if (proposal.proposal?.id) {
-          // Buy the contract
           const buy = await derivWS.buyContract(proposal.proposal.id, parseFloat(stake));
           
           if (buy.buy) {
             const profit = buy.buy.profit || 0;
             totalProfit += profit;
-            setResults(prev => [...prev, { round: i, profit, status: profit >= 0 ? 'WIN' : 'LOSS' }]);
+            const status = profit >= 0 ? 'WIN' : 'LOSS';
+            setResults(prev => [...prev, { round: i, profit, status }]);
+            tradeNotifications.notify({
+              type: profit >= 0 ? 'win' : 'loss',
+              title: `Bot Round ${i}: ${status}`,
+              message: `${selectedSymbol} ${contractType} — Stake: $${stake}`,
+              profit,
+            });
           }
         }
       } catch (err: any) {
@@ -93,8 +100,14 @@ const DashboardBotBuilder = () => {
       }
 
       // Check stop loss / take profit
-      if (stopLoss && totalProfit <= -parseFloat(stopLoss)) break;
-      if (takeProfit && totalProfit >= parseFloat(takeProfit)) break;
+      if (stopLoss && totalProfit <= -parseFloat(stopLoss)) {
+        tradeNotifications.notify({ type: 'stop_loss', title: 'Stop Loss Hit!', message: `Total loss: $${totalProfit.toFixed(2)}`, profit: totalProfit });
+        break;
+      }
+      if (takeProfit && totalProfit >= parseFloat(takeProfit)) {
+        tradeNotifications.notify({ type: 'take_profit', title: 'Take Profit Hit!', message: `Total profit: $${totalProfit.toFixed(2)}`, profit: totalProfit });
+        break;
+      }
 
       // Wait between rounds
       await new Promise(r => setTimeout(r, 2000));
