@@ -80,13 +80,19 @@ const DashboardBotBuilder = () => {
         });
 
         if (proposal.proposal?.id) {
-          // Buy the contract
           const buy = await derivWS.buyContract(proposal.proposal.id, parseFloat(stake));
           
           if (buy.buy) {
             const profit = buy.buy.profit || 0;
             totalProfit += profit;
-            setResults(prev => [...prev, { round: i, profit, status: profit >= 0 ? 'WIN' : 'LOSS' }]);
+            const status = profit >= 0 ? 'WIN' : 'LOSS';
+            setResults(prev => [...prev, { round: i, profit, status }]);
+            tradeNotifications.notify({
+              type: profit >= 0 ? 'win' : 'loss',
+              title: `Bot Round ${i}: ${status}`,
+              message: `${selectedSymbol} ${contractType} — Stake: $${stake}`,
+              profit,
+            });
           }
         }
       } catch (err: any) {
