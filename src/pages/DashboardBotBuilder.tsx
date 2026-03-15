@@ -1,11 +1,10 @@
-import { useEffect, useState, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { DashboardSidebar } from '@/components/DashboardSidebar';
-import { getUser, getBots, type Bot } from '@/lib/store';
+import { useEffect, useState } from 'react';
+import { DashboardLayout } from '@/components/DashboardLayout';
+import { getUser } from '@/lib/store';
 import { useDerivConnection, useActiveSymbols } from '@/hooks/useDerivWS';
 import { derivWS } from '@/lib/deriv-ws';
 import { tradeNotifications } from '@/lib/trade-notifications';
-import { Wrench, Play, Square, Settings, Plus, ChevronDown } from 'lucide-react';
+import { Wrench, Play, Square, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -22,7 +21,6 @@ const contractTypes = [
 ];
 
 const DashboardBotBuilder = () => {
-  const navigate = useNavigate();
   const user = getUser();
   const { connected, authorized } = useDerivConnection();
   const { symbols } = useActiveSymbols();
@@ -39,11 +37,6 @@ const DashboardBotBuilder = () => {
   const [results, setResults] = useState<{ round: number; profit: number; status: string }[]>([]);
   const [stopLoss, setStopLoss] = useState('');
   const [takeProfit, setTakeProfit] = useState('');
-  const runningRef = useState(false);
-
-  useEffect(() => {
-    if (!user) navigate('/');
-  }, [user, navigate]);
 
   useEffect(() => {
     if (symbols.length > 0 && !selectedSymbol) {
@@ -68,7 +61,6 @@ const DashboardBotBuilder = () => {
       setCurrentRound(i);
 
       try {
-        // Get proposal
         const proposal = await derivWS.getProposal({
           amount: parseFloat(stake),
           basis: 'stake',
@@ -81,35 +73,27 @@ const DashboardBotBuilder = () => {
 
         if (proposal.proposal?.id) {
           const buy = await derivWS.buyContract(proposal.proposal.id, parseFloat(stake));
-          
           if (buy.buy) {
             const profit = buy.buy.profit || 0;
             totalProfit += profit;
             const status = profit >= 0 ? 'WIN' : 'LOSS';
             setResults(prev => [...prev, { round: i, profit, status }]);
-            tradeNotifications.notify({
-              type: profit >= 0 ? 'win' : 'loss',
-              title: `Bot Round ${i}: ${status}`,
-              message: `${selectedSymbol} ${contractType} — Stake: $${stake}`,
-              profit,
-            });
+            tradeNotifications.notify({ type: profit >= 0 ? 'win' : 'loss', title: `Round ${i}: ${status}`, message: `${selectedSymbol} ${contractType}`, profit });
           }
         }
       } catch (err: any) {
         setResults(prev => [...prev, { round: i, profit: 0, status: 'ERROR: ' + (err.message || 'Unknown') }]);
       }
 
-      // Check stop loss / take profit
       if (stopLoss && totalProfit <= -parseFloat(stopLoss)) {
         tradeNotifications.notify({ type: 'stop_loss', title: 'Stop Loss Hit!', message: `Total loss: $${totalProfit.toFixed(2)}`, profit: totalProfit });
         break;
       }
       if (takeProfit && totalProfit >= parseFloat(takeProfit)) {
-        tradeNotifications.notify({ type: 'take_profit', title: 'Take Profit Hit!', message: `Total profit: $${totalProfit.toFixed(2)}`, profit: totalProfit });
+        tradeNotifications.notify({ type: 'take_profit', title: 'Take Profit!', message: `Total profit: $${totalProfit.toFixed(2)}`, profit: totalProfit });
         break;
       }
 
-      // Wait between rounds
       await new Promise(r => setTimeout(r, 2000));
     }
 
@@ -118,146 +102,103 @@ const DashboardBotBuilder = () => {
 
   if (!user) return null;
 
+  const selectClass = "w-full bg-secondary border border-border text-foreground rounded-md px-3 py-2 text-xs sm:text-sm";
+
   return (
-    <div className="flex h-screen bg-background">
-      <DashboardSidebar />
-      <main className="flex-1 overflow-auto">
-        <header className="border-b border-border px-6 py-3">
-          <h1 className="text-lg font-semibold text-foreground flex items-center gap-2">
-            <Wrench className="h-5 w-5 text-primary" /> Bot Builder
-          </h1>
-          <p className="text-xs text-muted-foreground">Build and run custom trading bots on Deriv</p>
-        </header>
-
-        <div className="p-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Configuration Panel */}
-          <div className="lg:col-span-1 space-y-4">
-            <div className="bg-card border border-border rounded-lg p-5 space-y-4">
-              <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
-                <Settings className="h-4 w-4 text-primary" /> Bot Configuration
-              </h2>
-
-              <div className="space-y-2">
-                <Label className="text-xs text-muted-foreground uppercase tracking-wider">Symbol</Label>
-                <select
-                  value={selectedSymbol}
-                  onChange={e => setSelectedSymbol(e.target.value)}
-                  className="w-full bg-secondary border border-border text-foreground rounded-md px-3 py-2 text-sm"
-                >
-                  {symbols.map(s => (
-                    <option key={s.symbol} value={s.symbol}>{s.display_name}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="space-y-2">
-                <Label className="text-xs text-muted-foreground uppercase tracking-wider">Contract Type</Label>
-                <select
-                  value={contractType}
-                  onChange={e => setContractType(e.target.value)}
-                  className="w-full bg-secondary border border-border text-foreground rounded-md px-3 py-2 text-sm"
-                >
-                  {contractTypes.map(t => (
-                    <option key={t.value} value={t.value}>{t.label}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-2">
-                  <Label className="text-xs text-muted-foreground uppercase tracking-wider">Duration</Label>
-                  <Input value={duration} onChange={e => setDuration(e.target.value)} type="number" className="bg-secondary border-border text-foreground" />
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-xs text-muted-foreground uppercase tracking-wider">Unit</Label>
-                  <select
-                    value={durationUnit}
-                    onChange={e => setDurationUnit(e.target.value)}
-                    className="w-full bg-secondary border border-border text-foreground rounded-md px-3 py-2 text-sm"
-                  >
-                    <option value="t">Ticks</option>
-                    <option value="s">Seconds</option>
-                    <option value="m">Minutes</option>
-                    <option value="h">Hours</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label className="text-xs text-muted-foreground uppercase tracking-wider">Stake (USD)</Label>
-                <Input value={stake} onChange={e => setStake(e.target.value)} type="number" className="bg-secondary border-border text-foreground" />
-              </div>
-
-              <div className="space-y-2">
-                <Label className="text-xs text-muted-foreground uppercase tracking-wider">Rounds</Label>
-                <Input value={rounds} onChange={e => setRounds(e.target.value)} type="number" className="bg-secondary border-border text-foreground" />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-2">
-                  <Label className="text-xs text-muted-foreground uppercase tracking-wider">Stop Loss</Label>
-                  <Input value={stopLoss} onChange={e => setStopLoss(e.target.value)} type="number" placeholder="Optional" className="bg-secondary border-border text-foreground" />
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-xs text-muted-foreground uppercase tracking-wider">Take Profit</Label>
-                  <Input value={takeProfit} onChange={e => setTakeProfit(e.target.value)} type="number" placeholder="Optional" className="bg-secondary border-border text-foreground" />
-                </div>
-              </div>
-
-              <Button
-                onClick={running ? () => setRunning(false) : runBot}
-                className={`w-full font-semibold ${running ? 'bg-loss/20 text-loss hover:bg-loss/30' : 'bg-primary text-primary-foreground hover:bg-primary/90'}`}
-                disabled={!connected}
-              >
-                {running ? <><Square className="h-4 w-4 mr-2" /> Stop Bot</> : <><Play className="h-4 w-4 mr-2" /> Run Bot</>}
-              </Button>
+    <DashboardLayout title="Bot Builder" icon={<Wrench className="h-5 w-5 text-primary" />} subtitle="Build and run custom trading bots">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
+        {/* Config */}
+        <div className="lg:col-span-1 space-y-4">
+          <div className="bg-card border border-border rounded-lg p-4 sm:p-5 space-y-3 sm:space-y-4">
+            <h2 className="text-xs sm:text-sm font-semibold text-foreground flex items-center gap-2">
+              <Settings className="h-4 w-4 text-primary" /> Configuration
+            </h2>
+            <div className="space-y-2">
+              <Label className="text-[10px] sm:text-xs text-muted-foreground uppercase tracking-wider">Symbol</Label>
+              <select value={selectedSymbol} onChange={e => setSelectedSymbol(e.target.value)} className={selectClass}>
+                {symbols.map(s => <option key={s.symbol} value={s.symbol}>{s.display_name}</option>)}
+              </select>
             </div>
+            <div className="space-y-2">
+              <Label className="text-[10px] sm:text-xs text-muted-foreground uppercase tracking-wider">Contract Type</Label>
+              <select value={contractType} onChange={e => setContractType(e.target.value)} className={selectClass}>
+                {contractTypes.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+              </select>
+            </div>
+            <div className="grid grid-cols-2 gap-2 sm:gap-3">
+              <div className="space-y-2">
+                <Label className="text-[10px] sm:text-xs text-muted-foreground uppercase tracking-wider">Duration</Label>
+                <Input value={duration} onChange={e => setDuration(e.target.value)} type="number" className="bg-secondary border-border text-foreground text-xs sm:text-sm" />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-[10px] sm:text-xs text-muted-foreground uppercase tracking-wider">Unit</Label>
+                <select value={durationUnit} onChange={e => setDurationUnit(e.target.value)} className={selectClass}>
+                  <option value="t">Ticks</option>
+                  <option value="s">Seconds</option>
+                  <option value="m">Minutes</option>
+                </select>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label className="text-[10px] sm:text-xs text-muted-foreground uppercase tracking-wider">Stake (USD)</Label>
+              <Input value={stake} onChange={e => setStake(e.target.value)} type="number" className="bg-secondary border-border text-foreground text-xs sm:text-sm" />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-[10px] sm:text-xs text-muted-foreground uppercase tracking-wider">Rounds</Label>
+              <Input value={rounds} onChange={e => setRounds(e.target.value)} type="number" className="bg-secondary border-border text-foreground text-xs sm:text-sm" />
+            </div>
+            <div className="grid grid-cols-2 gap-2 sm:gap-3">
+              <div className="space-y-2">
+                <Label className="text-[10px] sm:text-xs text-muted-foreground uppercase tracking-wider">Stop Loss</Label>
+                <Input value={stopLoss} onChange={e => setStopLoss(e.target.value)} type="number" placeholder="—" className="bg-secondary border-border text-foreground text-xs sm:text-sm" />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-[10px] sm:text-xs text-muted-foreground uppercase tracking-wider">Take Profit</Label>
+                <Input value={takeProfit} onChange={e => setTakeProfit(e.target.value)} type="number" placeholder="—" className="bg-secondary border-border text-foreground text-xs sm:text-sm" />
+              </div>
+            </div>
+            <Button onClick={running ? () => setRunning(false) : runBot} disabled={!connected}
+              className={`w-full font-semibold text-xs sm:text-sm ${running ? 'bg-loss/20 text-loss hover:bg-loss/30' : 'bg-primary text-primary-foreground hover:bg-primary/90'}`}>
+              {running ? <><Square className="h-4 w-4 mr-2" /> Stop Bot</> : <><Play className="h-4 w-4 mr-2" /> Run Bot</>}
+            </Button>
           </div>
+        </div>
 
-          {/* Results Panel */}
-          <div className="lg:col-span-2">
-            <div className="bg-card border border-border rounded-lg">
-              <div className="px-4 py-3 border-b border-border flex items-center justify-between">
-                <h2 className="text-sm font-semibold text-foreground">Bot Results</h2>
-                {running && (
-                  <span className="text-xs text-primary animate-pulse">
-                    Round {currentRound}/{rounds}
+        {/* Results */}
+        <div className="lg:col-span-2">
+          <div className="bg-card border border-border rounded-lg">
+            <div className="px-3 sm:px-4 py-2 sm:py-3 border-b border-border flex items-center justify-between">
+              <h2 className="text-xs sm:text-sm font-semibold text-foreground">Bot Results</h2>
+              {running && <span className="text-xs text-primary animate-pulse">Round {currentRound}/{rounds}</span>}
+            </div>
+            <div className="divide-y divide-border max-h-[400px] sm:max-h-[500px] overflow-y-auto">
+              {results.map((r, i) => (
+                <motion.div key={i} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }}
+                  className="px-3 sm:px-4 py-2 sm:py-3 flex items-center justify-between">
+                  <span className="text-xs sm:text-sm text-muted-foreground">Round {r.round}</span>
+                  <span className={`text-xs sm:text-sm font-mono font-medium ${r.status === 'WIN' ? 'text-profit' : r.status === 'LOSS' ? 'text-loss' : 'text-muted-foreground'}`}>
+                    {r.status === 'WIN' || r.status === 'LOSS' ? `${r.profit >= 0 ? '+' : ''}${r.profit.toFixed(2)}` : r.status}
                   </span>
-                )}
-              </div>
-              <div className="divide-y divide-border max-h-[500px] overflow-y-auto">
-                {results.map((r, i) => (
-                  <motion.div
-                    key={i}
-                    initial={{ opacity: 0, x: -10 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    className="px-4 py-3 flex items-center justify-between"
-                  >
-                    <span className="text-sm text-muted-foreground">Round {r.round}</span>
-                    <span className={`text-sm font-mono font-medium ${r.status === 'WIN' ? 'text-profit' : r.status === 'LOSS' ? 'text-loss' : 'text-muted-foreground'}`}>
-                      {r.status === 'WIN' || r.status === 'LOSS' ? `${r.profit >= 0 ? '+' : ''}${r.profit.toFixed(2)}` : r.status}
-                    </span>
-                  </motion.div>
-                ))}
-                {results.length === 0 && (
-                  <div className="px-4 py-12 text-center text-muted-foreground text-sm">
-                    Configure and run your bot to see results here
-                  </div>
-                )}
-              </div>
-              {results.length > 0 && (
-                <div className="px-4 py-3 border-t border-border flex items-center justify-between bg-secondary/30">
-                  <span className="text-sm font-medium text-foreground">Total P&L</span>
-                  <span className={`text-base font-mono font-bold ${results.reduce((s, r) => s + r.profit, 0) >= 0 ? 'text-profit' : 'text-loss'}`}>
-                    {results.reduce((s, r) => s + r.profit, 0) >= 0 ? '+' : ''}{results.reduce((s, r) => s + r.profit, 0).toFixed(2)}
-                  </span>
+                </motion.div>
+              ))}
+              {results.length === 0 && (
+                <div className="px-4 py-8 sm:py-12 text-center text-muted-foreground text-xs sm:text-sm">
+                  Configure and run your bot to see results
                 </div>
               )}
             </div>
+            {results.length > 0 && (
+              <div className="px-3 sm:px-4 py-2 sm:py-3 border-t border-border flex items-center justify-between bg-secondary/30">
+                <span className="text-xs sm:text-sm font-medium text-foreground">Total P&L</span>
+                <span className={`text-sm sm:text-base font-mono font-bold ${results.reduce((s, r) => s + r.profit, 0) >= 0 ? 'text-profit' : 'text-loss'}`}>
+                  {results.reduce((s, r) => s + r.profit, 0) >= 0 ? '+' : ''}{results.reduce((s, r) => s + r.profit, 0).toFixed(2)}
+                </span>
+              </div>
+            )}
           </div>
         </div>
-      </main>
-    </div>
+      </div>
+    </DashboardLayout>
   );
 };
 

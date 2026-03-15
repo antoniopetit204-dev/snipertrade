@@ -1,4 +1,4 @@
-import { Activity, BarChart3, Bot, LineChart, LogOut, TrendingUp, Wallet, ChevronLeft, ChevronRight, BookOpen, Copy, Shield, Lightbulb, Gift, Wrench } from 'lucide-react';
+import { Activity, BarChart3, Bot, LineChart, LogOut, TrendingUp, Wallet, ChevronLeft, ChevronRight, BookOpen, Copy, Shield, Lightbulb, Gift, Wrench, X } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { setUser, getSettings, getUser } from '@/lib/store';
 import { useState } from 'react';
@@ -19,7 +19,11 @@ const navItems = [
   { label: 'Tutorial', icon: BookOpen, path: '/dashboard/tutorial' },
 ];
 
-export const DashboardSidebar = () => {
+interface SidebarProps {
+  onClose?: () => void;
+}
+
+export const DashboardSidebar = ({ onClose }: SidebarProps) => {
   const navigate = useNavigate();
   const location = useLocation();
   const settings = getSettings();
@@ -32,6 +36,11 @@ export const DashboardSidebar = () => {
     navigate('/');
   };
 
+  const handleNav = (path: string) => {
+    navigate(path);
+    onClose?.();
+  };
+
   return (
     <div className={cn(
       "h-screen bg-card border-r border-border flex flex-col transition-all duration-200",
@@ -40,13 +49,18 @@ export const DashboardSidebar = () => {
       <div className="p-4 border-b border-border flex items-center gap-2">
         <Activity className="h-6 w-6 text-primary shrink-0" />
         {!collapsed && (
-          <span className="font-bold text-foreground text-sm truncate">
+          <span className="font-bold text-foreground text-sm truncate flex-1">
             {settings.siteName || 'HFT Pro'}
           </span>
         )}
+        {/* Mobile close button */}
+        {!collapsed && onClose && (
+          <button onClick={onClose} className="lg:hidden p-1 rounded hover:bg-accent">
+            <X className="h-4 w-4 text-muted-foreground" />
+          </button>
+        )}
       </div>
 
-      {/* Account info */}
       {!collapsed && user?.activeAccount && (
         <div className="px-4 py-2 border-b border-border">
           <p className="text-xs text-muted-foreground truncate">{user.activeAccount.acct}</p>
@@ -60,7 +74,7 @@ export const DashboardSidebar = () => {
           return (
             <button
               key={item.path}
-              onClick={() => navigate(item.path)}
+              onClick={() => handleNav(item.path)}
               className={cn(
                 "w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors",
                 active
@@ -78,7 +92,7 @@ export const DashboardSidebar = () => {
       <div className="p-2 border-t border-border space-y-1">
         <button
           onClick={() => setCollapsed(!collapsed)}
-          className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+          className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm text-muted-foreground hover:text-foreground hover:bg-accent transition-colors hidden lg:flex"
         >
           {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
           {!collapsed && <span>Collapse</span>}
