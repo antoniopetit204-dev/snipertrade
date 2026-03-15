@@ -1,84 +1,158 @@
-import { useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { DashboardSidebar } from '@/components/DashboardSidebar';
+import { useEffect, useState } from 'react';
+import { DashboardLayout } from '@/components/DashboardLayout';
+import { useDerivConnection } from '@/hooks/useDerivWS';
+import { derivWS } from '@/lib/deriv-ws';
 import { getUser } from '@/lib/store';
 import { Wallet, ArrowUpRight, ArrowDownRight } from 'lucide-react';
 import { motion } from 'framer-motion';
 
-const holdings = [
-  { asset: 'USD Balance', amount: 12450.00, change: 0, allocation: 35 },
-  { asset: 'BTC', amount: 0.45, value: 30344.25, change: 2.34, allocation: 25 },
-  { asset: 'ETH', amount: 8.2, value: 28878.76, change: 1.87, allocation: 20 },
-  { asset: 'Gold (XAU)', amount: 5, value: 11708.00, change: 0.42, allocation: 12 },
-  { asset: 'EUR', amount: 3200, value: 3479.36, change: 0.15, allocation: 8 },
-];
-
 const DashboardPortfolio = () => {
-  const navigate = useNavigate();
   const user = getUser();
+  const { connected, authorized, balance, currency } = useDerivConnection();
+  const [statement, setStatement] = useState<any[]>([]);
+  const [openContracts, setOpenContracts] = useState<any[]>([]);
+  const [profitTable, setProfitTable] = useState<any[]>([]);
 
   useEffect(() => {
-    if (!user) navigate('/');
-  }, [user, navigate]);
+    if (!connected || !authorized) return;
+    const fetchData = async () => {
+      try {
+        const [stmtResp, portfolioResp, profitResp] = await Promise.allSettled([
+          derivWS.getStatement(50),
+          derivWS.getOpenContracts(),
+          derivWS.getProfitTable(50),
+        ]);
+        if (stmtResp.status === 'fulfilled' && stmtResp.value.statement?.transactions) {
+          setStatement(stmtResp.value.statement.transactions);
+        }
+        if (portfolioResp.status === 'fulfilled' && portfolioResp.value.portfolio?.contracts) {
+          setOpenContracts(portfolioResp.value.portfolio.contracts);
+        }
+        if (profitResp.status === 'fulfilled' && profitResp.value.profit_table?.transactions) {
+          setProfitTable(profitResp.value.profit_table.transactions);
+        }
+      } catch {}
+    };
+    fetchData();
+  }, [connected, authorized]);
 
   if (!user) return null;
 
-  const totalValue = holdings.reduce((s, h) => s + (h.value || h.amount), 0);
+  const totalPnL = profitTable.reduce((s, t) => s + parseFloat(t.profit || 0), 0);
 
   return (
-    <div className="flex h-screen bg-background">
-      <DashboardSidebar />
-      <main className="flex-1 overflow-auto">
-        <header className="border-b border-border px-6 py-3">
-          <h1 className="text-lg font-semibold text-foreground flex items-center gap-2">
-            <Wallet className="h-5 w-5 text-primary" /> Portfolio
-          </h1>
-        </header>
-
-        <div className="p-6 space-y-6">
-          <div className="bg-card border border-border rounded-lg p-6 text-center">
-            <p className="text-sm text-muted-foreground mb-1">Total Portfolio Value</p>
-            <p className="text-3xl font-bold font-mono text-foreground">${totalValue.toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
+    <DashboardLayout title="Portfolio" icon={<Wallet className="h-5 w-5 text-primary" />}>
+      <div className="space-y-4 sm:space-y-6">
+        {/* Balance Overview */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+          <div className="bg-card border border-border rounded-lg p-4 sm:p-6 text-center">
+            <p className="text-xs text-muted-foreground mb-1">Account Balance</p>
+            <p className="text-2xl sm:text-3xl font-bold font-mono text-foreground">
+              {balance !== null ? `${balance.toFixed(2)}` : '—'} <span className="text-sm text-primary">{currency}</span>
+            </p>
           </div>
+          <div className="bg-card border border-border rounded-lg p-4 sm:p-6 text-center">
+            <p className="text-xs text-muted-foreground mb-1">Open Positions</p>
+            <p className="text-2xl sm:text-3xl font-bold font-mono text-foreground">{openContracts.length}</p>
+          </div>
+          <div className="bg-card border border-border rounded-lg p-4 sm:p-6 text-center">
+            <p className="text-xs text-muted-foreground mb-1">Total P&L (Recent)</p>
+            <p className={`text-2xl sm:text-3xl font-bold font-mono ${totalPnL >= 0 ? 'text-profit' : 'text-loss'}`}>
+              {totalPnL >= 0 ? '+' : ''}{totalPnL.toFixed(2)}
+            </p>
+          </div>
+        </div>
 
+        {/* Open Positions */}
+        {openContracts.length > 0 && (
           <div className="bg-card border border-border rounded-lg">
-            <div className="px-4 py-3 border-b border-border">
-              <h2 className="text-sm font-semibold text-foreground">Holdings</h2>
+            <div className="px-3 sm:px-4 py-2 sm:py-3 border-b border-border">
+              <h2 className="text-xs sm:text-sm font-semibold text-foreground">Open Positions</h2>
             </div>
             <div className="divide-y divide-border">
-              {holdings.map((h, i) => (
-                <motion.div
-                  key={h.asset}
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ delay: i * 0.05 }}
-                  className="px-4 py-4 flex items-center justify-between hover:bg-accent/30 transition-colors"
-                >
-                  <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-xs">
-                      {h.asset.slice(0, 3)}
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-foreground">{h.asset}</p>
-                      <p className="text-xs text-muted-foreground">{h.allocation}% allocation</p>
-                    </div>
+              {openContracts.map((c: any, i: number) => (
+                <motion.div key={i} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: i * 0.03 }}
+                  className="px-3 sm:px-4 py-3 flex items-center justify-between">
+                  <div>
+                    <p className="text-xs sm:text-sm font-medium text-foreground">{c.symbol}</p>
+                    <p className="text-[10px] sm:text-xs text-muted-foreground">{c.contract_type} • Buy: {c.buy_price}</p>
                   </div>
-                  <div className="text-right">
-                    <p className="text-sm font-mono text-foreground">${(h.value || h.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
-                    {h.change !== 0 && (
-                      <p className={`text-xs font-mono flex items-center justify-end gap-0.5 ${h.change >= 0 ? 'text-profit' : 'text-loss'}`}>
-                        {h.change >= 0 ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
-                        {h.change >= 0 ? '+' : ''}{h.change}%
-                      </p>
-                    )}
-                  </div>
+                  <span className={`text-xs sm:text-sm font-mono font-medium ${(c.payout - c.buy_price) >= 0 ? 'text-profit' : 'text-loss'}`}>
+                    {(c.payout - c.buy_price) >= 0 ? '+' : ''}{(c.payout - c.buy_price).toFixed(2)}
+                  </span>
                 </motion.div>
               ))}
             </div>
           </div>
+        )}
+
+        {/* Profit Table */}
+        <div className="bg-card border border-border rounded-lg">
+          <div className="px-3 sm:px-4 py-2 sm:py-3 border-b border-border">
+            <h2 className="text-xs sm:text-sm font-semibold text-foreground">Trade History</h2>
+          </div>
+          {profitTable.length > 0 ? (
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs sm:text-sm">
+                <thead>
+                  <tr className="border-b border-border text-[10px] sm:text-xs text-muted-foreground uppercase tracking-wider">
+                    <th className="text-left px-3 sm:px-4 py-2">Date</th>
+                    <th className="text-left px-3 sm:px-4 py-2 hidden sm:table-cell">Contract</th>
+                    <th className="text-right px-3 sm:px-4 py-2">Buy</th>
+                    <th className="text-right px-3 sm:px-4 py-2">Sell</th>
+                    <th className="text-right px-3 sm:px-4 py-2">P&L</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {profitTable.map((t: any, i: number) => (
+                    <tr key={i} className="hover:bg-accent/30">
+                      <td className="px-3 sm:px-4 py-2 font-mono text-muted-foreground text-[10px] sm:text-xs whitespace-nowrap">
+                        {new Date(t.purchase_time * 1000).toLocaleDateString()}
+                      </td>
+                      <td className="px-3 sm:px-4 py-2 text-foreground hidden sm:table-cell truncate max-w-[150px]">{t.shortcode || t.contract_id}</td>
+                      <td className="px-3 sm:px-4 py-2 font-mono text-right text-foreground">{t.buy_price}</td>
+                      <td className="px-3 sm:px-4 py-2 font-mono text-right text-foreground">{t.sell_price}</td>
+                      <td className={`px-3 sm:px-4 py-2 font-mono text-right font-medium ${parseFloat(t.profit) >= 0 ? 'text-profit' : 'text-loss'}`}>
+                        {parseFloat(t.profit) >= 0 ? '+' : ''}{t.profit}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="py-8 text-center text-muted-foreground text-xs sm:text-sm">
+              {connected && authorized ? 'No trade history yet' : 'Connect & authorize to see your trade history'}
+            </div>
+          )}
         </div>
-      </main>
-    </div>
+
+        {/* Statement */}
+        {statement.length > 0 && (
+          <div className="bg-card border border-border rounded-lg">
+            <div className="px-3 sm:px-4 py-2 sm:py-3 border-b border-border">
+              <h2 className="text-xs sm:text-sm font-semibold text-foreground">Account Statement</h2>
+            </div>
+            <div className="divide-y divide-border max-h-[300px] overflow-y-auto">
+              {statement.map((tx: any, i: number) => (
+                <div key={i} className="px-3 sm:px-4 py-2.5 flex items-center justify-between text-xs sm:text-sm">
+                  <div className="min-w-0">
+                    <p className="text-foreground truncate">{tx.action_type}</p>
+                    <p className="text-[10px] sm:text-xs text-muted-foreground">{new Date(tx.transaction_time * 1000).toLocaleString()}</p>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <p className={`font-mono ${tx.amount >= 0 ? 'text-profit' : 'text-loss'}`}>
+                      {tx.amount >= 0 ? '+' : ''}{tx.amount}
+                    </p>
+                    <p className="text-[10px] text-muted-foreground font-mono">Bal: {tx.balance_after}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </DashboardLayout>
   );
 };
 
