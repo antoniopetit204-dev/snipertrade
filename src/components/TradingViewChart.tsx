@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
-import { createChart, IChartApi, ISeriesApi, CandlestickData, Time, ColorType, CrosshairMode } from 'lightweight-charts';
+import { useEffect, useRef, useCallback } from 'react';
+import { createChart, IChartApi, ISeriesApi, CandlestickData, Time, ColorType, CrosshairMode, CandlestickSeries, HistogramSeries } from 'lightweight-charts';
 import { derivWS } from '@/lib/deriv-ws';
 
 interface TradingViewChartProps {
@@ -17,7 +17,6 @@ export const TradingViewChart = ({ symbol, granularity = 60, height = 500 }: Tra
   const initChart = useCallback(() => {
     if (!containerRef.current) return;
 
-    // Remove old chart
     if (chartRef.current) {
       chartRef.current.remove();
       chartRef.current = null;
@@ -53,7 +52,7 @@ export const TradingViewChart = ({ symbol, granularity = 60, height = 500 }: Tra
       handleScale: { mouseWheel: true, pinch: true },
     });
 
-    const candleSeries = chart.addCandlestickSeries({
+    const candleSeries = chart.addSeries(CandlestickSeries, {
       upColor: 'hsl(160, 85%, 43%)',
       downColor: 'hsl(356, 90%, 62%)',
       borderUpColor: 'hsl(160, 85%, 43%)',
@@ -62,7 +61,7 @@ export const TradingViewChart = ({ symbol, granularity = 60, height = 500 }: Tra
       wickDownColor: 'hsl(356, 90%, 68%)',
     });
 
-    const volumeSeries = chart.addHistogramSeries({
+    const volumeSeries = chart.addSeries(HistogramSeries, {
       priceFormat: { type: 'volume' },
       priceScaleId: 'volume',
     });
@@ -75,7 +74,6 @@ export const TradingViewChart = ({ symbol, granularity = 60, height = 500 }: Tra
     candleSeriesRef.current = candleSeries;
     volumeSeriesRef.current = volumeSeries;
 
-    // Resize handler
     const ro = new ResizeObserver(() => {
       if (containerRef.current && chartRef.current) {
         chartRef.current.applyOptions({ width: containerRef.current.clientWidth });
@@ -86,13 +84,11 @@ export const TradingViewChart = ({ symbol, granularity = 60, height = 500 }: Tra
     return () => ro.disconnect();
   }, [height]);
 
-  // Initialize chart
   useEffect(() => {
     const cleanup = initChart();
     return () => cleanup?.();
   }, [initChart]);
 
-  // Fetch and stream data
   useEffect(() => {
     if (!derivWS.isConnected || !symbol || !candleSeriesRef.current) return;
 
@@ -114,8 +110,8 @@ export const TradingViewChart = ({ symbol, granularity = 60, height = 500 }: Tra
             const volumes = resp.candles.map((c: any) => ({
               time: c.epoch as Time,
               value: Math.abs(parseFloat(c.high) - parseFloat(c.low)) * 10000,
-              color: parseFloat(c.close) >= parseFloat(c.open) 
-                ? 'rgba(52, 211, 153, 0.3)' 
+              color: parseFloat(c.close) >= parseFloat(c.open)
+                ? 'rgba(52, 211, 153, 0.3)'
                 : 'rgba(239, 83, 80, 0.3)',
             }));
             volumeSeriesRef.current.setData(volumes);
@@ -130,7 +126,6 @@ export const TradingViewChart = ({ symbol, granularity = 60, height = 500 }: Tra
 
     fetchData();
 
-    // Subscribe to live candle updates
     derivWS.subscribeCandles(symbol, granularity).catch(() => {});
 
     const unsub = derivWS.subscribe('ohlc', (data) => {
@@ -155,14 +150,7 @@ export const TradingViewChart = ({ symbol, granularity = 60, height = 500 }: Tra
       }
     });
 
-    // Also handle tick data for smoother updates
-    const unsubTick = derivWS.subscribe('tick', (data) => {
-      if (data.tick?.symbol === symbol && candleSeriesRef.current) {
-        // tick updates handled via ohlc subscription
-      }
-    });
-
-    return () => { unsub(); unsubTick(); };
+    return () => { unsub(); };
   }, [symbol, granularity]);
 
   return (
