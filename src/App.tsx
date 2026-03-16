@@ -4,8 +4,6 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import Landing from "./pages/Landing";
-import Login from "./pages/Login";
-import DerivCallback from "./pages/DerivCallback";
 import Dashboard from "./pages/Dashboard";
 import DashboardBots from "./pages/DashboardBots";
 import DashboardBotBuilder from "./pages/DashboardBotBuilder";
@@ -30,8 +28,6 @@ const App = () => (
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Landing />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/callback" element={<DerivCallback />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/dashboard/bots" element={<DashboardBots />} />
           <Route path="/dashboard/bot-builder" element={<DashboardBotBuilder />} />
