@@ -1,22 +1,28 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { DashboardLayout } from '@/components/DashboardLayout';
-import { getUser, getBots, saveBots, type Bot } from '@/lib/store';
+import { fetchBots } from '@/lib/db';
+import { getUser, type Bot } from '@/lib/store';
 import { Bot as BotIcon, Play, Square, TrendingUp, Crown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
+import { toggleBotEnabled } from '@/lib/db';
 import { motion } from 'framer-motion';
 
 const DashboardBots = () => {
   const user = getUser();
-  const [bots, setBots] = useState<Bot[]>(getBots());
+  const [bots, setBots] = useState<Bot[]>([]);
   const { toast } = useToast();
 
-  const toggleBot = (id: string) => {
-    const updated = bots.map(b => b.id === id ? { ...b, enabled: !b.enabled } : b);
-    setBots(updated);
-    saveBots(updated);
-    const bot = updated.find(b => b.id === id)!;
-    toast({ title: `${bot.name} ${bot.enabled ? 'started' : 'stopped'}` });
+  useEffect(() => {
+    fetchBots().then(setBots);
+  }, []);
+
+  const toggleBot = async (id: string) => {
+    const bot = bots.find(b => b.id === id);
+    if (!bot) return;
+    await toggleBotEnabled(id, !bot.enabled);
+    setBots(bots.map(b => b.id === id ? { ...b, enabled: !b.enabled } : b));
+    toast({ title: `${bot.name} ${!bot.enabled ? 'started' : 'stopped'}` });
   };
 
   if (!user) return null;
@@ -63,6 +69,9 @@ const DashboardBots = () => {
             </div>
           </motion.div>
         ))}
+        {bots.length === 0 && (
+          <p className="col-span-full text-center text-muted-foreground text-sm py-8">No bots available. Admin can create bots in /adminking.</p>
+        )}
       </div>
     </DashboardLayout>
   );

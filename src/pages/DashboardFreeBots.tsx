@@ -1,6 +1,8 @@
+import { useEffect, useState } from 'react';
 import { DashboardLayout } from '@/components/DashboardLayout';
-import { getUser, getBots } from '@/lib/store';
-import { Gift, Play, TrendingUp, Crown } from 'lucide-react';
+import { fetchBots } from '@/lib/db';
+import { getUser, type Bot } from '@/lib/store';
+import { Gift, Play, Crown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
@@ -8,8 +10,14 @@ import { useNavigate } from 'react-router-dom';
 const DashboardFreeBots = () => {
   const user = getUser();
   const navigate = useNavigate();
-  const freeBots = getBots().filter(b => b.category === 'free');
-  const premiumBots = getBots().filter(b => b.category === 'premium');
+  const [bots, setBots] = useState<Bot[]>([]);
+
+  useEffect(() => {
+    fetchBots().then(setBots);
+  }, []);
+
+  const freeBots = bots.filter(b => b.category === 'free');
+  const premiumBots = bots.filter(b => b.category === 'premium');
 
   if (!user) return null;
 
