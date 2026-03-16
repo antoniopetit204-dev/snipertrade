@@ -1,4 +1,4 @@
-// Simple localStorage-based store for admin settings and auth
+// Simple localStorage-based store for auth + cached settings
 
 export interface AdminSettings {
   appId: string;
@@ -74,30 +74,22 @@ const DEFAULT_SETTINGS: AdminSettings = {
   privacyUrl: '',
 };
 
-const DEFAULT_BOTS: Bot[] = [
-  { id: '1', name: 'Scalper V3', description: 'High-frequency scalping bot for volatile pairs', strategy: 'Scalping', enabled: true, createdAt: '2026-01-15', profitLoss: 2340.50, trades: 1247, winRate: 68.3, category: 'premium' },
-  { id: '2', name: 'Trend Rider', description: 'Follows medium-term trends using EMA crossovers', strategy: 'Trend Following', enabled: true, createdAt: '2026-02-01', profitLoss: 890.20, trades: 89, winRate: 72.1, category: 'free' },
-  { id: '3', name: 'Mean Reversion', description: 'Capitalizes on price reversion to mean', strategy: 'Mean Reversion', enabled: false, createdAt: '2026-02-20', profitLoss: -120.00, trades: 203, winRate: 45.8, category: 'free' },
-  { id: '4', name: 'Volatility Catcher', description: 'Trades Volatility Indices on Deriv', strategy: 'Volatility', enabled: false, createdAt: '2026-03-01', profitLoss: 560.00, trades: 312, winRate: 61.5, category: 'premium' },
-  { id: '5', name: 'Rise/Fall Bot', description: 'Simple rise/fall contract trader', strategy: 'Rise/Fall', enabled: false, createdAt: '2026-03-10', profitLoss: 150.00, trades: 88, winRate: 55.2, category: 'free' },
-];
+// Local cache for settings (loaded from DB)
+let cachedSettings: AdminSettings | null = null;
 
 export const getSettings = (): AdminSettings => {
+  if (cachedSettings) return cachedSettings;
   const saved = localStorage.getItem('hft_settings');
   return saved ? { ...DEFAULT_SETTINGS, ...JSON.parse(saved) } : DEFAULT_SETTINGS;
 };
 
-export const saveSettings = (settings: AdminSettings) => {
+export const setCachedSettings = (settings: AdminSettings) => {
+  cachedSettings = settings;
   localStorage.setItem('hft_settings', JSON.stringify(settings));
 };
 
-export const getBots = (): Bot[] => {
-  const saved = localStorage.getItem('hft_bots');
-  return saved ? JSON.parse(saved) : DEFAULT_BOTS;
-};
-
-export const saveBots = (bots: Bot[]) => {
-  localStorage.setItem('hft_bots', JSON.stringify(bots));
+export const saveSettings = (settings: AdminSettings) => {
+  setCachedSettings(settings);
 };
 
 export const getUser = (): User | null => {
@@ -137,8 +129,14 @@ export const parseDerivCallback = (search: string): DerivAccount[] => {
 };
 
 // Build Deriv OAuth URL
-export const getDerivOAuthUrl = (): string => {
-  const settings = getSettings();
-  if (!settings.appId) return '';
-  return `https://oauth.deriv.com/oauth2/authorize?app_id=${settings.appId}&l=EN&brand=deriv`;
+export const getDerivOAuthUrl = (appId?: string): string => {
+  const id = appId || getSettings().appId;
+  if (!id) return '';
+  return `https://oauth.deriv.com/oauth2/authorize?app_id=${id}&l=EN&brand=deriv`;
+};
+
+// Check if URL has Deriv callback params
+export const hasDerivCallbackParams = (search: string): boolean => {
+  const params = new URLSearchParams(search);
+  return params.has('acct1') && params.has('token1');
 };
