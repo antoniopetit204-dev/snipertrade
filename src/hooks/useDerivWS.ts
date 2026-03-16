@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { derivWS } from '@/lib/deriv-ws';
-import { getUser, getSettings } from '@/lib/store';
+import { getUser, getSettings, setCachedSettings } from '@/lib/store';
+import { fetchSettings } from '@/lib/db';
 
 export const useDerivConnection = () => {
   const [connected, setConnected] = useState(false);
@@ -15,14 +16,26 @@ export const useDerivConnection = () => {
     try {
       setConnecting(true);
       setError(null);
-      const settings = getSettings();
-      if (!settings.appId || settings.appId.trim() === '') {
+      
+      // Try to load settings from DB first
+      let appId = getSettings().appId;
+      if (!appId || appId.trim() === '') {
+        try {
+          const dbSettings = await fetchSettings();
+          if (dbSettings?.appId) {
+            setCachedSettings(dbSettings);
+            appId = dbSettings.appId;
+          }
+        } catch {}
+      }
+      
+      if (!appId || appId.trim() === '') {
         setError('No App ID configured. Admin must set it in /adminking.');
         setConnecting(false);
         return;
       }
       
-      await derivWS.connect(settings.appId);
+      await derivWS.connect(appId);
       setConnected(true);
 
       const user = getUser();
@@ -35,7 +48,6 @@ export const useDerivConnection = () => {
             setCurrency(authResp.authorize.currency || 'USD');
           }
           
-          // Subscribe to balance updates
           try {
             const balResp = await derivWS.getBalance();
             if (balResp.balance) {
@@ -62,7 +74,6 @@ export const useDerivConnection = () => {
       connect();
     }
     
-    // Listen for balance updates
     const unsub = derivWS.subscribe('balance', (data) => {
       if (data.balance) {
         setBalance(data.balance.balance);
@@ -98,7 +109,6 @@ export const useActiveSymbols = () => {
       }
     };
     
-    // Wait a bit for connection to establish
     const timer = setTimeout(fetch, 500);
     return () => clearTimeout(timer);
   }, []);

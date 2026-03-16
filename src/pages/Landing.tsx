@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { getSettings, getUser, getDerivOAuthUrl } from '@/lib/store';
-import { Activity, TrendingUp, Bot, BarChart3, Shield, Zap, ArrowRight, ChevronDown, Menu, X } from 'lucide-react';
+import { getSettings, getUser, getDerivOAuthUrl, parseDerivCallback, setUser, hasDerivCallbackParams } from '@/lib/store';
+import { upsertSession } from '@/lib/db';
+import { useSettings } from '@/hooks/useSettings';
+import { Activity, TrendingUp, Bot, BarChart3, Shield, Zap, ArrowRight, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 const HFTLoader = () => (
@@ -31,30 +33,70 @@ const features = [
 
 const Landing = () => {
   const navigate = useNavigate();
-  const settings = getSettings();
+  const location = useLocation();
+  const { settings, loading: settingsLoading } = useSettings();
   const user = getUser();
   const [loading, setLoading] = useState(true);
+  const [processing, setProcessing] = useState(false);
+
+  // Handle Deriv OAuth callback params on root URL
+  useEffect(() => {
+    if (hasDerivCallbackParams(location.search)) {
+      setProcessing(true);
+      const accounts = parseDerivCallback(location.search);
+      if (accounts.length > 0) {
+        const newUser = {
+          email: accounts[0].acct,
+          role: 'user' as const,
+          derivAccounts: accounts,
+          activeAccount: accounts[0],
+        };
+        setUser(newUser);
+        
+        // Save sessions to DB
+        Promise.all(accounts.map(acc => upsertSession(acc))).catch(console.error);
+        
+        // Clean URL and redirect to dashboard
+        window.history.replaceState({}, '', '/');
+        navigate('/dashboard');
+        return;
+      }
+    }
+  }, [location.search, navigate]);
 
   useEffect(() => {
     const timer = setTimeout(() => setLoading(false), 2500);
     return () => clearTimeout(timer);
   }, []);
 
+  // Redirect authenticated users to dashboard
   useEffect(() => {
-    if (!loading && user?.derivAccounts?.length) {
+    if (!loading && !processing && user?.derivAccounts?.length) {
       navigate('/dashboard');
     }
-  }, [loading, user, navigate]);
+  }, [loading, processing, user, navigate]);
 
   const handleLogin = () => {
-    const url = getDerivOAuthUrl();
+    const url = getDerivOAuthUrl(settings.appId);
     if (url) {
       window.location.href = url;
     } else {
-      // No app ID configured - show message
       alert('Trading is not yet configured. Please contact the administrator.');
     }
   };
+
+  if (processing) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <HFTLoader />
+          <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-sm text-muted-foreground mt-6">
+            Authenticating with Deriv...
+          </motion.p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
