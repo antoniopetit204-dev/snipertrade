@@ -14,7 +14,162 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      admin_settings: {
+        Row: {
+          allow_signups: boolean
+          announcement_bar: string
+          api_key: string
+          app_id: string
+          contact_email: string
+          contact_phone: string
+          created_at: string
+          default_currency: string
+          favicon: string
+          footer_text: string
+          id: string
+          logo_url: string
+          maintenance_mode: boolean
+          max_bot_per_user: number
+          meta_description: string
+          meta_keywords: string
+          primary_color: string
+          privacy_url: string
+          site_name: string
+          site_title: string
+          support_url: string
+          telegram_link: string
+          terms_url: string
+          updated_at: string
+        }
+        Insert: {
+          allow_signups?: boolean
+          announcement_bar?: string
+          api_key?: string
+          app_id?: string
+          contact_email?: string
+          contact_phone?: string
+          created_at?: string
+          default_currency?: string
+          favicon?: string
+          footer_text?: string
+          id?: string
+          logo_url?: string
+          maintenance_mode?: boolean
+          max_bot_per_user?: number
+          meta_description?: string
+          meta_keywords?: string
+          primary_color?: string
+          privacy_url?: string
+          site_name?: string
+          site_title?: string
+          support_url?: string
+          telegram_link?: string
+          terms_url?: string
+          updated_at?: string
+        }
+        Update: {
+          allow_signups?: boolean
+          announcement_bar?: string
+          api_key?: string
+          app_id?: string
+          contact_email?: string
+          contact_phone?: string
+          created_at?: string
+          default_currency?: string
+          favicon?: string
+          footer_text?: string
+          id?: string
+          logo_url?: string
+          maintenance_mode?: boolean
+          max_bot_per_user?: number
+          meta_description?: string
+          meta_keywords?: string
+          primary_color?: string
+          privacy_url?: string
+          site_name?: string
+          site_title?: string
+          support_url?: string
+          telegram_link?: string
+          terms_url?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      bots: {
+        Row: {
+          category: string
+          created_at: string
+          description: string
+          enabled: boolean
+          id: string
+          name: string
+          profit_loss: number
+          strategy: string
+          trades: number
+          updated_at: string
+          win_rate: number
+        }
+        Insert: {
+          category?: string
+          created_at?: string
+          description?: string
+          enabled?: boolean
+          id?: string
+          name: string
+          profit_loss?: number
+          strategy?: string
+          trades?: number
+          updated_at?: string
+          win_rate?: number
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          description?: string
+          enabled?: boolean
+          id?: string
+          name?: string
+          profit_loss?: number
+          strategy?: string
+          trades?: number
+          updated_at?: string
+          win_rate?: number
+        }
+        Relationships: []
+      }
+      user_sessions: {
+        Row: {
+          created_at: string
+          deriv_account: string
+          deriv_currency: string
+          deriv_token: string
+          id: string
+          is_active: boolean
+          last_login: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          deriv_account: string
+          deriv_currency?: string
+          deriv_token: string
+          id?: string
+          is_active?: boolean
+          last_login?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          deriv_account?: string
+          deriv_currency?: string
+          deriv_token?: string
+          id?: string
+          is_active?: boolean
+          last_login?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
