@@ -160,7 +160,7 @@ export const fetchMpesaConfig = async (): Promise<MpesaConfig | null> => {
     consumerSecret: data.consumer_secret,
     shortcode: data.shortcode,
     passkey: data.passkey,
-    environment: data.environment,
+    environment: data.environment as 'sandbox' | 'production',
   };
 };
 
