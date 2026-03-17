@@ -98,7 +98,7 @@ const Admin = () => {
         profitLoss: 0,
         trades: 0,
         winRate: 0,
-        category: data.category,
+        category: data.category as 'free' | 'premium',
       }]);
       setNewBot({ name: '', description: '', strategy: '', category: 'free' });
       toast({ title: `${data.name} created` });
