@@ -35,6 +35,7 @@ export interface Bot {
   trades: number;
   winRate: number;
   category: 'free' | 'premium';
+  price: number;
 }
 
 export interface DerivAccount {
@@ -74,7 +75,6 @@ const DEFAULT_SETTINGS: AdminSettings = {
   privacyUrl: '',
 };
 
-// Local cache for settings (loaded from DB)
 let cachedSettings: AdminSettings | null = null;
 
 export const getSettings = (): AdminSettings => {
@@ -112,7 +112,6 @@ export const ADMIN_ACCOUNT = {
   role: 'admin' as const,
 };
 
-// Parse Deriv OAuth callback URL parameters
 export const parseDerivCallback = (search: string): DerivAccount[] => {
   const params = new URLSearchParams(search);
   const accounts: DerivAccount[] = [];
@@ -128,14 +127,12 @@ export const parseDerivCallback = (search: string): DerivAccount[] => {
   return accounts;
 };
 
-// Build Deriv OAuth URL
 export const getDerivOAuthUrl = (appId?: string): string => {
   const id = appId || getSettings().appId;
   if (!id) return '';
   return `https://oauth.deriv.com/oauth2/authorize?app_id=${id}&l=EN&brand=deriv`;
 };
 
-// Check if URL has Deriv callback params
 export const hasDerivCallbackParams = (search: string): boolean => {
   const params = new URLSearchParams(search);
   return params.has('acct1') && params.has('token1');

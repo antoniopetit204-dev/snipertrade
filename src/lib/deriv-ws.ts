@@ -19,22 +19,30 @@ class DerivWS {
   get isConnected() { return this._isConnected; }
   get isAuthorized() { return this._isAuthorized; }
 
+  private connectPromise: Promise<void> | null = null;
+
   connect(appId?: string): Promise<void> {
-    return new Promise((resolve, reject) => {
+    // If already connecting, return existing promise to prevent race condition
+    if (this.connectPromise && this.ws?.readyState === WebSocket.CONNECTING) {
+      return this.connectPromise;
+    }
+
+    this.connectPromise = new Promise((resolve, reject) => {
       const id = appId || getSettings().appId;
       if (!id || id.trim() === '') { 
         reject(new Error('No App ID configured. Admin must set the App ID first.')); 
+        this.connectPromise = null;
         return; 
       }
       
       this.currentAppId = id;
       
       // Already connected
-      if (this.ws?.readyState === WebSocket.OPEN) { resolve(); return; }
+      if (this.ws?.readyState === WebSocket.OPEN) { resolve(); this.connectPromise = null; return; }
       
-      // Close any existing connection
+      // Close any existing connection cleanly
       if (this.ws) {
-        try { this.ws.close(); } catch {}
+        try { this.ws.onclose = null; this.ws.onerror = null; this.ws.close(); } catch {}
         this.ws = null;
       }
       
@@ -55,6 +63,7 @@ class DerivWS {
           clearTimeout(connectionTimeout);
           this._isConnected = true;
           this.reconnectAttempts = 0;
+          this.connectPromise = null;
           console.log('[DerivWS] Connected successfully');
           resolve();
         };
@@ -112,12 +121,15 @@ class DerivWS {
           clearTimeout(connectionTimeout);
           console.error('[DerivWS] WebSocket error');
           this._isConnected = false;
+          this.connectPromise = null;
           reject(new Error('WebSocket connection failed. Verify your App ID is valid.'));
         };
       } catch (err) {
+        this.connectPromise = null;
         reject(err);
       }
     });
+    return this.connectPromise;
   }
 
   disconnect() {
