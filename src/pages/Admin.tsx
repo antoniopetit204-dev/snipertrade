@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getUser, getSettings, setUser, ADMIN_ACCOUNT, type AdminSettings } from '@/lib/store';
-import { fetchSettings, updateSettings, fetchBots, createBot, deleteBot as dbDeleteBot, toggleBotEnabled } from '@/lib/db';
+import { fetchSettings, updateSettings, fetchBots, createBot, deleteBot as dbDeleteBot, toggleBotEnabled, fetchMpesaConfig, updateMpesaConfig, fetchAccessRequests, updateAccessRequestStatus, fetchPurchases, type MpesaConfig } from '@/lib/db';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
@@ -9,7 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-import { Settings, Bot as BotIcon, Globe, Shield, LogOut, Activity, Plus, Trash2, Key, AppWindow, Users, Palette, Crown, Lock } from 'lucide-react';
+import { Settings, Bot as BotIcon, Globe, Shield, LogOut, Activity, Plus, Trash2, Key, AppWindow, Users, Palette, Crown, Lock, Smartphone, CheckCircle, XCircle, Clock } from 'lucide-react';
 import { motion } from 'framer-motion';
 import type { Bot } from '@/lib/store';
 
@@ -19,10 +19,12 @@ const Admin = () => {
   const { toast } = useToast();
   const [settings, setSettings] = useState<AdminSettings | null>(null);
   const [bots, setBots] = useState<Bot[]>([]);
-  const [newBot, setNewBot] = useState({ name: '', description: '', strategy: '', category: 'free' as 'free' | 'premium' });
+  const [newBot, setNewBot] = useState({ name: '', description: '', strategy: '', category: 'free' as 'free' | 'premium', price: 0 });
   const [loading, setLoading] = useState(true);
+  const [mpesaConfig, setMpesaConfig] = useState<Omit<MpesaConfig, 'id'>>({ consumerKey: '', consumerSecret: '', shortcode: '', passkey: '', environment: 'sandbox' });
+  const [accessRequests, setAccessRequests] = useState<any[]>([]);
+  const [purchases, setPurchases] = useState<any[]>([]);
 
-  // Admin login state (for users who aren't logged in yet)
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loginLoading, setLoginLoading] = useState(false);
@@ -31,9 +33,14 @@ const Admin = () => {
 
   useEffect(() => {
     const loadData = async () => {
-      const [dbSettings, dbBots] = await Promise.all([fetchSettings(), fetchBots()]);
+      const [dbSettings, dbBots, dbMpesa, dbRequests, dbPurchases] = await Promise.all([
+        fetchSettings(), fetchBots(), fetchMpesaConfig(), fetchAccessRequests(), fetchPurchases(),
+      ]);
       if (dbSettings) setSettings(dbSettings);
       setBots(dbBots);
+      if (dbMpesa) setMpesaConfig({ consumerKey: dbMpesa.consumerKey, consumerSecret: dbMpesa.consumerSecret, shortcode: dbMpesa.shortcode, passkey: dbMpesa.passkey, environment: dbMpesa.environment });
+      setAccessRequests(dbRequests);
+      setPurchases(dbPurchases);
       setLoading(false);
     };
     if (isAdmin) loadData();
@@ -58,11 +65,12 @@ const Admin = () => {
   const handleSaveSettings = async () => {
     if (!settings) return;
     const success = await updateSettings(settings);
-    if (success) {
-      toast({ title: 'Settings saved to database' });
-    } else {
-      toast({ title: 'Failed to save', variant: 'destructive' });
-    }
+    toast({ title: success ? 'Settings saved' : 'Failed to save', variant: success ? 'default' : 'destructive' });
+  };
+
+  const handleSaveMpesa = async () => {
+    const success = await updateMpesaConfig(mpesaConfig);
+    toast({ title: success ? 'M-Pesa config saved' : 'Failed to save', variant: success ? 'default' : 'destructive' });
   };
 
   const handleToggleBot = async (id: string) => {
@@ -86,6 +94,7 @@ const Admin = () => {
       strategy: newBot.strategy || 'Custom',
       enabled: false,
       category: newBot.category,
+      price: newBot.price,
     });
     if (data) {
       setBots([...bots, {
@@ -99,15 +108,21 @@ const Admin = () => {
         trades: 0,
         winRate: 0,
         category: data.category as 'free' | 'premium',
+        price: Number(data.price || 0),
       }]);
-      setNewBot({ name: '', description: '', strategy: '', category: 'free' });
+      setNewBot({ name: '', description: '', strategy: '', category: 'free', price: 0 });
       toast({ title: `${data.name} created` });
     }
   };
 
+  const handleRequestAction = async (id: string, status: string) => {
+    await updateAccessRequestStatus(id, status);
+    setAccessRequests(accessRequests.map(r => r.id === id ? { ...r, status } : r));
+    toast({ title: `Request ${status}` });
+  };
+
   const handleLogout = () => { setUser(null); navigate('/'); };
 
-  // Admin login form
   if (!isAdmin) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background geometric-bg p-4">
@@ -134,8 +149,7 @@ const Admin = () => {
               </Button>
             </form>
             <div className="mt-4 flex items-center justify-center gap-1.5 text-[10px] sm:text-xs text-muted-foreground">
-              <Lock className="h-3 w-3" />
-              <span>Secured admin access</span>
+              <Lock className="h-3 w-3" /><span>Secured admin access</span>
             </div>
           </div>
         </motion.div>
@@ -164,11 +178,9 @@ const Admin = () => {
             <p className="text-[10px] sm:text-xs text-muted-foreground truncate max-w-[150px] sm:max-w-none">{user.email}</p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={handleLogout} className="text-loss border-border hover:bg-loss/10 text-xs h-7 sm:h-8">
-            <LogOut className="h-3 w-3 sm:mr-1" /> <span className="hidden sm:inline">Logout</span>
-          </Button>
-        </div>
+        <Button variant="outline" size="sm" onClick={handleLogout} className="text-loss border-border hover:bg-loss/10 text-xs h-7 sm:h-8">
+          <LogOut className="h-3 w-3 sm:mr-1" /> <span className="hidden sm:inline">Logout</span>
+        </Button>
       </header>
 
       <div className="max-w-5xl mx-auto p-3 sm:p-6">
@@ -178,9 +190,10 @@ const Admin = () => {
               { value: 'api', icon: Key, label: 'API' },
               { value: 'general', icon: Globe, label: 'General' },
               { value: 'bots', icon: BotIcon, label: 'Bots' },
+              { value: 'mpesa', icon: Smartphone, label: 'M-Pesa' },
+              { value: 'requests', icon: Users, label: 'Requests' },
               { value: 'seo', icon: AppWindow, label: 'SEO' },
               { value: 'appearance', icon: Palette, label: 'Look' },
-              { value: 'users', icon: Users, label: 'Users' },
             ].map(tab => (
               <TabsTrigger key={tab.value} value={tab.value} className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground text-[10px] sm:text-xs px-2 sm:px-3 py-1 sm:py-1.5">
                 <tab.icon className="h-3 w-3 mr-1" /> {tab.label}
@@ -273,6 +286,7 @@ const Admin = () => {
                     <option value="free">Free</option>
                     <option value="premium">Premium</option>
                   </select>
+                  <Input value={newBot.price} onChange={e => setNewBot({ ...newBot, price: Number(e.target.value) || 0 })} placeholder="Price (KES)" type="number" className={inputClass} />
                 </div>
                 <Button onClick={handleAddBot} className="bg-primary text-primary-foreground hover:bg-primary/90 text-xs sm:text-sm">
                   <Plus className="h-3 w-3 mr-1" /> Add Bot
@@ -294,22 +308,118 @@ const Admin = () => {
                             {bot.category === 'premium' && <Crown className="h-3 w-3 text-primary shrink-0" />}
                           </p>
                           <p className="text-[10px] sm:text-xs text-muted-foreground truncate">
-                            {bot.strategy} • {bot.trades} trades • <span className={bot.category === 'free' ? 'text-profit' : 'text-primary'}>{bot.category}</span>
+                            {bot.strategy} • {bot.category} {bot.price > 0 ? `• KES ${bot.price}` : ''}
                           </p>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-                        <span className={`text-xs sm:text-sm font-mono ${bot.profitLoss >= 0 ? 'text-profit' : 'text-loss'}`}>
-                          {bot.profitLoss >= 0 ? '+' : ''}${bot.profitLoss.toFixed(0)}
-                        </span>
-                        <Button variant="ghost" size="sm" onClick={() => handleDeleteBot(bot.id)} className="text-loss hover:text-loss hover:bg-loss/10 h-7 w-7 p-0">
-                          <Trash2 className="h-3 w-3" />
-                        </Button>
-                      </div>
+                      <Button variant="ghost" size="sm" onClick={() => handleDeleteBot(bot.id)} className="text-loss hover:text-loss hover:bg-loss/10 h-7 w-7 p-0">
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
                     </div>
                   ))}
                 </div>
               </div>
+            </motion.div>
+          </TabsContent>
+
+          {/* M-Pesa */}
+          <TabsContent value="mpesa">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="bg-card border border-border rounded-lg p-4 sm:p-6 space-y-4 sm:space-y-5">
+              <h2 className="text-sm sm:text-base font-semibold text-foreground flex items-center gap-2">
+                <Smartphone className="h-4 w-4 text-primary" /> M-Pesa Daraja Configuration
+              </h2>
+              <p className="text-[10px] sm:text-xs text-muted-foreground">
+                Get credentials from <a href="https://developer.safaricom.co.ke" target="_blank" className="text-primary hover:underline">Safaricom Developer Portal</a>. Use Paybill (CustomerPayBillOnline).
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                <div className="space-y-2">
+                  <Label className={labelClass}>Consumer Key</Label>
+                  <Input value={mpesaConfig.consumerKey} onChange={e => setMpesaConfig({ ...mpesaConfig, consumerKey: e.target.value })} placeholder="Consumer Key" className={`${inputClass} font-mono`} />
+                </div>
+                <div className="space-y-2">
+                  <Label className={labelClass}>Consumer Secret</Label>
+                  <Input value={mpesaConfig.consumerSecret} onChange={e => setMpesaConfig({ ...mpesaConfig, consumerSecret: e.target.value })} type="password" placeholder="Consumer Secret" className={`${inputClass} font-mono`} />
+                </div>
+                <div className="space-y-2">
+                  <Label className={labelClass}>Paybill / Shortcode</Label>
+                  <Input value={mpesaConfig.shortcode} onChange={e => setMpesaConfig({ ...mpesaConfig, shortcode: e.target.value })} placeholder="e.g. 174379" className={`${inputClass} font-mono`} />
+                </div>
+                <div className="space-y-2">
+                  <Label className={labelClass}>Passkey</Label>
+                  <Input value={mpesaConfig.passkey} onChange={e => setMpesaConfig({ ...mpesaConfig, passkey: e.target.value })} type="password" placeholder="Lipa Na M-Pesa Passkey" className={`${inputClass} font-mono`} />
+                </div>
+                <div className="space-y-2">
+                  <Label className={labelClass}>Environment</Label>
+                  <select value={mpesaConfig.environment} onChange={e => setMpesaConfig({ ...mpesaConfig, environment: e.target.value as 'sandbox' | 'production' })}
+                    className="w-full bg-secondary border border-border text-foreground rounded-md px-3 py-2 text-xs sm:text-sm">
+                    <option value="sandbox">Sandbox (Testing)</option>
+                    <option value="production">Production (Live)</option>
+                  </select>
+                </div>
+              </div>
+              <Button onClick={handleSaveMpesa} className="bg-primary text-primary-foreground hover:bg-primary/90 text-xs sm:text-sm">Save M-Pesa Config</Button>
+
+              {/* Recent Payments */}
+              {purchases.length > 0 && (
+                <div className="mt-6">
+                  <h3 className="text-xs sm:text-sm font-semibold text-foreground mb-3">Recent Payments</h3>
+                  <div className="space-y-2 max-h-[300px] overflow-y-auto">
+                    {purchases.map((p: any) => (
+                      <div key={p.id} className="flex items-center justify-between bg-secondary/50 rounded-lg p-3 text-xs">
+                        <div>
+                          <p className="font-medium text-foreground">{p.phone_number} • KES {p.amount}</p>
+                          <p className="text-muted-foreground">{p.deriv_account} • {new Date(p.created_at).toLocaleDateString()}</p>
+                        </div>
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${
+                          p.status === 'completed' ? 'bg-profit/20 text-profit' :
+                          p.status === 'cancelled' ? 'bg-loss/20 text-loss' :
+                          'bg-primary/20 text-primary'
+                        }`}>{p.status}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </motion.div>
+          </TabsContent>
+
+          {/* Access Requests */}
+          <TabsContent value="requests">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="bg-card border border-border rounded-lg p-4 sm:p-6 space-y-4">
+              <h2 className="text-sm sm:text-base font-semibold text-foreground flex items-center gap-2">
+                <Users className="h-4 w-4 text-primary" /> Access Requests & User Management
+              </h2>
+              {accessRequests.length === 0 ? (
+                <p className="text-xs sm:text-sm text-muted-foreground text-center py-4">No access requests yet.</p>
+              ) : (
+                <div className="space-y-2">
+                  {accessRequests.map((r: any) => (
+                    <div key={r.id} className="flex items-center justify-between bg-secondary/50 rounded-lg p-3 gap-3">
+                      <div className="min-w-0">
+                        <p className="text-xs sm:text-sm font-medium text-foreground truncate">{r.deriv_account}</p>
+                        <p className="text-[10px] sm:text-xs text-muted-foreground truncate">{r.message}</p>
+                        <p className="text-[10px] text-muted-foreground">{new Date(r.created_at).toLocaleDateString()}</p>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        {r.status === 'pending' ? (
+                          <>
+                            <Button size="sm" onClick={() => handleRequestAction(r.id, 'approved')} className="bg-profit/20 text-profit hover:bg-profit/30 h-7 text-xs">
+                              <CheckCircle className="h-3 w-3 mr-1" /> Approve
+                            </Button>
+                            <Button size="sm" onClick={() => handleRequestAction(r.id, 'rejected')} className="bg-loss/20 text-loss hover:bg-loss/30 h-7 text-xs">
+                              <XCircle className="h-3 w-3 mr-1" /> Reject
+                            </Button>
+                          </>
+                        ) : (
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${
+                            r.status === 'approved' ? 'bg-profit/20 text-profit' : 'bg-loss/20 text-loss'
+                          }`}>{r.status}</span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </motion.div>
           </TabsContent>
 
@@ -362,22 +472,6 @@ const Admin = () => {
                 </div>
               </div>
               <Button onClick={handleSaveSettings} className="bg-primary text-primary-foreground hover:bg-primary/90 text-xs sm:text-sm">Save Appearance</Button>
-            </motion.div>
-          </TabsContent>
-
-          {/* Users */}
-          <TabsContent value="users">
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="bg-card border border-border rounded-lg p-4 sm:p-6 space-y-4 sm:space-y-5">
-              <h2 className="text-sm sm:text-base font-semibold text-foreground flex items-center gap-2">
-                <Users className="h-4 w-4 text-primary" /> User Management
-              </h2>
-              <p className="text-xs sm:text-sm text-muted-foreground">
-                Users authenticate via Deriv OAuth. They login through the landing page and are authenticated automatically. Accounts are managed by Deriv.
-              </p>
-              <div className="bg-secondary/50 border border-border rounded-lg p-3 sm:p-4 space-y-2">
-                <p className="text-[10px] sm:text-xs text-muted-foreground">Admin Account:</p>
-                <p className="text-xs sm:text-sm font-mono text-foreground">{user?.email}</p>
-              </div>
             </motion.div>
           </TabsContent>
         </Tabs>
