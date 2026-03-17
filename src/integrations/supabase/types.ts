@@ -14,6 +14,44 @@ export type Database = {
   }
   public: {
     Tables: {
+      access_requests: {
+        Row: {
+          bot_id: string | null
+          created_at: string
+          deriv_account: string
+          id: string
+          message: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          bot_id?: string | null
+          created_at?: string
+          deriv_account: string
+          id?: string
+          message?: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          bot_id?: string | null
+          created_at?: string
+          deriv_account?: string
+          id?: string
+          message?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "access_requests_bot_id_fkey"
+            columns: ["bot_id"]
+            isOneToOne: false
+            referencedRelation: "bots"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       admin_settings: {
         Row: {
           allow_signups: boolean
@@ -103,6 +141,7 @@ export type Database = {
           enabled: boolean
           id: string
           name: string
+          price: number
           profit_loss: number
           strategy: string
           trades: number
@@ -116,6 +155,7 @@ export type Database = {
           enabled?: boolean
           id?: string
           name: string
+          price?: number
           profit_loss?: number
           strategy?: string
           trades?: number
@@ -129,6 +169,7 @@ export type Database = {
           enabled?: boolean
           id?: string
           name?: string
+          price?: number
           profit_loss?: number
           strategy?: string
           trades?: number
@@ -136,6 +177,86 @@ export type Database = {
           win_rate?: number
         }
         Relationships: []
+      }
+      mpesa_config: {
+        Row: {
+          consumer_key: string
+          consumer_secret: string
+          created_at: string
+          environment: string
+          id: string
+          passkey: string
+          shortcode: string
+          updated_at: string
+        }
+        Insert: {
+          consumer_key?: string
+          consumer_secret?: string
+          created_at?: string
+          environment?: string
+          id?: string
+          passkey?: string
+          shortcode?: string
+          updated_at?: string
+        }
+        Update: {
+          consumer_key?: string
+          consumer_secret?: string
+          created_at?: string
+          environment?: string
+          id?: string
+          passkey?: string
+          shortcode?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      purchases: {
+        Row: {
+          amount: number
+          bot_id: string | null
+          created_at: string
+          deriv_account: string
+          id: string
+          mpesa_checkout_request_id: string | null
+          mpesa_receipt: string | null
+          phone_number: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          amount?: number
+          bot_id?: string | null
+          created_at?: string
+          deriv_account: string
+          id?: string
+          mpesa_checkout_request_id?: string | null
+          mpesa_receipt?: string | null
+          phone_number: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          bot_id?: string | null
+          created_at?: string
+          deriv_account?: string
+          id?: string
+          mpesa_checkout_request_id?: string | null
+          mpesa_receipt?: string | null
+          phone_number?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "purchases_bot_id_fkey"
+            columns: ["bot_id"]
+            isOneToOne: false
+            referencedRelation: "bots"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_sessions: {
         Row: {
