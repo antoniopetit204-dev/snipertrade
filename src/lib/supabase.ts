@@ -1,13 +1,2 @@
-import { createClient } from '@supabase/supabase-js';
-
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
-
-if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-  console.warn('Supabase env vars not set');
-}
-
-export const supabase = createClient(
-  SUPABASE_URL || '',
-  SUPABASE_ANON_KEY || ''
-);
+// Re-export supabase client from the auto-generated integration
+export { supabase } from '@/integrations/supabase/client';
