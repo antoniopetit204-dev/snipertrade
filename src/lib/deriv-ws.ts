@@ -63,6 +63,7 @@ class DerivWS {
           clearTimeout(connectionTimeout);
           this._isConnected = true;
           this.reconnectAttempts = 0;
+          this.connectPromise = null;
           console.log('[DerivWS] Connected successfully');
           resolve();
         };
