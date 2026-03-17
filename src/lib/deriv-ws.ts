@@ -125,9 +125,11 @@ class DerivWS {
           reject(new Error('WebSocket connection failed. Verify your App ID is valid.'));
         };
       } catch (err) {
+        this.connectPromise = null;
         reject(err);
       }
     });
+    return this.connectPromise;
   }
 
   disconnect() {
