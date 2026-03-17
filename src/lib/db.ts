@@ -62,7 +62,7 @@ export const updateSettings = async (settings: AdminSettings) => {
       terms_url: settings.termsUrl,
       privacy_url: settings.privacyUrl,
     })
-    .not('id', 'is', null); // update all rows (single row table)
+    .not('id', 'is', null);
   return !error;
 };
 
@@ -85,6 +85,7 @@ export const fetchBots = async (): Promise<Bot[]> => {
     trades: b.trades,
     winRate: Number(b.win_rate),
     category: b.category,
+    price: Number(b.price || 0),
   }));
 };
 
@@ -97,6 +98,7 @@ export const createBot = async (bot: Omit<Bot, 'id' | 'createdAt' | 'profitLoss'
       strategy: bot.strategy,
       enabled: bot.enabled,
       category: bot.category,
+      price: bot.price || 0,
     })
     .select()
     .single();
@@ -132,4 +134,96 @@ export const fetchActiveSessions = async () => {
     .eq('is_active', true)
     .order('last_login', { ascending: false });
   return data || [];
+};
+
+// ---- M-Pesa Config ----
+
+export interface MpesaConfig {
+  id: string;
+  consumerKey: string;
+  consumerSecret: string;
+  shortcode: string;
+  passkey: string;
+  environment: 'sandbox' | 'production';
+}
+
+export const fetchMpesaConfig = async (): Promise<MpesaConfig | null> => {
+  const { data, error } = await supabase
+    .from('mpesa_config')
+    .select('*')
+    .limit(1)
+    .single();
+  if (error || !data) return null;
+  return {
+    id: data.id,
+    consumerKey: data.consumer_key,
+    consumerSecret: data.consumer_secret,
+    shortcode: data.shortcode,
+    passkey: data.passkey,
+    environment: data.environment,
+  };
+};
+
+export const updateMpesaConfig = async (config: Omit<MpesaConfig, 'id'>) => {
+  const { error } = await supabase
+    .from('mpesa_config')
+    .update({
+      consumer_key: config.consumerKey,
+      consumer_secret: config.consumerSecret,
+      shortcode: config.shortcode,
+      passkey: config.passkey,
+      environment: config.environment,
+    })
+    .not('id', 'is', null);
+  return !error;
+};
+
+// ---- Purchases ----
+
+export const fetchPurchases = async () => {
+  const { data } = await supabase
+    .from('purchases')
+    .select('*')
+    .order('created_at', { ascending: false });
+  return data || [];
+};
+
+// ---- Access Requests ----
+
+export const createAccessRequest = async (derivAccount: string, botId: string, message: string) => {
+  return supabase.from('access_requests').insert({
+    deriv_account: derivAccount,
+    bot_id: botId,
+    message,
+  });
+};
+
+export const fetchAccessRequests = async () => {
+  const { data } = await supabase
+    .from('access_requests')
+    .select('*')
+    .order('created_at', { ascending: false });
+  return data || [];
+};
+
+export const updateAccessRequestStatus = async (id: string, status: string) => {
+  return supabase.from('access_requests').update({ status }).eq('id', id);
+};
+
+// ---- M-Pesa STK Push (calls edge function) ----
+
+export const initiateStkPush = async (phoneNumber: string, amount: number, botId: string, derivAccount: string) => {
+  const { data, error } = await supabase.functions.invoke('mpesa-stk', {
+    body: { phone_number: phoneNumber, amount, bot_id: botId, deriv_account: derivAccount },
+  });
+  if (error) throw error;
+  return data;
+};
+
+export const queryStkStatus = async (checkoutRequestId: string) => {
+  const { data, error } = await supabase.functions.invoke('mpesa-stk?action=query', {
+    body: { checkout_request_id: checkoutRequestId },
+  });
+  if (error) throw error;
+  return data;
 };
