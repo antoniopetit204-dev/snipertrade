@@ -1,4 +1,4 @@
-import { Activity, BarChart3, Bot, LineChart, LogOut, TrendingUp, Wallet, ChevronLeft, ChevronRight, BookOpen, Copy, Shield, Lightbulb, Gift, Wrench, X } from 'lucide-react';
+import { Activity, BarChart3, Bot, LineChart, LogOut, TrendingUp, Wallet, ChevronLeft, ChevronRight, BookOpen, Copy, Shield, Lightbulb, Gift, Wrench, X, Crosshair } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { setUser, getSettings, getUser } from '@/lib/store';
 import { useState } from 'react';
@@ -7,6 +7,7 @@ import { derivWS } from '@/lib/deriv-ws';
 
 const navItems = [
   { label: 'Dashboard', icon: TrendingUp, path: '/dashboard' },
+  { label: 'Trader', icon: Crosshair, path: '/dashboard/trader' },
   { label: 'Bot Builder', icon: Wrench, path: '/dashboard/bot-builder' },
   { label: 'Free Bots', icon: Gift, path: '/dashboard/free-bots' },
   { label: 'DBots', icon: Bot, path: '/dashboard/bots' },
@@ -53,7 +54,6 @@ export const DashboardSidebar = ({ onClose }: SidebarProps) => {
             {settings.siteName || 'HFT Pro'}
           </span>
         )}
-        {/* Mobile close button */}
         {!collapsed && onClose && (
           <button onClick={onClose} className="lg:hidden p-1 rounded hover:bg-accent">
             <X className="h-4 w-4 text-muted-foreground" />
@@ -77,9 +77,7 @@ export const DashboardSidebar = ({ onClose }: SidebarProps) => {
               onClick={() => handleNav(item.path)}
               className={cn(
                 "w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors",
-                active
-                  ? "bg-primary/10 text-primary font-medium"
-                  : "text-muted-foreground hover:text-foreground hover:bg-accent"
+                active ? "bg-primary/10 text-primary font-medium" : "text-muted-foreground hover:text-foreground hover:bg-accent"
               )}
             >
               <item.icon className="h-4 w-4 shrink-0" />

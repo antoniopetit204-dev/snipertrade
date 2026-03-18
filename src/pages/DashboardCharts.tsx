@@ -1,7 +1,7 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState } from 'react';
 import { DashboardLayout } from '@/components/DashboardLayout';
 import { TradingViewChart } from '@/components/TradingViewChart';
-import { QuickTradePanel } from '@/components/QuickTradePanel';
+import { TradingPanel } from '@/components/TradingPanel';
 import { getUser } from '@/lib/store';
 import { useDerivConnection, useActiveSymbols } from '@/hooks/useDerivWS';
 import { derivWS } from '@/lib/deriv-ws';
@@ -32,12 +32,11 @@ const DashboardCharts = () => {
 
   useEffect(() => {
     if (symbols.length > 0 && !selectedSymbol) {
-      const vol = symbols.find(s => s.symbol.startsWith('R_')) || symbols[0];
+      const vol = symbols.find((s: any) => s.symbol.startsWith('R_')) || symbols[0];
       setSelectedSymbol(vol.symbol);
     }
   }, [symbols, selectedSymbol]);
 
-  // Live tick subscription for price display
   useEffect(() => {
     if (!connected || !selectedSymbol) return;
     derivWS.subscribeTicks(selectedSymbol).catch(() => {});
@@ -55,12 +54,12 @@ const DashboardCharts = () => {
 
   if (!user) return null;
 
-  const filteredSymbols = symbols.filter(s =>
+  const filteredSymbols = symbols.filter((s: any) =>
     s.display_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     s.symbol?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const displayName = symbols.find(s => s.symbol === selectedSymbol)?.display_name || selectedSymbol;
+  const displayName = symbols.find((s: any) => s.symbol === selectedSymbol)?.display_name || selectedSymbol;
 
   return (
     <DashboardLayout title="Live Charts" icon={<LineChartIcon className="h-5 w-5 text-primary" />}
@@ -95,7 +94,7 @@ const DashboardCharts = () => {
                       className="w-full bg-secondary border-border text-foreground text-sm px-3 py-2 rounded-md outline-none focus:ring-1 focus:ring-primary" autoFocus />
                   </div>
                   <div className="overflow-y-auto max-h-60">
-                    {filteredSymbols.map(s => (
+                    {filteredSymbols.map((s: any) => (
                       <button key={s.symbol} onClick={() => { setSelectedSymbol(s.symbol); setShowSymbolPicker(false); setSearchTerm(''); setLivePrice(null); }}
                         className={`w-full text-left px-3 py-2 text-sm hover:bg-accent transition-colors ${s.symbol === selectedSymbol ? 'bg-primary/10 text-primary' : 'text-foreground'}`}>
                         <span className="font-medium">{s.display_name}</span>
@@ -110,7 +109,6 @@ const DashboardCharts = () => {
         </div>
       }>
       <div className="space-y-4">
-        {/* Mobile price display */}
         {livePrice !== null && (
           <div className="sm:hidden flex items-center justify-between bg-card border border-border rounded-lg p-3">
             <span className="text-lg font-mono font-bold text-foreground">{livePrice.toFixed(4)}</span>
@@ -121,7 +119,6 @@ const DashboardCharts = () => {
           </div>
         )}
 
-        {/* Timeframe selector */}
         <div className="flex items-center gap-1 overflow-x-auto pb-1">
           {granularityOptions.map(g => (
             <button key={g.value} onClick={() => setGranularity(g.value)}
@@ -133,7 +130,6 @@ const DashboardCharts = () => {
           ))}
         </div>
 
-        {/* TradingView Chart */}
         <div className="bg-card border border-border rounded-lg p-2 sm:p-4">
           <h2 className="text-xs sm:text-sm font-semibold text-foreground mb-2 sm:mb-4">{displayName} — OHLC Candlestick</h2>
           {connected && selectedSymbol ? (
@@ -148,7 +144,7 @@ const DashboardCharts = () => {
 
       <AnimatePresence>
         {selectedTrade && (
-          <QuickTradePanel symbol={selectedTrade.symbol} displayName={selectedTrade.displayName} currentPrice={selectedTrade.price} onClose={() => setSelectedTrade(null)} />
+          <TradingPanel symbol={selectedTrade.symbol} displayName={selectedTrade.displayName} currentPrice={selectedTrade.price} onClose={() => setSelectedTrade(null)} />
         )}
       </AnimatePresence>
     </DashboardLayout>

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { DashboardLayout } from '@/components/DashboardLayout';
-import { QuickTradePanel } from '@/components/QuickTradePanel';
+import { TradingPanel } from '@/components/TradingPanel';
+import { OpenPositions } from '@/components/OpenPositions';
 import { getUser } from '@/lib/store';
 import { useDerivConnection } from '@/hooks/useDerivWS';
 import { derivWS } from '@/lib/deriv-ws';
@@ -13,7 +14,6 @@ const Dashboard = () => {
   const { connected, authorized, balance, currency, connecting } = useDerivConnection();
   const [symbols, setSymbols] = useState<any[]>([]);
   const [ticks, setTicks] = useState<Record<string, { quote: number; change: number }>>({});
-  const [openContracts, setOpenContracts] = useState<any[]>([]);
   const [profitTable, setProfitTable] = useState<any[]>([]);
   const [selectedTrade, setSelectedTrade] = useState<{ symbol: string; displayName: string; price: number } | null>(null);
 
@@ -32,10 +32,6 @@ const Dashboard = () => {
       } catch {}
 
       if (authorized) {
-        try {
-          const portfolio = await derivWS.getOpenContracts();
-          if (portfolio.portfolio?.contracts) setOpenContracts(portfolio.portfolio.contracts);
-        } catch {}
         try {
           const profits = await derivWS.getProfitTable(10);
           if (profits.profit_table?.transactions) setProfitTable(profits.profit_table.transactions);
@@ -59,12 +55,11 @@ const Dashboard = () => {
     const unsubContract = derivWS.subscribe('proposal_open_contract', (data) => {
       if (data.proposal_open_contract?.is_sold) {
         const c = data.proposal_open_contract;
-        const profit = c.profit;
         tradeNotifications.notify({
-          type: profit >= 0 ? 'win' : 'loss',
-          title: profit >= 0 ? 'Trade Won!' : 'Trade Lost',
+          type: c.profit >= 0 ? 'win' : 'loss',
+          title: c.profit >= 0 ? 'Trade Won!' : 'Trade Lost',
           message: `${c.display_name || c.underlying} — ${c.contract_type}`,
-          profit,
+          profit: c.profit,
         });
       }
     });
@@ -75,16 +70,15 @@ const Dashboard = () => {
   if (!user) return null;
 
   return (
-    <DashboardLayout title="Trading Dashboard" icon={<TrendingUp className="h-5 w-5 text-primary" />}
-      subtitle={user.activeAccount ? `Account: ${user.activeAccount.acct}` : user.email}>
+    <DashboardLayout title="Trading Dashboard" icon={<TrendingUp className="h-5 w-5 text-primary" />}>
       <div className="space-y-4 sm:space-y-6">
         {/* Stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-4">
           {[
             { label: 'Balance', value: balance !== null ? `${balance.toFixed(2)} ${currency}` : '—', icon: Wallet, positive: true },
-            { label: 'Open Positions', value: openContracts.length.toString(), icon: Zap, positive: true },
             { label: 'Active Symbols', value: symbols.length.toString(), icon: BarChart3, positive: true },
-            { label: 'Connection', value: connecting ? 'Connecting' : connected ? 'Live' : 'Offline', icon: Activity, positive: connected },
+            { label: 'Connection', value: connecting ? 'Connecting' : connected ? (authorized ? 'Live & Auth' : 'Live') : 'Offline', icon: Activity, positive: connected },
+            { label: 'Status', value: authorized ? 'Ready to Trade' : 'View Only', icon: Zap, positive: authorized },
           ].map((stat, i) => (
             <motion.div key={stat.label} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}
               className="bg-card border border-border rounded-lg p-3 sm:p-4">
@@ -137,27 +131,8 @@ const Dashboard = () => {
             </div>
           </div>
 
-          {/* Open Contracts */}
-          <div className="bg-card border border-border rounded-lg">
-            <div className="px-3 sm:px-4 py-2 sm:py-3 border-b border-border">
-              <h2 className="text-xs sm:text-sm font-semibold text-foreground">Open Positions</h2>
-            </div>
-            <div className="p-3 sm:p-4 space-y-2 sm:space-y-3 max-h-[300px] overflow-y-auto">
-              {openContracts.length > 0 ? openContracts.map((c: any, i: number) => (
-                <div key={i} className="p-2 sm:p-3 bg-secondary/50 rounded-lg border border-border">
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs sm:text-sm font-medium text-foreground">{c.symbol}</span>
-                    <span className={`text-xs font-mono ${c.payout > c.buy_price ? 'text-profit' : 'text-loss'}`}>
-                      {c.payout > c.buy_price ? '+' : ''}{(c.payout - c.buy_price).toFixed(2)}
-                    </span>
-                  </div>
-                  <p className="text-[10px] sm:text-xs text-muted-foreground">{c.contract_type} • Buy: {c.buy_price}</p>
-                </div>
-              )) : (
-                <p className="text-xs sm:text-sm text-muted-foreground text-center py-4">No open positions</p>
-              )}
-            </div>
-          </div>
+          {/* Open Positions with sell capability */}
+          <OpenPositions />
         </div>
 
         {/* Recent Trades */}
@@ -200,7 +175,7 @@ const Dashboard = () => {
 
       <AnimatePresence>
         {selectedTrade && (
-          <QuickTradePanel symbol={selectedTrade.symbol} displayName={selectedTrade.displayName} currentPrice={selectedTrade.price} onClose={() => setSelectedTrade(null)} />
+          <TradingPanel symbol={selectedTrade.symbol} displayName={selectedTrade.displayName} currentPrice={selectedTrade.price} onClose={() => setSelectedTrade(null)} />
         )}
       </AnimatePresence>
     </DashboardLayout>

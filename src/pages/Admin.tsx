@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getUser, getSettings, setUser, ADMIN_ACCOUNT, type AdminSettings } from '@/lib/store';
-import { fetchSettings, updateSettings, fetchBots, createBot, deleteBot as dbDeleteBot, toggleBotEnabled, fetchMpesaConfig, updateMpesaConfig, fetchAccessRequests, updateAccessRequestStatus, fetchPurchases, type MpesaConfig } from '@/lib/db';
+import { fetchSettings, updateSettings, fetchBots, createBot, deleteBot as dbDeleteBot, toggleBotEnabled, updateBot as dbUpdateBot, fetchMpesaConfig, updateMpesaConfig, fetchAccessRequests, updateAccessRequestStatus, fetchPurchases, type MpesaConfig } from '@/lib/db';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
@@ -9,7 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-import { Settings, Bot as BotIcon, Globe, Shield, LogOut, Activity, Plus, Trash2, Key, AppWindow, Users, Palette, Crown, Lock, Smartphone, CheckCircle, XCircle, Clock } from 'lucide-react';
+import { Settings, Bot as BotIcon, Globe, Shield, LogOut, Activity, Plus, Trash2, Key, AppWindow, Users, Palette, Crown, Lock, Smartphone, CheckCircle, XCircle, Clock, Edit2, Save } from 'lucide-react';
 import { motion } from 'framer-motion';
 import type { Bot } from '@/lib/store';
 
@@ -24,6 +24,8 @@ const Admin = () => {
   const [mpesaConfig, setMpesaConfig] = useState<Omit<MpesaConfig, 'id'>>({ consumerKey: '', consumerSecret: '', shortcode: '', passkey: '', environment: 'sandbox' });
   const [accessRequests, setAccessRequests] = useState<any[]>([]);
   const [purchases, setPurchases] = useState<any[]>([]);
+  const [editingBot, setEditingBot] = useState<string | null>(null);
+  const [editBotData, setEditBotData] = useState<Partial<Bot>>({});
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -98,21 +100,25 @@ const Admin = () => {
     });
     if (data) {
       setBots([...bots, {
-        id: data.id,
-        name: data.name,
-        description: data.description,
-        strategy: data.strategy,
-        enabled: data.enabled,
-        createdAt: data.created_at,
-        profitLoss: 0,
-        trades: 0,
-        winRate: 0,
-        category: data.category as 'free' | 'premium',
-        price: Number(data.price || 0),
+        id: data.id, name: data.name, description: data.description, strategy: data.strategy,
+        enabled: data.enabled, createdAt: data.created_at, profitLoss: 0, trades: 0, winRate: 0,
+        category: data.category as 'free' | 'premium', price: Number(data.price || 0),
       }]);
       setNewBot({ name: '', description: '', strategy: '', category: 'free', price: 0 });
       toast({ title: `${data.name} created` });
     }
+  };
+
+  const startEditBot = (bot: Bot) => {
+    setEditingBot(bot.id);
+    setEditBotData({ name: bot.name, description: bot.description, strategy: bot.strategy, category: bot.category, price: bot.price });
+  };
+
+  const saveEditBot = async (id: string) => {
+    await dbUpdateBot(id, editBotData);
+    setBots(bots.map(b => b.id === id ? { ...b, ...editBotData } : b));
+    setEditingBot(null);
+    toast({ title: 'Bot updated' });
   };
 
   const handleRequestAction = async (id: string, status: string) => {
@@ -239,16 +245,11 @@ const Admin = () => {
               </h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 {[
-                  { key: 'siteName', label: 'Site Name' },
-                  { key: 'siteTitle', label: 'Site Title' },
-                  { key: 'contactEmail', label: 'Contact Email' },
-                  { key: 'contactPhone', label: 'Contact Phone' },
-                  { key: 'telegramLink', label: 'Telegram Link' },
-                  { key: 'supportUrl', label: 'Support URL' },
-                  { key: 'footerText', label: 'Footer Text' },
-                  { key: 'announcementBar', label: 'Announcement Bar' },
-                  { key: 'termsUrl', label: 'Terms URL' },
-                  { key: 'privacyUrl', label: 'Privacy URL' },
+                  { key: 'siteName', label: 'Site Name' }, { key: 'siteTitle', label: 'Site Title' },
+                  { key: 'contactEmail', label: 'Contact Email' }, { key: 'contactPhone', label: 'Contact Phone' },
+                  { key: 'telegramLink', label: 'Telegram Link' }, { key: 'supportUrl', label: 'Support URL' },
+                  { key: 'footerText', label: 'Footer Text' }, { key: 'announcementBar', label: 'Announcement Bar' },
+                  { key: 'termsUrl', label: 'Terms URL' }, { key: 'privacyUrl', label: 'Privacy URL' },
                 ].map(field => (
                   <div key={field.key} className="space-y-2">
                     <Label className={labelClass}>{field.label}</Label>
@@ -270,7 +271,7 @@ const Admin = () => {
             </motion.div>
           </TabsContent>
 
-          {/* Bots */}
+          {/* Bots - with full CRUD */}
           <TabsContent value="bots">
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">
               <div className="bg-card border border-border rounded-lg p-4 sm:p-6 space-y-3 sm:space-y-4">
@@ -299,24 +300,54 @@ const Admin = () => {
                 </div>
                 <div className="divide-y divide-border">
                   {bots.map(bot => (
-                    <div key={bot.id} className="px-3 sm:px-4 py-2 sm:py-3 flex items-center justify-between hover:bg-accent/30 transition-colors gap-2">
-                      <div className="flex items-center gap-2 sm:gap-4 min-w-0">
-                        <Switch checked={bot.enabled} onCheckedChange={() => handleToggleBot(bot.id)} />
-                        <div className="min-w-0">
-                          <p className="text-xs sm:text-sm font-medium text-foreground flex items-center gap-1.5 truncate">
-                            {bot.name}
-                            {bot.category === 'premium' && <Crown className="h-3 w-3 text-primary shrink-0" />}
-                          </p>
-                          <p className="text-[10px] sm:text-xs text-muted-foreground truncate">
-                            {bot.strategy} • {bot.category} {bot.price > 0 ? `• KES ${bot.price}` : ''}
-                          </p>
+                    <div key={bot.id} className="px-3 sm:px-4 py-2 sm:py-3 hover:bg-accent/30 transition-colors">
+                      {editingBot === bot.id ? (
+                        <div className="space-y-2">
+                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                            <Input value={editBotData.name || ''} onChange={e => setEditBotData({ ...editBotData, name: e.target.value })} placeholder="Name" className={`${inputClass} text-xs`} />
+                            <Input value={editBotData.strategy || ''} onChange={e => setEditBotData({ ...editBotData, strategy: e.target.value })} placeholder="Strategy" className={`${inputClass} text-xs`} />
+                            <Input value={editBotData.price || 0} onChange={e => setEditBotData({ ...editBotData, price: Number(e.target.value) || 0 })} placeholder="Price" type="number" className={`${inputClass} text-xs`} />
+                          </div>
+                          <Input value={editBotData.description || ''} onChange={e => setEditBotData({ ...editBotData, description: e.target.value })} placeholder="Description" className={`${inputClass} text-xs`} />
+                          <div className="flex items-center gap-2">
+                            <select value={editBotData.category || 'free'} onChange={e => setEditBotData({ ...editBotData, category: e.target.value as any })}
+                              className="bg-secondary border border-border text-foreground rounded-md px-2 py-1 text-xs">
+                              <option value="free">Free</option>
+                              <option value="premium">Premium</option>
+                            </select>
+                            <Button size="sm" onClick={() => saveEditBot(bot.id)} className="bg-profit/20 text-profit hover:bg-profit/30 h-7 text-xs">
+                              <Save className="h-3 w-3 mr-1" /> Save
+                            </Button>
+                            <Button size="sm" variant="ghost" onClick={() => setEditingBot(null)} className="h-7 text-xs text-muted-foreground">Cancel</Button>
+                          </div>
                         </div>
-                      </div>
-                      <Button variant="ghost" size="sm" onClick={() => handleDeleteBot(bot.id)} className="text-loss hover:text-loss hover:bg-loss/10 h-7 w-7 p-0">
-                        <Trash2 className="h-3 w-3" />
-                      </Button>
+                      ) : (
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2 sm:gap-4 min-w-0">
+                            <Switch checked={bot.enabled} onCheckedChange={() => handleToggleBot(bot.id)} />
+                            <div className="min-w-0">
+                              <p className="text-xs sm:text-sm font-medium text-foreground flex items-center gap-1.5 truncate">
+                                {bot.name}
+                                {bot.category === 'premium' && <Crown className="h-3 w-3 text-primary shrink-0" />}
+                              </p>
+                              <p className="text-[10px] sm:text-xs text-muted-foreground truncate">
+                                {bot.strategy} • {bot.category} {bot.price > 0 ? `• KES ${bot.price}` : ''}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1 shrink-0">
+                            <Button variant="ghost" size="sm" onClick={() => startEditBot(bot)} className="text-primary hover:text-primary hover:bg-primary/10 h-7 w-7 p-0">
+                              <Edit2 className="h-3 w-3" />
+                            </Button>
+                            <Button variant="ghost" size="sm" onClick={() => handleDeleteBot(bot.id)} className="text-loss hover:text-loss hover:bg-loss/10 h-7 w-7 p-0">
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   ))}
+                  {bots.length === 0 && <p className="px-4 py-4 text-xs text-muted-foreground text-center">No bots yet</p>}
                 </div>
               </div>
             </motion.div>
@@ -359,7 +390,6 @@ const Admin = () => {
               </div>
               <Button onClick={handleSaveMpesa} className="bg-primary text-primary-foreground hover:bg-primary/90 text-xs sm:text-sm">Save M-Pesa Config</Button>
 
-              {/* Recent Payments */}
               {purchases.length > 0 && (
                 <div className="mt-6">
                   <h3 className="text-xs sm:text-sm font-semibold text-foreground mb-3">Recent Payments</h3>
@@ -371,9 +401,7 @@ const Admin = () => {
                           <p className="text-muted-foreground">{p.deriv_account} • {new Date(p.created_at).toLocaleDateString()}</p>
                         </div>
                         <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${
-                          p.status === 'completed' ? 'bg-profit/20 text-profit' :
-                          p.status === 'cancelled' ? 'bg-loss/20 text-loss' :
-                          'bg-primary/20 text-primary'
+                          p.status === 'completed' ? 'bg-profit/20 text-profit' : p.status === 'cancelled' ? 'bg-loss/20 text-loss' : 'bg-primary/20 text-primary'
                         }`}>{p.status}</span>
                       </div>
                     ))}
