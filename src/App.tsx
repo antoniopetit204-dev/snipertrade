@@ -15,6 +15,7 @@ import DashboardCharts from "./pages/DashboardCharts";
 import DashboardTutorial from "./pages/DashboardTutorial";
 import DashboardCopyTrading from "./pages/DashboardCopyTrading";
 import DashboardRisk from "./pages/DashboardRisk";
+import DashboardTrader from "./pages/DashboardTrader";
 import Admin from "./pages/Admin";
 import NotFound from "./pages/NotFound";
 
