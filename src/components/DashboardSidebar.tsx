@@ -7,7 +7,7 @@ import { derivWS } from '@/lib/deriv-ws';
 
 const navItems = [
   { label: 'Dashboard', icon: TrendingUp, path: '/dashboard' },
-  { label: 'Trader', icon: Crosshair, path: '/dashboard/trader' },
+  { label: 'Manual Trader', icon: Crosshair, path: '/dashboard/trader' },
   { label: 'Bot Builder', icon: Wrench, path: '/dashboard/bot-builder' },
   { label: 'Free Bots', icon: Gift, path: '/dashboard/free-bots' },
   { label: 'DBots', icon: Bot, path: '/dashboard/bots' },

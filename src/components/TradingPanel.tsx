@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { derivWS } from '@/lib/deriv-ws';
 import { tradeNotifications } from '@/lib/trade-notifications';
-import { TrendingUp, TrendingDown, X, Loader2, Zap, BarChart3, Gauge, Layers } from 'lucide-react';
+import { TrendingUp, TrendingDown, X, Loader2, Zap, BarChart3, Gauge, Layers, CheckCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -24,22 +24,21 @@ const CONTRACT_TABS: { id: ContractCategory; label: string; icon: any }[] = [
   { id: 'turbos', label: 'Turbos', icon: Zap },
 ];
 
-// Animated digit ball component for Over/Under
-const DigitBall = ({ digit, selected, onClick, color }: { digit: number; selected: boolean; onClick: () => void; color: 'over' | 'under' | 'neutral' }) => {
+const DigitBall = ({ digit, selected, onClick, color, isLastDigit }: { digit: number; selected: boolean; onClick: () => void; color: 'over' | 'under' | 'neutral'; isLastDigit?: boolean }) => {
   const colorMap = {
-    over: selected ? 'bg-profit text-background glow-profit' : 'bg-profit/10 text-profit hover:bg-profit/20 border-profit/30',
-    under: selected ? 'bg-loss text-background glow-loss' : 'bg-loss/10 text-loss hover:bg-loss/20 border-loss/30',
-    neutral: selected ? 'bg-primary text-primary-foreground glow-primary' : 'bg-primary/10 text-primary hover:bg-primary/20 border-primary/30',
+    over: selected ? 'bg-profit text-background shadow-lg shadow-profit/40' : 'bg-profit/10 text-profit hover:bg-profit/20 border-profit/30',
+    under: selected ? 'bg-loss text-background shadow-lg shadow-loss/40' : 'bg-loss/10 text-loss hover:bg-loss/20 border-loss/30',
+    neutral: selected ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/40' : 'bg-primary/10 text-primary hover:bg-primary/20 border-primary/30',
   };
 
   return (
     <motion.button
       onClick={onClick}
-      whileHover={{ scale: 1.15, y: -2 }}
+      whileHover={{ scale: 1.15, y: -3 }}
       whileTap={{ scale: 0.9 }}
-      animate={selected ? { scale: [1, 1.2, 1], y: [0, -8, 0] } : {}}
-      transition={selected ? { duration: 0.6, repeat: Infinity, repeatType: 'reverse' } : { type: 'spring', stiffness: 400 }}
-      className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center text-sm sm:text-base font-bold border transition-all ${colorMap[color]}`}
+      animate={isLastDigit ? { scale: [1, 1.4, 1], boxShadow: ['0 0 0px rgba(229,184,75,0)', '0 0 20px rgba(229,184,75,0.6)', '0 0 0px rgba(229,184,75,0)'] } : selected ? { y: [0, -5, 0] } : {}}
+      transition={isLastDigit ? { duration: 0.5 } : selected ? { duration: 1.5, repeat: Infinity, repeatType: 'reverse' } : { type: 'spring', stiffness: 400 }}
+      className={`w-9 h-9 sm:w-11 sm:h-11 rounded-full flex items-center justify-center text-xs sm:text-sm font-bold border transition-all ${colorMap[color]} ${isLastDigit ? 'ring-2 ring-primary ring-offset-1 ring-offset-background' : ''}`}
     >
       {digit}
     </motion.button>
@@ -54,15 +53,14 @@ export const TradingPanel = ({ symbol, displayName, currentPrice, onClose }: Tra
   const [selectedDigit, setSelectedDigit] = useState(5);
   const [multiplier, setMultiplier] = useState('10');
   const [growthRate, setGrowthRate] = useState('0.01');
-  const [vanillaStrike, setVanillaStrike] = useState('');
   const [proposals, setProposals] = useState<Record<string, any>>({});
   const [buying, setBuying] = useState<string | null>(null);
+  const [tradePlaced, setTradePlaced] = useState<string | null>(null);
   const [livePrice, setLivePrice] = useState(currentPrice);
   const [lastDigit, setLastDigit] = useState<number | null>(null);
   const [digitHistory, setDigitHistory] = useState<number[]>([]);
   const [availableContracts, setAvailableContracts] = useState<string[]>([]);
 
-  // Check available contracts for this symbol
   useEffect(() => {
     if (!derivWS.isConnected) return;
     derivWS.getContractsFor(symbol).then(resp => {
@@ -73,7 +71,6 @@ export const TradingPanel = ({ symbol, displayName, currentPrice, onClose }: Tra
     }).catch(() => {});
   }, [symbol]);
 
-  // Subscribe to live price & track last digit
   useEffect(() => {
     const unsub = derivWS.subscribe('tick', (data) => {
       if (data.tick?.symbol === symbol) {
@@ -87,7 +84,6 @@ export const TradingPanel = ({ symbol, displayName, currentPrice, onClose }: Tra
     return () => { unsub(); };
   }, [symbol]);
 
-  // Fetch proposals based on category
   useEffect(() => {
     if (!derivWS.isConnected) return;
 
@@ -98,7 +94,6 @@ export const TradingPanel = ({ symbol, displayName, currentPrice, onClose }: Tra
         currency: 'USD',
         symbol,
       };
-
       const durationParams = {
         duration: parseInt(duration) || 5,
         duration_unit: durationUnit,
@@ -161,7 +156,7 @@ export const TradingPanel = ({ symbol, displayName, currentPrice, onClose }: Tra
       }
     };
 
-    const timer = setTimeout(getProposals, 400);
+    const timer = setTimeout(getProposals, 500);
     return () => clearTimeout(timer);
   }, [symbol, stake, duration, durationUnit, category, selectedDigit, multiplier, growthRate]);
 
@@ -170,21 +165,28 @@ export const TradingPanel = ({ symbol, displayName, currentPrice, onClose }: Tra
     if (!proposal?.id) return;
 
     setBuying(contractType);
+    setTradePlaced(null);
     try {
       const result = await derivWS.buyContract(proposal.id, parseFloat(stake));
       if (result.buy) {
+        setTradePlaced(contractType);
         tradeNotifications.notify({
           type: 'info',
-          title: `${contractType} Contract Purchased`,
-          message: `${displayName} — Stake: $${stake}, ID: ${result.buy.contract_id}`,
+          title: `Trade Placed: ${contractType}`,
+          message: `${displayName} — Stake: $${stake}, Contract ID: ${result.buy.contract_id}`,
         });
-        onClose();
+        
+        // Subscribe to contract for live updates
+        derivWS.send({ proposal_open_contract: 1, contract_id: result.buy.contract_id, subscribe: 1 }).catch(() => {});
+        
+        // Auto-clear success indicator after 3s
+        setTimeout(() => setTradePlaced(null), 3000);
       }
     } catch (err: any) {
       tradeNotifications.notify({
         type: 'warning',
         title: 'Trade Failed',
-        message: err.message || 'Could not execute trade',
+        message: err.message || err.code || 'Could not execute trade',
       });
     } finally {
       setBuying(null);
@@ -211,14 +213,21 @@ export const TradingPanel = ({ symbol, displayName, currentPrice, onClose }: Tra
     };
     const IconMap = { profit: TrendingUp, loss: TrendingDown, primary: Zap };
     const Icon = IconMap[variant];
+    const isPlaced = tradePlaced === key;
     
     return (
       <Button
         onClick={() => executeTrade(key)}
         disabled={!proposals[key]?.id || buying !== null}
-        className={`${colorMap[variant]} border font-semibold h-12`}
+        className={`${isPlaced ? 'bg-profit/30 text-profit border-profit/50' : colorMap[variant]} border font-semibold h-12 transition-all`}
       >
-        {buying === key ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Icon className="h-4 w-4 mr-2" /> {label}</>}
+        {buying === key ? (
+          <Loader2 className="h-4 w-4 animate-spin" />
+        ) : isPlaced ? (
+          <><CheckCircle className="h-4 w-4 mr-2" /> Placed!</>
+        ) : (
+          <><Icon className="h-4 w-4 mr-2" /> {label}</>
+        )}
       </Button>
     );
   };
@@ -228,21 +237,23 @@ export const TradingPanel = ({ symbol, displayName, currentPrice, onClose }: Tra
       initial={{ opacity: 0, scale: 0.95, y: 10 }}
       animate={{ opacity: 1, scale: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.95, y: 10 }}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-background/60 backdrop-blur-sm p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-background/60 backdrop-blur-sm p-2 sm:p-4"
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
       <div className="bg-card border border-border rounded-xl shadow-2xl w-full max-w-lg overflow-hidden max-h-[90vh] overflow-y-auto">
         {/* Header */}
-        <div className="px-5 py-4 border-b border-border flex items-center justify-between sticky top-0 bg-card z-10">
+        <div className="px-4 py-3 border-b border-border flex items-center justify-between sticky top-0 bg-card z-10">
           <div>
-            <h3 className="text-base font-semibold text-foreground">{displayName}</h3>
-            <p className="text-lg font-mono font-bold text-primary">{livePrice.toFixed(4)}</p>
+            <h3 className="text-sm sm:text-base font-semibold text-foreground">{displayName}</h3>
+            <motion.p key={livePrice} initial={{ scale: 1.05 }} animate={{ scale: 1 }} className="text-base sm:text-lg font-mono font-bold text-primary">
+              {livePrice.toFixed(4)}
+            </motion.p>
           </div>
           <div className="flex items-center gap-2">
             {lastDigit !== null && (
               <motion.div
                 key={lastDigit}
-                initial={{ scale: 1.5, opacity: 0 }}
+                initial={{ scale: 1.8, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center"
               >
@@ -256,12 +267,12 @@ export const TradingPanel = ({ symbol, displayName, currentPrice, onClose }: Tra
         </div>
 
         {/* Contract type tabs */}
-        <div className="px-3 py-2 border-b border-border overflow-x-auto flex gap-1">
+        <div className="px-2 py-1.5 border-b border-border overflow-x-auto flex gap-1 scrollbar-none">
           {CONTRACT_TABS.map(tab => (
             <button
               key={tab.id}
-              onClick={() => { setCategory(tab.id); setProposals({}); }}
-              className={`flex items-center gap-1 px-2.5 py-1.5 rounded-md text-[10px] sm:text-xs font-medium whitespace-nowrap transition-colors ${
+              onClick={() => { setCategory(tab.id); setProposals({}); setTradePlaced(null); }}
+              className={`flex items-center gap-1 px-2 py-1.5 rounded-md text-[10px] sm:text-xs font-medium whitespace-nowrap transition-colors shrink-0 ${
                 category === tab.id ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-accent hover:text-foreground'
               }`}
             >
@@ -271,27 +282,26 @@ export const TradingPanel = ({ symbol, displayName, currentPrice, onClose }: Tra
           ))}
         </div>
 
-        <div className="p-5 space-y-4">
+        <div className="p-4 space-y-3">
           {/* Common: Stake */}
-          <div className="grid grid-cols-3 gap-3">
-            <div className="col-span-1">
-              <label className="text-xs text-muted-foreground uppercase tracking-wider block mb-1">Stake ($)</label>
+          <div className="grid grid-cols-3 gap-2">
+            <div>
+              <label className="text-[10px] sm:text-xs text-muted-foreground uppercase tracking-wider block mb-1">Stake ($)</label>
               <Input value={stake} onChange={e => setStake(e.target.value)} type="number" min="0.35" step="0.1"
-                className="bg-secondary border-border text-foreground font-mono" />
+                className="bg-secondary border-border text-foreground font-mono text-xs" />
             </div>
 
-            {/* Duration for applicable types */}
             {['rise_fall', 'over_under', 'vanillas', 'turbos'].includes(category) && (
               <>
-                <div className="col-span-1">
-                  <label className="text-xs text-muted-foreground uppercase tracking-wider block mb-1">Duration</label>
+                <div>
+                  <label className="text-[10px] sm:text-xs text-muted-foreground uppercase tracking-wider block mb-1">Duration</label>
                   <Input value={duration} onChange={e => setDuration(e.target.value)} type="number"
-                    className="bg-secondary border-border text-foreground font-mono" />
+                    className="bg-secondary border-border text-foreground font-mono text-xs" />
                 </div>
-                <div className="col-span-1">
-                  <label className="text-xs text-muted-foreground uppercase tracking-wider block mb-1">Unit</label>
+                <div>
+                  <label className="text-[10px] sm:text-xs text-muted-foreground uppercase tracking-wider block mb-1">Unit</label>
                   <select value={durationUnit} onChange={e => setDurationUnit(e.target.value)}
-                    className="w-full h-9 bg-secondary border border-border text-foreground rounded-md px-2 text-sm">
+                    className="w-full h-9 bg-secondary border border-border text-foreground rounded-md px-2 text-xs">
                     <option value="t">Ticks</option>
                     <option value="s">Secs</option>
                     <option value="m">Mins</option>
@@ -302,10 +312,9 @@ export const TradingPanel = ({ symbol, displayName, currentPrice, onClose }: Tra
               </>
             )}
 
-            {/* Multiplier input */}
             {category === 'multipliers' && (
               <div className="col-span-2">
-                <label className="text-xs text-muted-foreground uppercase tracking-wider block mb-1">Multiplier</label>
+                <label className="text-[10px] sm:text-xs text-muted-foreground uppercase tracking-wider block mb-1">Multiplier</label>
                 <div className="flex gap-1">
                   {[10, 20, 50, 100, 200].map(m => (
                     <button key={m} onClick={() => setMultiplier(String(m))}
@@ -319,10 +328,9 @@ export const TradingPanel = ({ symbol, displayName, currentPrice, onClose }: Tra
               </div>
             )}
 
-            {/* Growth rate for accumulators */}
             {category === 'accumulators' && (
               <div className="col-span-2">
-                <label className="text-xs text-muted-foreground uppercase tracking-wider block mb-1">Growth Rate</label>
+                <label className="text-[10px] sm:text-xs text-muted-foreground uppercase tracking-wider block mb-1">Growth Rate</label>
                 <div className="flex gap-1">
                   {['0.01', '0.02', '0.03', '0.04', '0.05'].map(r => (
                     <button key={r} onClick={() => setGrowthRate(r)}
@@ -337,32 +345,32 @@ export const TradingPanel = ({ symbol, displayName, currentPrice, onClose }: Tra
             )}
           </div>
 
-          {/* Over/Under: Digit selector with animated balls */}
+          {/* Over/Under: Digit selector */}
           {category === 'over_under' && (
-            <div className="space-y-3">
-              <label className="text-xs text-muted-foreground uppercase tracking-wider block">Select Digit (Last digit prediction)</label>
-              <div className="flex justify-center gap-1.5 sm:gap-2 flex-wrap">
+            <div className="space-y-2">
+              <label className="text-[10px] sm:text-xs text-muted-foreground uppercase tracking-wider block">Predict Last Digit</label>
+              <div className="flex justify-center gap-1 sm:gap-1.5 flex-wrap">
                 {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map(d => (
                   <DigitBall
                     key={d}
                     digit={d}
                     selected={d === selectedDigit}
+                    isLastDigit={d === lastDigit}
                     onClick={() => setSelectedDigit(d)}
                     color={d === selectedDigit ? (d >= 5 ? 'over' : 'under') : 'neutral'}
                   />
                 ))}
               </div>
-              {/* Digit history visualization */}
               {digitHistory.length > 0 && (
                 <div className="space-y-1">
                   <p className="text-[10px] text-muted-foreground">Recent digits:</p>
-                  <div className="flex gap-1 overflow-hidden">
+                  <div className="flex gap-0.5 overflow-hidden">
                     {digitHistory.slice(0, 20).map((d, i) => (
                       <motion.div
                         key={`${i}-${d}`}
                         initial={{ scale: 0, opacity: 0 }}
                         animate={{ scale: 1, opacity: 1 - i * 0.04 }}
-                        className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${
+                        className={`w-5 h-5 sm:w-6 sm:h-6 rounded-full flex items-center justify-center text-[9px] sm:text-[10px] font-bold shrink-0 ${
                           d > selectedDigit ? 'bg-profit/20 text-profit' : d < selectedDigit ? 'bg-loss/20 text-loss' : 'bg-primary/20 text-primary'
                         }`}
                       >
@@ -376,78 +384,61 @@ export const TradingPanel = ({ symbol, displayName, currentPrice, onClose }: Tra
           )}
 
           {/* Payout info */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-2">
             {category === 'rise_fall' && (
-              <>
-                {renderProposalInfo('CALL', 'Rise')}
-                {renderProposalInfo('PUT', 'Fall')}
-              </>
+              <>{renderProposalInfo('CALL', 'Rise')}{renderProposalInfo('PUT', 'Fall')}</>
             )}
             {category === 'over_under' && (
-              <>
-                {renderProposalInfo('DIGITOVER', 'Over')}
-                {renderProposalInfo('DIGITUNDER', 'Under')}
-              </>
+              <>{renderProposalInfo('DIGITOVER', 'Over')}{renderProposalInfo('DIGITUNDER', 'Under')}</>
             )}
-            {category === 'accumulators' && renderProposalInfo('ACCU', 'Accumulator')}
+            {category === 'accumulators' && <div className="col-span-2">{renderProposalInfo('ACCU', 'Accumulator')}</div>}
             {category === 'multipliers' && (
-              <>
-                {renderProposalInfo('MULTUP', 'Up')}
-                {renderProposalInfo('MULTDOWN', 'Down')}
-              </>
+              <>{renderProposalInfo('MULTUP', 'Up')}{renderProposalInfo('MULTDOWN', 'Down')}</>
             )}
             {category === 'vanillas' && (
-              <>
-                {renderProposalInfo('VANILLALONGCALL', 'Call')}
-                {renderProposalInfo('VANILLALONGPUT', 'Put')}
-              </>
+              <>{renderProposalInfo('VANILLALONGCALL', 'Call')}{renderProposalInfo('VANILLALONGPUT', 'Put')}</>
             )}
             {category === 'turbos' && (
-              <>
-                {renderProposalInfo('TURBOSLONG', 'Long')}
-                {renderProposalInfo('TURBOSSHORT', 'Short')}
-              </>
+              <>{renderProposalInfo('TURBOSLONG', 'Long')}{renderProposalInfo('TURBOSSHORT', 'Short')}</>
             )}
           </div>
 
           {/* Buy buttons */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-2">
             {category === 'rise_fall' && (
-              <>
-                {renderBuyButton('CALL', 'Rise', 'profit')}
-                {renderBuyButton('PUT', 'Fall', 'loss')}
-              </>
+              <>{renderBuyButton('CALL', 'Rise', 'profit')}{renderBuyButton('PUT', 'Fall', 'loss')}</>
             )}
             {category === 'over_under' && (
-              <>
-                {renderBuyButton('DIGITOVER', `Over ${selectedDigit}`, 'profit')}
-                {renderBuyButton('DIGITUNDER', `Under ${selectedDigit}`, 'loss')}
-              </>
+              <>{renderBuyButton('DIGITOVER', `Over ${selectedDigit}`, 'profit')}{renderBuyButton('DIGITUNDER', `Under ${selectedDigit}`, 'loss')}</>
             )}
             {category === 'accumulators' && (
-              <div className="col-span-2">
-                {renderBuyButton('ACCU', 'Start Accumulating', 'primary')}
-              </div>
+              <div className="col-span-2">{renderBuyButton('ACCU', 'Start Accumulating', 'primary')}</div>
             )}
             {category === 'multipliers' && (
-              <>
-                {renderBuyButton('MULTUP', `Up x${multiplier}`, 'profit')}
-                {renderBuyButton('MULTDOWN', `Down x${multiplier}`, 'loss')}
-              </>
+              <>{renderBuyButton('MULTUP', `Up x${multiplier}`, 'profit')}{renderBuyButton('MULTDOWN', `Down x${multiplier}`, 'loss')}</>
             )}
             {category === 'vanillas' && (
-              <>
-                {renderBuyButton('VANILLALONGCALL', 'Call', 'profit')}
-                {renderBuyButton('VANILLALONGPUT', 'Put', 'loss')}
-              </>
+              <>{renderBuyButton('VANILLALONGCALL', 'Call', 'profit')}{renderBuyButton('VANILLALONGPUT', 'Put', 'loss')}</>
             )}
             {category === 'turbos' && (
-              <>
-                {renderBuyButton('TURBOSLONG', 'Long', 'profit')}
-                {renderBuyButton('TURBOSSHORT', 'Short', 'loss')}
-              </>
+              <>{renderBuyButton('TURBOSLONG', 'Long', 'profit')}{renderBuyButton('TURBOSSHORT', 'Short', 'loss')}</>
             )}
           </div>
+
+          {/* Placed trade indicator */}
+          <AnimatePresence>
+            {tradePlaced && (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="bg-profit/10 border border-profit/30 rounded-lg p-3 flex items-center gap-2"
+              >
+                <CheckCircle className="h-4 w-4 text-profit shrink-0" />
+                <p className="text-xs text-profit">Trade placed successfully! Check Open Positions to monitor.</p>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       </div>
     </motion.div>
