@@ -145,12 +145,36 @@ export const updateMpesaConfig = async (config: Omit<MpesaConfig, 'id'>) => {
 
 // ---- Purchases ----
 
-export const fetchPurchases = async () => {
-  const { data } = await supabase
-    .from('purchases')
-    .select('*')
-    .order('created_at', { ascending: false });
+export const fetchPurchases = async (derivAccount?: string) => {
+  let query = supabase.from('purchases').select('*');
+  if (derivAccount) query = query.eq('deriv_account', derivAccount);
+  const { data } = await query.order('created_at', { ascending: false });
   return data || [];
+};
+
+export const fetchBotAccess = async (derivAccount?: string) => {
+  if (!derivAccount) {
+    return { accessibleBotIds: [] as string[], pendingBotIds: [] as string[] };
+  }
+
+  const [purchaseResp, approvedResp, pendingResp] = await Promise.all([
+    supabase.from('purchases').select('bot_id').eq('deriv_account', derivAccount).eq('status', 'completed').not('bot_id', 'is', null),
+    supabase.from('access_requests').select('bot_id').eq('deriv_account', derivAccount).eq('status', 'approved').not('bot_id', 'is', null),
+    supabase.from('access_requests').select('bot_id').eq('deriv_account', derivAccount).eq('status', 'pending').not('bot_id', 'is', null),
+  ]);
+
+  const accessibleBotIds = Array.from(new Set([
+    ...(purchaseResp.data || []).map((row: any) => row.bot_id),
+    ...(approvedResp.data || []).map((row: any) => row.bot_id),
+  ].filter(Boolean)));
+
+  const pendingBotIds = Array.from(new Set(
+    (pendingResp.data || [])
+      .map((row: any) => row.bot_id)
+      .filter((botId: string | null) => Boolean(botId) && !accessibleBotIds.includes(botId as string))
+  )) as string[];
+
+  return { accessibleBotIds, pendingBotIds };
 };
 
 // ---- Access Requests ----
@@ -161,11 +185,10 @@ export const createAccessRequest = async (derivAccount: string, botId: string, m
   });
 };
 
-export const fetchAccessRequests = async () => {
-  const { data } = await supabase
-    .from('access_requests')
-    .select('*')
-    .order('created_at', { ascending: false });
+export const fetchAccessRequests = async (derivAccount?: string) => {
+  let query = supabase.from('access_requests').select('*');
+  if (derivAccount) query = query.eq('deriv_account', derivAccount);
+  const { data } = await query.order('created_at', { ascending: false });
   return data || [];
 };
 

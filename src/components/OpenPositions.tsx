@@ -40,7 +40,13 @@ export const OpenPositions = () => {
             profit: poc.profit,
           });
         } else {
-          setContracts(prev => prev.map(c => c.contract_id === poc.contract_id ? { ...c, ...poc } : c));
+          setContracts(prev => {
+            const exists = prev.some(c => c.contract_id === poc.contract_id);
+            if (exists) {
+              return prev.map(c => c.contract_id === poc.contract_id ? { ...c, ...poc } : c);
+            }
+            return [{ ...poc }, ...prev];
+          });
         }
       }
     });
