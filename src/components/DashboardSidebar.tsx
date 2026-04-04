@@ -1,4 +1,4 @@
-import { Activity, BarChart3, Bot, LineChart, LogOut, TrendingUp, Wallet, ChevronLeft, ChevronRight, BookOpen, Copy, Shield, Lightbulb, Gift, Wrench, X, Crosshair } from 'lucide-react';
+import { Activity, BarChart3, Bot, LineChart, LogOut, TrendingUp, Wallet, ChevronLeft, ChevronRight, BookOpen, Copy, Shield, Lightbulb, Wrench, X, Crosshair } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { setUser, getSettings, getUser } from '@/lib/store';
 import { useState } from 'react';
@@ -8,9 +8,8 @@ import { derivWS } from '@/lib/deriv-ws';
 const navItems = [
   { label: 'Dashboard', icon: TrendingUp, path: '/dashboard' },
   { label: 'Manual Trader', icon: Crosshair, path: '/dashboard/trader' },
+  { label: 'Bots', icon: Bot, path: '/dashboard/bots' },
   { label: 'Bot Builder', icon: Wrench, path: '/dashboard/bot-builder' },
-  { label: 'Free Bots', icon: Gift, path: '/dashboard/free-bots' },
-  { label: 'DBots', icon: Bot, path: '/dashboard/bots' },
   { label: 'Analysis', icon: BarChart3, path: '/dashboard/analysis' },
   { label: 'Strategy', icon: Lightbulb, path: '/dashboard/strategy' },
   { label: 'Charts', icon: LineChart, path: '/dashboard/charts' },

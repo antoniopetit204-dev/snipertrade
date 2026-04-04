@@ -242,8 +242,8 @@ class DerivWS {
     return this.send({ statement: 1, description: 1, limit });
   }
 
-  async getContractsFor(symbol: string) {
-    return this.send({ contracts_for: symbol, currency: 'USD', product_type: 'basic' });
+  async getContractsFor(symbol: string, currency = 'USD') {
+    return this.send({ contracts_for: symbol, currency });
   }
 
   async buyContract(proposal_id: string, price: number) {
