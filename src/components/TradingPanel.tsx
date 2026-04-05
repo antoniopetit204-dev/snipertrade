@@ -1,10 +1,11 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { derivWS } from '@/lib/deriv-ws';
 import { tradeNotifications } from '@/lib/trade-notifications';
 import { TrendingUp, TrendingDown, X, Loader2, Zap, BarChart3, Gauge, Layers, CheckCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { motion, AnimatePresence } from 'framer-motion';
+import { buildProposalPayload, getAccountCurrency, getFriendlyTradeError, isContractSupported, normalizeDuration, type ContractCategory } from '@/lib/trading';
 
 interface TradingPanelProps {
   symbol: string;
@@ -13,9 +14,8 @@ interface TradingPanelProps {
   onClose: () => void;
 }
 
-type ContractCategory = 'rise_fall' | 'over_under' | 'accumulators' | 'multipliers' | 'vanillas' | 'turbos';
-
 const CONTRACT_TABS: { id: ContractCategory; label: string; icon: any }[] = [
+  { id: 'normal', label: 'Buy/Sell', icon: TrendingUp },
   { id: 'rise_fall', label: 'Rise/Fall', icon: TrendingUp },
   { id: 'over_under', label: 'Over/Under', icon: BarChart3 },
   { id: 'accumulators', label: 'Accum.', icon: Zap },
@@ -46,14 +46,17 @@ const DigitBall = ({ digit, selected, onClick, color, isLastDigit }: { digit: nu
 };
 
 export const TradingPanel = ({ symbol, displayName, currentPrice, onClose }: TradingPanelProps) => {
-  const [category, setCategory] = useState<ContractCategory>('rise_fall');
+  const [category, setCategory] = useState<ContractCategory>('normal');
   const [stake, setStake] = useState('1');
   const [duration, setDuration] = useState('5');
   const [durationUnit, setDurationUnit] = useState('t');
   const [selectedDigit, setSelectedDigit] = useState(5);
   const [multiplier, setMultiplier] = useState('10');
   const [growthRate, setGrowthRate] = useState('0.01');
+  const [takeProfit, setTakeProfit] = useState('');
+  const [stopLoss, setStopLoss] = useState('');
   const [proposals, setProposals] = useState<Record<string, any>>({});
+  const [proposalErrors, setProposalErrors] = useState<Record<string, string>>({});
   const [buying, setBuying] = useState<string | null>(null);
   const [tradePlaced, setTradePlaced] = useState<string | null>(null);
   const [livePrice, setLivePrice] = useState(currentPrice);
@@ -63,7 +66,8 @@ export const TradingPanel = ({ symbol, displayName, currentPrice, onClose }: Tra
 
   useEffect(() => {
     if (!derivWS.isConnected) return;
-    derivWS.getContractsFor(symbol).then(resp => {
+    derivWS.subscribeTicks(symbol).catch(() => {});
+    derivWS.getContractsFor(symbol, getAccountCurrency()).then(resp => {
       if (resp.contracts_for?.available) {
         const types = [...new Set(resp.contracts_for.available.map((c: any) => c.contract_type))];
         setAvailableContracts(types as string[]);
@@ -88,69 +92,96 @@ export const TradingPanel = ({ symbol, displayName, currentPrice, onClose }: Tra
     if (!derivWS.isConnected) return;
 
     const getProposals = async () => {
-      const baseParams = {
-        amount: parseFloat(stake) || 1,
-        basis: 'stake',
-        currency: 'USD',
+      const normalizedDuration = normalizeDuration(symbol, category, parseInt(duration) || 5, durationUnit);
+      const commonOptions = {
         symbol,
-      };
-      const durationParams = {
-        duration: parseInt(duration) || 5,
-        duration_unit: durationUnit,
+        stake: parseFloat(stake) || 1,
+        currency: getAccountCurrency(),
+        duration: normalizedDuration.duration,
+        durationUnit: normalizedDuration.durationUnit,
+        barrier: String(selectedDigit),
+        multiplier: parseInt(multiplier) || 10,
+        growthRate: parseFloat(growthRate) || 0.01,
+        takeProfit: takeProfit ? parseFloat(takeProfit) : null,
+        stopLoss: stopLoss ? parseFloat(stopLoss) : null,
       };
 
       try {
         let requests: { key: string; params: any }[] = [];
 
         switch (category) {
+          case 'normal':
+            requests = [
+              { key: 'MULTUP', params: buildProposalPayload({ ...commonOptions, contractType: 'MULTUP' }) },
+              { key: 'MULTDOWN', params: buildProposalPayload({ ...commonOptions, contractType: 'MULTDOWN' }) },
+            ];
+            break;
           case 'rise_fall':
             requests = [
-              { key: 'CALL', params: { ...baseParams, ...durationParams, contract_type: 'CALL' } },
-              { key: 'PUT', params: { ...baseParams, ...durationParams, contract_type: 'PUT' } },
+              { key: 'CALL', params: buildProposalPayload({ ...commonOptions, contractType: 'CALL' }) },
+              { key: 'PUT', params: buildProposalPayload({ ...commonOptions, contractType: 'PUT' }) },
             ];
             break;
           case 'over_under':
             requests = [
-              { key: 'DIGITOVER', params: { ...baseParams, ...durationParams, contract_type: 'DIGITOVER', barrier: String(selectedDigit) } },
-              { key: 'DIGITUNDER', params: { ...baseParams, ...durationParams, contract_type: 'DIGITUNDER', barrier: String(selectedDigit) } },
+              { key: 'DIGITOVER', params: buildProposalPayload({ ...commonOptions, contractType: 'DIGITOVER' }) },
+              { key: 'DIGITUNDER', params: buildProposalPayload({ ...commonOptions, contractType: 'DIGITUNDER' }) },
             ];
             break;
           case 'accumulators':
             requests = [
-              { key: 'ACCU', params: { ...baseParams, contract_type: 'ACCU', growth_rate: parseFloat(growthRate) || 0.01 } },
+              { key: 'ACCU', params: buildProposalPayload({ ...commonOptions, contractType: 'ACCU' }) },
             ];
             break;
           case 'multipliers':
             requests = [
-              { key: 'MULTUP', params: { ...baseParams, contract_type: 'MULTUP', multiplier: parseInt(multiplier) || 10 } },
-              { key: 'MULTDOWN', params: { ...baseParams, contract_type: 'MULTDOWN', multiplier: parseInt(multiplier) || 10 } },
+              { key: 'MULTUP', params: buildProposalPayload({ ...commonOptions, contractType: 'MULTUP' }) },
+              { key: 'MULTDOWN', params: buildProposalPayload({ ...commonOptions, contractType: 'MULTDOWN' }) },
             ];
             break;
           case 'vanillas':
             requests = [
-              { key: 'VANILLALONGCALL', params: { ...baseParams, ...durationParams, contract_type: 'VANILLALONGCALL' } },
-              { key: 'VANILLALONGPUT', params: { ...baseParams, ...durationParams, contract_type: 'VANILLALONGPUT' } },
+              { key: 'VANILLALONGCALL', params: buildProposalPayload({ ...commonOptions, contractType: 'VANILLALONGCALL' }) },
+              { key: 'VANILLALONGPUT', params: buildProposalPayload({ ...commonOptions, contractType: 'VANILLALONGPUT' }) },
             ];
             break;
           case 'turbos':
             requests = [
-              { key: 'TURBOSLONG', params: { ...baseParams, ...durationParams, contract_type: 'TURBOSLONG' } },
-              { key: 'TURBOSSHORT', params: { ...baseParams, ...durationParams, contract_type: 'TURBOSSHORT' } },
+              { key: 'TURBOSLONG', params: buildProposalPayload({ ...commonOptions, contractType: 'TURBOSLONG' }) },
+              { key: 'TURBOSSHORT', params: buildProposalPayload({ ...commonOptions, contractType: 'TURBOSSHORT' }) },
             ];
             break;
         }
 
+        const filteredRequests = requests.filter((request) => isContractSupported(availableContracts, request.key));
+        const unsupportedErrors = requests
+          .filter((request) => !isContractSupported(availableContracts, request.key))
+          .reduce<Record<string, string>>((acc, request) => {
+            acc[request.key] = 'This market does not support that contract type.';
+            return acc;
+          }, {});
+
+        if (filteredRequests.length === 0) {
+          setProposals({});
+          setProposalErrors(unsupportedErrors);
+          return;
+        }
+
         const results = await Promise.allSettled(
-          requests.map(r => derivWS.send({ proposal: 1, ...r.params }))
+          filteredRequests.map(r => derivWS.send({ proposal: 1, ...r.params }))
         );
 
         const newProposals: Record<string, any> = {};
+        const newErrors: Record<string, string> = { ...unsupportedErrors };
         results.forEach((result, i) => {
           if (result.status === 'fulfilled' && result.value.proposal) {
-            newProposals[requests[i].key] = result.value.proposal;
+            newProposals[filteredRequests[i].key] = result.value.proposal;
+          } else if (result.status === 'rejected') {
+            newErrors[filteredRequests[i].key] = getFriendlyTradeError(result.reason);
           }
         });
         setProposals(newProposals);
+        setProposalErrors(newErrors);
       } catch (err) {
         console.error('Proposal error:', err);
       }
@@ -158,11 +189,14 @@ export const TradingPanel = ({ symbol, displayName, currentPrice, onClose }: Tra
 
     const timer = setTimeout(getProposals, 500);
     return () => clearTimeout(timer);
-  }, [symbol, stake, duration, durationUnit, category, selectedDigit, multiplier, growthRate]);
+  }, [symbol, stake, duration, durationUnit, category, selectedDigit, multiplier, growthRate, takeProfit, stopLoss, availableContracts]);
 
   const executeTrade = async (contractType: string) => {
     const proposal = proposals[contractType];
-    if (!proposal?.id) return;
+    if (!proposal?.id) {
+      tradeNotifications.notify({ type: 'warning', title: 'Trade not ready', message: proposalErrors[contractType] || 'Pricing is still loading for this contract.' });
+      return;
+    }
 
     setBuying(contractType);
     setTradePlaced(null);
@@ -175,6 +209,7 @@ export const TradingPanel = ({ symbol, displayName, currentPrice, onClose }: Tra
           title: `Trade Placed: ${contractType}`,
           message: `${displayName} — Stake: $${stake}, Contract ID: ${result.buy.contract_id}`,
         });
+        window.dispatchEvent(new CustomEvent('deriv:trade-opened', { detail: { contractId: result.buy.contract_id, contractType, symbol, displayName } }));
         
         // Subscribe to contract for live updates
         derivWS.send({ proposal_open_contract: 1, contract_id: result.buy.contract_id, subscribe: 1 }).catch(() => {});
@@ -186,7 +221,7 @@ export const TradingPanel = ({ symbol, displayName, currentPrice, onClose }: Tra
       tradeNotifications.notify({
         type: 'warning',
         title: 'Trade Failed',
-        message: err.message || err.code || 'Could not execute trade',
+        message: getFriendlyTradeError(err),
       });
     } finally {
       setBuying(null);
@@ -312,7 +347,7 @@ export const TradingPanel = ({ symbol, displayName, currentPrice, onClose }: Tra
               </>
             )}
 
-            {category === 'multipliers' && (
+            {['normal', 'multipliers'].includes(category) && (
               <div className="col-span-2">
                 <label className="text-[10px] sm:text-xs text-muted-foreground uppercase tracking-wider block mb-1">Multiplier</label>
                 <div className="flex gap-1">
@@ -326,6 +361,21 @@ export const TradingPanel = ({ symbol, displayName, currentPrice, onClose }: Tra
                   ))}
                 </div>
               </div>
+            )}
+
+            {category === 'normal' && (
+              <>
+                <div>
+                  <label className="text-[10px] sm:text-xs text-muted-foreground uppercase tracking-wider block mb-1">Take Profit</label>
+                  <Input value={takeProfit} onChange={e => setTakeProfit(e.target.value)} type="number" min="0" placeholder="Optional"
+                    className="bg-secondary border-border text-foreground font-mono text-xs" />
+                </div>
+                <div>
+                  <label className="text-[10px] sm:text-xs text-muted-foreground uppercase tracking-wider block mb-1">Stop Loss</label>
+                  <Input value={stopLoss} onChange={e => setStopLoss(e.target.value)} type="number" min="0" placeholder="Optional"
+                    className="bg-secondary border-border text-foreground font-mono text-xs" />
+                </div>
+              </>
             )}
 
             {category === 'accumulators' && (
@@ -385,6 +435,9 @@ export const TradingPanel = ({ symbol, displayName, currentPrice, onClose }: Tra
 
           {/* Payout info */}
           <div className="grid grid-cols-2 gap-2">
+            {category === 'normal' && (
+              <>{renderProposalInfo('MULTUP', 'Buy')}{renderProposalInfo('MULTDOWN', 'Sell')}</>
+            )}
             {category === 'rise_fall' && (
               <>{renderProposalInfo('CALL', 'Rise')}{renderProposalInfo('PUT', 'Fall')}</>
             )}
@@ -405,6 +458,9 @@ export const TradingPanel = ({ symbol, displayName, currentPrice, onClose }: Tra
 
           {/* Buy buttons */}
           <div className="grid grid-cols-2 gap-2">
+            {category === 'normal' && (
+              <>{renderBuyButton('MULTUP', 'Buy', 'profit')}{renderBuyButton('MULTDOWN', 'Sell', 'loss')}</>
+            )}
             {category === 'rise_fall' && (
               <>{renderBuyButton('CALL', 'Rise', 'profit')}{renderBuyButton('PUT', 'Fall', 'loss')}</>
             )}
@@ -424,6 +480,14 @@ export const TradingPanel = ({ symbol, displayName, currentPrice, onClose }: Tra
               <>{renderBuyButton('TURBOSLONG', 'Long', 'profit')}{renderBuyButton('TURBOSSHORT', 'Short', 'loss')}</>
             )}
           </div>
+
+          {Object.values(proposalErrors).length > 0 && (
+            <div className="space-y-1">
+              {Object.entries(proposalErrors).map(([key, value]) => (
+                <p key={key} className="text-[10px] sm:text-xs text-muted-foreground"><span className="text-foreground font-medium">{key}:</span> {value}</p>
+              ))}
+            </div>
+          )}
 
           {/* Placed trade indicator */}
           <AnimatePresence>

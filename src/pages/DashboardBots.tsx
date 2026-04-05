@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { DashboardLayout } from '@/components/DashboardLayout';
-import { fetchBots, initiateStkPush, queryStkStatus, createAccessRequest } from '@/lib/db';
+import { fetchBots, fetchBotAccess, initiateStkPush, queryStkStatus, createAccessRequest } from '@/lib/db';
 import { getUser, type Bot } from '@/lib/store';
 import { Bot as BotIcon, Play, Square, TrendingUp, Crown, ShoppingCart, Loader2, Send } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { toggleBotEnabled } from '@/lib/db';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
 
 const DashboardBots = () => {
   const user = getUser();
@@ -19,10 +20,42 @@ const DashboardBots = () => {
   const [pollId, setPollId] = useState<string | null>(null);
   const [requestBot, setRequestBot] = useState<Bot | null>(null);
   const [requestMessage, setRequestMessage] = useState('');
+  const [accessibleBotIds, setAccessibleBotIds] = useState<string[]>([]);
+  const [pendingBotIds, setPendingBotIds] = useState<string[]>([]);
+  const navigate = useNavigate();
 
   useEffect(() => {
-    fetchBots().then(setBots);
-  }, []);
+    const loadData = async () => {
+      const [loadedBots, access] = await Promise.all([
+        fetchBots(),
+        fetchBotAccess(user?.activeAccount?.acct),
+      ]);
+      setBots(loadedBots);
+      setAccessibleBotIds(access.accessibleBotIds);
+      setPendingBotIds(access.pendingBotIds);
+    };
+
+    loadData();
+  }, [user?.activeAccount?.acct]);
+
+  const buildBotDeploymentSearch = (bot: Bot) => {
+    const text = `${bot.name} ${bot.description} ${bot.strategy}`.toLowerCase();
+    const params = new URLSearchParams();
+    params.set('botId', bot.id);
+    params.set('botName', bot.name);
+    params.set('symbol', text.includes('volatility 10') ? 'R_10' : text.includes('volatility 25') ? 'R_25' : 'R_100');
+    params.set('contractType', text.includes('under') ? 'DIGITUNDER' : text.includes('over') ? 'DIGITOVER' : text.includes('fall') || text.includes('sell') || text.includes('bear') ? 'PUT' : 'CALL');
+    params.set('stake', '1');
+    params.set('duration', text.includes('swing') ? '10' : '5');
+    params.set('durationUnit', 't');
+    params.set('rounds', '10');
+    params.set('barrier', '5');
+    return params.toString();
+  };
+
+  const deployBot = (bot: Bot) => {
+    navigate(`/dashboard/bot-builder?${buildBotDeploymentSearch(bot)}`);
+  };
 
   // Poll for STK status
   useEffect(() => {
@@ -33,6 +66,7 @@ const DashboardBots = () => {
         if (result.db_status === 'completed') {
           clearInterval(interval);
           setPollId(null);
+          if (buyingBot?.id) setAccessibleBotIds(prev => prev.includes(buyingBot.id) ? prev : [...prev, buyingBot.id]);
           setBuyingBot(null);
           setPurchasing(false);
           toast({ title: '✅ Payment Successful!', description: `Receipt: ${result.receipt || 'Processing'}` });
@@ -50,7 +84,8 @@ const DashboardBots = () => {
   const toggleBot = async (id: string) => {
     const bot = bots.find(b => b.id === id);
     if (!bot) return;
-    if (bot.category === 'premium' && !bot.enabled) {
+    const hasAccess = bot.category === 'free' || accessibleBotIds.includes(bot.id);
+    if (bot.category === 'premium' && !hasAccess) {
       setBuyingBot(bot);
       return;
     }
@@ -81,6 +116,7 @@ const DashboardBots = () => {
     if (!requestBot || !user?.activeAccount) return;
     try {
       await createAccessRequest(user.activeAccount.acct, requestBot.id, requestMessage || 'Requesting access to this bot');
+      setPendingBotIds(prev => prev.includes(requestBot.id) ? prev : [...prev, requestBot.id]);
       toast({ title: 'Request sent!', description: 'Admin will review your request.' });
       setRequestBot(null);
       setRequestMessage('');
@@ -102,7 +138,7 @@ const DashboardBots = () => {
           <h2 className="text-sm font-semibold text-foreground mb-3">Free Bots</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4">
             {freeBots.map((bot, i) => (
-              <BotCard key={bot.id} bot={bot} index={i} onToggle={toggleBot} />
+              <BotCard key={bot.id} bot={bot} index={i} onToggle={toggleBot} onDeploy={deployBot} />
             ))}
           </div>
         </div>
@@ -140,12 +176,26 @@ const DashboardBots = () => {
                   ))}
                 </div>
                 <div className="flex items-center gap-2">
-                  <Button size="sm" onClick={() => setBuyingBot(bot)} className="bg-primary text-primary-foreground hover:bg-primary/90 text-xs h-7 sm:h-8 flex-1">
-                    <ShoppingCart className="h-3 w-3 mr-1" /> Buy Now
-                  </Button>
-                  <Button size="sm" variant="outline" onClick={() => setRequestBot(bot)} className="text-xs h-7 sm:h-8 border-border">
-                    <Send className="h-3 w-3 mr-1" /> Request
-                  </Button>
+                  {accessibleBotIds.includes(bot.id) ? (
+                    <>
+                      <Button size="sm" onClick={() => deployBot(bot)} className="bg-primary text-primary-foreground hover:bg-primary/90 text-xs h-7 sm:h-8 flex-1">
+                        <Play className="h-3 w-3 mr-1" /> Deploy
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => toggleBot(bot.id)} className="text-xs h-7 sm:h-8 border-border">
+                        {bot.enabled ? <Square className="h-3 w-3 mr-1" /> : <Play className="h-3 w-3 mr-1" />}
+                        {bot.enabled ? 'Stop' : 'Arm'}
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <Button size="sm" onClick={() => setBuyingBot(bot)} className="bg-primary text-primary-foreground hover:bg-primary/90 text-xs h-7 sm:h-8 flex-1">
+                        <ShoppingCart className="h-3 w-3 mr-1" /> Buy Now
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => setRequestBot(bot)} disabled={pendingBotIds.includes(bot.id)} className="text-xs h-7 sm:h-8 border-border">
+                        <Send className="h-3 w-3 mr-1" /> {pendingBotIds.includes(bot.id) ? 'Requested' : 'Request'}
+                      </Button>
+                    </>
+                  )}
                 </div>
                 <span className="text-[10px] sm:text-xs text-muted-foreground flex items-center gap-1 mt-2">
                   <TrendingUp className="h-3 w-3" /> {bot.strategy}
@@ -224,7 +274,7 @@ const DashboardBots = () => {
   );
 };
 
-const BotCard = ({ bot, index, onToggle }: { bot: Bot; index: number; onToggle: (id: string) => void }) => (
+const BotCard = ({ bot, index, onToggle, onDeploy }: { bot: Bot; index: number; onToggle: (id: string) => void; onDeploy: (bot: Bot) => void }) => (
   <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.05 }}
     className="bg-card border border-border rounded-lg p-4 sm:p-5">
     <div className="flex items-start justify-between mb-3">
@@ -249,10 +299,13 @@ const BotCard = ({ bot, index, onToggle }: { bot: Bot; index: number; onToggle: 
       ))}
     </div>
     <div className="flex items-center gap-2">
+      <Button size="sm" onClick={() => onDeploy(bot)} className="bg-primary text-primary-foreground hover:bg-primary/90 text-xs h-7 sm:h-8">
+        <Play className="h-3 w-3 mr-1" /> Deploy
+      </Button>
       <Button size="sm" onClick={() => onToggle(bot.id)} variant="outline"
         className={`text-xs h-7 sm:h-8 ${bot.enabled ? 'bg-loss/20 text-loss hover:bg-loss/30 border-loss/30' : 'bg-profit/20 text-profit hover:bg-profit/30 border-profit/30'}`}>
         {bot.enabled ? <Square className="h-3 w-3 mr-1" /> : <Play className="h-3 w-3 mr-1" />}
-        {bot.enabled ? 'Stop' : 'Start'}
+        {bot.enabled ? 'Stop' : 'Arm'}
       </Button>
       <span className="text-[10px] sm:text-xs text-muted-foreground flex items-center gap-1">
         <TrendingUp className="h-3 w-3" /> {bot.strategy}

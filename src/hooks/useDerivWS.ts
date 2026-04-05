@@ -92,25 +92,31 @@ export const useActiveSymbols = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let cancelled = false;
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
+
     const fetch = async () => {
       try {
         if (!derivWS.isConnected) {
-          setLoading(false);
+          retryTimer = setTimeout(fetch, 1000);
           return;
         }
         const resp = await derivWS.getActiveSymbols();
-        if (resp.active_symbols) {
+        if (!cancelled && resp.active_symbols) {
           setSymbols(resp.active_symbols);
         }
       } catch (err) {
         console.error('Failed to fetch symbols:', err);
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
     
-    const timer = setTimeout(fetch, 500);
-    return () => clearTimeout(timer);
+    retryTimer = setTimeout(fetch, 500);
+    return () => {
+      cancelled = true;
+      if (retryTimer) clearTimeout(retryTimer);
+    };
   }, []);
 
   return { symbols, loading };

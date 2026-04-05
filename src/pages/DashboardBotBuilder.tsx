@@ -10,6 +10,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useSearchParams } from 'react-router-dom';
+import { buildProposalPayload, getFriendlyTradeError, normalizeDuration } from '@/lib/trading';
 
 const contractTypes = [
   { value: 'CALL', label: 'Rise', icon: TrendingUp },
@@ -25,6 +27,7 @@ const DashboardBotBuilder = () => {
   const { connected, authorized } = useDerivConnection();
   const { symbols } = useActiveSymbols();
   const { toast } = useToast();
+  const [searchParams] = useSearchParams();
   
   const [selectedSymbol, setSelectedSymbol] = useState('');
   const [contractType, setContractType] = useState('CALL');
@@ -38,6 +41,7 @@ const DashboardBotBuilder = () => {
   const [stopLoss, setStopLoss] = useState('');
   const [takeProfit, setTakeProfit] = useState('');
   const [barrier, setBarrier] = useState('5');
+  const [deployedBotName, setDeployedBotName] = useState('');
   const runningRef = useRef(false);
 
   useEffect(() => {
@@ -47,11 +51,39 @@ const DashboardBotBuilder = () => {
     }
   }, [symbols, selectedSymbol]);
 
+  useEffect(() => {
+    const botName = searchParams.get('botName');
+    const symbol = searchParams.get('symbol');
+    const nextContractType = searchParams.get('contractType');
+    const nextStake = searchParams.get('stake');
+    const nextDuration = searchParams.get('duration');
+    const nextDurationUnit = searchParams.get('durationUnit');
+    const nextRounds = searchParams.get('rounds');
+    const nextBarrier = searchParams.get('barrier');
+
+    if (botName) setDeployedBotName(botName);
+    if (symbol) setSelectedSymbol(symbol);
+    if (nextContractType) setContractType(nextContractType);
+    if (nextStake) setStake(nextStake);
+    if (nextDuration) setDuration(nextDuration);
+    if (nextDurationUnit) setDurationUnit(nextDurationUnit);
+    if (nextRounds) setRounds(nextRounds);
+    if (nextBarrier) setBarrier(nextBarrier);
+  }, [searchParams]);
+
   const selectedContract = contractTypes.find(c => c.value === contractType);
 
   const stopBot = useCallback(() => {
     runningRef.current = false;
     setRunning(false);
+  }, []);
+
+  const upsertResult = useCallback((round: number, patch: { profit?: number; status?: string; contractId?: number }) => {
+    setResults((prev) => {
+      const existing = prev.find((entry) => entry.round === round);
+      if (!existing) return [...prev, { round, profit: patch.profit ?? 0, status: patch.status || 'PLACED', contractId: patch.contractId }];
+      return prev.map((entry) => entry.round === round ? { ...entry, ...patch } : entry);
+    });
   }, []);
 
   const runBot = async () => {
@@ -72,27 +104,28 @@ const DashboardBotBuilder = () => {
       setCurrentRound(i);
 
       try {
-        // Build proposal params
-        const proposalParams: Record<string, any> = {
-          amount: parseFloat(stake),
-          basis: 'stake',
-          contract_type: contractType,
-          currency: 'USD',
-          duration: parseInt(duration),
-          duration_unit: durationUnit,
-          symbol: selectedSymbol,
-        };
+        const normalizedDuration = normalizeDuration(
+          selectedSymbol,
+          contractType === 'DIGITOVER' || contractType === 'DIGITUNDER' ? 'over_under' : 'rise_fall',
+          parseInt(duration),
+          durationUnit,
+        );
 
-        // Add barrier for digit contracts
-        if (selectedContract?.needsBarrier || contractType === 'DIGITOVER' || contractType === 'DIGITUNDER') {
-          proposalParams.barrier = barrier;
-        }
+        const proposalParams = buildProposalPayload({
+          symbol: selectedSymbol,
+          contractType,
+          stake: parseFloat(stake),
+          currency: user?.activeAccount?.cur || 'USD',
+          duration: normalizedDuration.duration,
+          durationUnit: normalizedDuration.durationUnit,
+          barrier,
+        });
 
         // Get proposal
         const proposal = await derivWS.send({ proposal: 1, ...proposalParams });
 
         if (proposal.error) {
-          setResults(prev => [...prev, { round: i, profit: 0, status: `ERROR: ${proposal.error.message}` }]);
+          upsertResult(i, { profit: 0, status: `ERROR: ${getFriendlyTradeError(proposal.error)}` });
           await new Promise(r => setTimeout(r, 1500));
           continue;
         }
@@ -102,13 +135,15 @@ const DashboardBotBuilder = () => {
           const buy = await derivWS.buyContract(proposal.proposal.id, parseFloat(stake));
           
           if (buy.error) {
-            setResults(prev => [...prev, { round: i, profit: 0, status: `ERROR: ${buy.error.message}` }]);
+            upsertResult(i, { profit: 0, status: `ERROR: ${getFriendlyTradeError(buy.error)}` });
             await new Promise(r => setTimeout(r, 1500));
             continue;
           }
 
           if (buy.buy) {
             const contractId = buy.buy.contract_id;
+            upsertResult(i, { profit: 0, status: 'PLACED', contractId });
+            window.dispatchEvent(new CustomEvent('deriv:trade-opened', { detail: { contractId, contractType, symbol: selectedSymbol } }));
             
             // Wait for contract to settle by subscribing to open contract
             const profit = await new Promise<number>((resolve) => {
@@ -136,7 +171,7 @@ const DashboardBotBuilder = () => {
 
             totalProfit += profit;
             const status = profit >= 0 ? 'WIN' : 'LOSS';
-            setResults(prev => [...prev, { round: i, profit, status, contractId }]);
+            upsertResult(i, { profit, status, contractId });
             
             tradeNotifications.notify({
               type: profit >= 0 ? 'win' : 'loss',
@@ -147,8 +182,7 @@ const DashboardBotBuilder = () => {
           }
         }
       } catch (err: any) {
-        const msg = err.message || err.code || 'Unknown error';
-        setResults(prev => [...prev, { round: i, profit: 0, status: `ERROR: ${msg}` }]);
+        upsertResult(i, { profit: 0, status: `ERROR: ${getFriendlyTradeError(err)}` });
       }
 
       // Check stop loss / take profit
@@ -173,9 +207,10 @@ const DashboardBotBuilder = () => {
   if (!user) return null;
 
   const totalPnL = results.reduce((s, r) => s + r.profit, 0);
-  const wins = results.filter(r => r.status === 'WIN').length;
-  const losses = results.filter(r => r.status === 'LOSS').length;
-  const winRate = results.length > 0 ? ((wins / results.length) * 100).toFixed(0) : '—';
+  const settledResults = results.filter(r => r.status === 'WIN' || r.status === 'LOSS');
+  const wins = settledResults.filter(r => r.status === 'WIN').length;
+  const losses = settledResults.filter(r => r.status === 'LOSS').length;
+  const winRate = settledResults.length > 0 ? ((wins / settledResults.length) * 100).toFixed(0) : '—';
 
   return (
     <DashboardLayout title="Bot Builder" icon={<Wrench className="h-5 w-5 text-primary" />} subtitle="Build and run automated trading bots">
@@ -186,6 +221,13 @@ const DashboardBotBuilder = () => {
             <h2 className="text-xs sm:text-sm font-semibold text-foreground flex items-center gap-2">
               <Settings className="h-4 w-4 text-primary" /> Bot Configuration
             </h2>
+
+            {deployedBotName && (
+              <div className="bg-secondary/50 border border-border rounded-lg p-3">
+                <p className="text-[10px] sm:text-xs text-muted-foreground uppercase tracking-wider">Deployed Bot</p>
+                <p className="text-xs sm:text-sm font-semibold text-foreground mt-1">{deployedBotName}</p>
+              </div>
+            )}
             
             <div className="space-y-1.5">
               <Label className="text-[10px] sm:text-xs text-muted-foreground uppercase tracking-wider">Symbol</Label>
@@ -327,13 +369,13 @@ const DashboardBotBuilder = () => {
                         {r.round}
                       </motion.div>
                       <span className="text-xs text-muted-foreground">
-                        {r.status.startsWith('ERROR') ? r.status : `${contractType} • Round ${r.round}`}
+                        {r.status.startsWith('ERROR') ? r.status : r.status === 'PLACED' ? `${contractType} • Round ${r.round} • Contract ${r.contractId}` : `${contractType} • Round ${r.round}`}
                       </span>
                     </div>
                     <span className={`text-xs sm:text-sm font-mono font-medium ${
-                      r.status === 'WIN' ? 'text-profit' : r.status === 'LOSS' ? 'text-loss' : 'text-muted-foreground'
+                      r.status === 'WIN' ? 'text-profit' : r.status === 'LOSS' ? 'text-loss' : r.status === 'PLACED' ? 'text-primary' : 'text-muted-foreground'
                     }`}>
-                      {r.status === 'WIN' || r.status === 'LOSS' ? `${r.profit >= 0 ? '+' : ''}$${r.profit.toFixed(2)}` : '—'}
+                      {r.status === 'WIN' || r.status === 'LOSS' ? `${r.profit >= 0 ? '+' : ''}$${r.profit.toFixed(2)}` : r.status === 'PLACED' ? 'Live' : '—'}
                     </span>
                   </motion.div>
                 ))}
