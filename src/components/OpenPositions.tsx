@@ -8,7 +8,15 @@ import { motion, AnimatePresence } from 'framer-motion';
 export const OpenPositions = () => {
   const [contracts, setContracts] = useState<any[]>([]);
   const [selling, setSelling] = useState<number | null>(null);
+  const [bulkSelling, setBulkSelling] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+
+  const getProfit = (contract: any) => contract.profit !== undefined
+    ? Number(contract.profit)
+    : Number((contract.bid_price || contract.payout || 0) - (contract.buy_price || 0));
+
+  const isBuySide = (contract: any) => ['CALL', 'MULTUP', 'TURBOSLONG', 'VANILLALONGCALL'].includes(contract.contract_type);
+  const isSellSide = (contract: any) => ['PUT', 'MULTDOWN', 'TURBOSSHORT', 'VANILLALONGPUT'].includes(contract.contract_type);
 
   const fetchPositions = async () => {
     if (!derivWS.isConnected || !derivWS.isAuthorized) { setLoading(false); return; }
@@ -20,13 +28,21 @@ export const OpenPositions = () => {
         for (const c of resp.portfolio.contracts) {
           derivWS.send({ proposal_open_contract: 1, contract_id: c.contract_id, subscribe: 1 }).catch(() => {});
         }
+      } else {
+        setContracts([]);
       }
     } catch {} finally { setLoading(false); }
+  };
+
+  const refreshAfterTrade = () => {
+    fetchPositions();
+    window.setTimeout(fetchPositions, 1200);
   };
 
   useEffect(() => {
     fetchPositions();
     const interval = setInterval(fetchPositions, 10000);
+    window.addEventListener('deriv:trade-opened', refreshAfterTrade);
 
     const unsub = derivWS.subscribe('proposal_open_contract', (data) => {
       if (data.proposal_open_contract) {
@@ -51,7 +67,7 @@ export const OpenPositions = () => {
       }
     });
 
-    return () => { clearInterval(interval); unsub(); };
+    return () => { clearInterval(interval); window.removeEventListener('deriv:trade-opened', refreshAfterTrade); unsub(); };
   }, []);
 
   const sellContract = async (contractId: number) => {
@@ -77,6 +93,48 @@ export const OpenPositions = () => {
     }
   };
 
+  const bulkClose = async (mode: 'all' | 'buy' | 'sell' | 'profit' | 'loss') => {
+    const targets = contracts.filter((contract) => {
+      if (!contract.is_valid_to_sell) return false;
+      if (mode === 'all') return true;
+      if (mode === 'buy') return isBuySide(contract);
+      if (mode === 'sell') return isSellSide(contract);
+      if (mode === 'profit') return getProfit(contract) > 0;
+      return getProfit(contract) < 0;
+    });
+
+    if (targets.length === 0) {
+      tradeNotifications.notify({
+        type: 'info',
+        title: 'No matching positions',
+        message: 'There are no open positions for that bulk action.',
+      });
+      return;
+    }
+
+    setBulkSelling(mode);
+    let closed = 0;
+
+    try {
+      for (const contract of targets) {
+        try {
+          const result = await derivWS.sellContract(contract.contract_id, 0);
+          if (result.sell) closed += 1;
+        } catch {}
+      }
+
+      setContracts((prev) => prev.filter((contract) => !targets.some((target) => target.contract_id === contract.contract_id)));
+      tradeNotifications.notify({
+        type: 'info',
+        title: 'Bulk close complete',
+        message: `Closed ${closed} of ${targets.length} matching positions.`,
+      });
+    } finally {
+      setBulkSelling(null);
+      fetchPositions();
+    }
+  };
+
   if (loading) {
     return (
       <div className="bg-card border border-border rounded-lg p-4">
@@ -89,16 +147,27 @@ export const OpenPositions = () => {
 
   return (
     <div className="bg-card border border-border rounded-lg">
-      <div className="px-3 sm:px-4 py-2 sm:py-3 border-b border-border flex items-center justify-between">
-        <h2 className="text-xs sm:text-sm font-semibold text-foreground">Open Positions ({contracts.length})</h2>
-        <Button variant="ghost" size="sm" onClick={fetchPositions} className="text-xs h-6 px-2 text-muted-foreground">
-          Refresh
-        </Button>
+      <div className="px-3 sm:px-4 py-2 sm:py-3 border-b border-border space-y-2">
+        <div className="flex items-center justify-between">
+          <h2 className="text-xs sm:text-sm font-semibold text-foreground">Open Positions ({contracts.length})</h2>
+          <Button variant="ghost" size="sm" onClick={fetchPositions} className="text-xs h-6 px-2 text-muted-foreground">
+            Refresh
+          </Button>
+        </div>
+        {contracts.length > 0 && (
+          <div className="flex flex-wrap gap-1">
+            <Button size="sm" variant="outline" onClick={() => bulkClose('all')} disabled={bulkSelling !== null} className="h-7 px-2 text-[10px] sm:text-xs">{bulkSelling === 'all' ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Close All'}</Button>
+            <Button size="sm" variant="outline" onClick={() => bulkClose('buy')} disabled={bulkSelling !== null} className="h-7 px-2 text-[10px] sm:text-xs">{bulkSelling === 'buy' ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Close Buys'}</Button>
+            <Button size="sm" variant="outline" onClick={() => bulkClose('sell')} disabled={bulkSelling !== null} className="h-7 px-2 text-[10px] sm:text-xs">{bulkSelling === 'sell' ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Close Sells'}</Button>
+            <Button size="sm" variant="outline" onClick={() => bulkClose('profit')} disabled={bulkSelling !== null} className="h-7 px-2 text-[10px] sm:text-xs">{bulkSelling === 'profit' ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Close Profit'}</Button>
+            <Button size="sm" variant="outline" onClick={() => bulkClose('loss')} disabled={bulkSelling !== null} className="h-7 px-2 text-[10px] sm:text-xs">{bulkSelling === 'loss' ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Close Loss'}</Button>
+          </div>
+        )}
       </div>
       <div className="p-2 sm:p-3 space-y-2 max-h-[400px] overflow-y-auto">
         <AnimatePresence>
           {contracts.length > 0 ? contracts.map((c: any) => {
-            const profit = c.profit !== undefined ? c.profit : (c.bid_price || c.payout || 0) - (c.buy_price || 0);
+            const profit = getProfit(c);
             const isProfit = profit >= 0;
             
             return (
