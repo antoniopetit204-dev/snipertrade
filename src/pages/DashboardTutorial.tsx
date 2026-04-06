@@ -14,8 +14,8 @@ const tutorials = [
     steps: ['Never risk more than 2% per trade', 'Always set stop loss limits', 'Diversify across symbols', 'Use take profit to lock gains', 'Track performance in Portfolio'] },
   { title: 'Advanced Strategy Development', description: 'Create sophisticated trading strategies.', duration: '15 min', level: 'Advanced',
     steps: ['Study the Strategy page', 'Combine contract types', 'Use Charts for analysis', 'Confirm with Analysis signals', 'Test with demo account first'] },
-  { title: 'Copy Trading Guide', description: 'Follow successful traders.', duration: '6 min', level: 'Beginner',
-    steps: ['Go to Copy Trading', 'Browse top performers', 'Review history & win rate', 'Set copy amount & risk limits', 'Monitor in Portfolio'] },
+  { title: 'Trading From Mobile', description: 'Use the platform like a mobile app.', duration: '6 min', level: 'Beginner',
+    steps: ['Install the app shortcut from the website or dashboard', 'Use the bottom nav on mobile', 'Open Manual Trader to place a trade', 'Watch live positions in Portfolio', 'Use Close buttons or bulk close actions when needed'] },
 ];
 
 const DashboardTutorial = () => {

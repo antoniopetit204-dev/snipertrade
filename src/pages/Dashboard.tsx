@@ -6,6 +6,7 @@ import { getUser } from '@/lib/store';
 import { useDerivConnection } from '@/hooks/useDerivWS';
 import { derivWS } from '@/lib/deriv-ws';
 import { tradeNotifications } from '@/lib/trade-notifications';
+import { InstallShortcutPrompt } from '@/components/InstallShortcutPrompt';
 import { TrendingUp, TrendingDown, Zap, Wallet, BarChart3, Activity } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -72,6 +73,8 @@ const Dashboard = () => {
   return (
     <DashboardLayout title="Trading Dashboard" icon={<TrendingUp className="h-5 w-5 text-primary" />}>
       <div className="space-y-4 sm:space-y-6">
+        <InstallShortcutPrompt variant="dashboard" />
+
         {/* Stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-4">
           {[

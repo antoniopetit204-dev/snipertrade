@@ -63,6 +63,7 @@ export const TradingPanel = ({ symbol, displayName, currentPrice, onClose }: Tra
   const [lastDigit, setLastDigit] = useState<number | null>(null);
   const [digitHistory, setDigitHistory] = useState<number[]>([]);
   const [availableContracts, setAvailableContracts] = useState<string[]>([]);
+  const normalUsesMultiplier = isContractSupported(availableContracts, 'MULTUP') && isContractSupported(availableContracts, 'MULTDOWN');
 
   useEffect(() => {
     if (!derivWS.isConnected) return;
@@ -112,8 +113,15 @@ export const TradingPanel = ({ symbol, displayName, currentPrice, onClose }: Tra
         switch (category) {
           case 'normal':
             requests = [
-              { key: 'MULTUP', params: buildProposalPayload({ ...commonOptions, contractType: 'MULTUP' }) },
-              { key: 'MULTDOWN', params: buildProposalPayload({ ...commonOptions, contractType: 'MULTDOWN' }) },
+              ...(normalUsesMultiplier
+                ? [
+                    { key: 'MULTUP', params: buildProposalPayload({ ...commonOptions, contractType: 'MULTUP' }) },
+                    { key: 'MULTDOWN', params: buildProposalPayload({ ...commonOptions, contractType: 'MULTDOWN' }) },
+                  ]
+                : [
+                    { key: 'CALL', params: buildProposalPayload({ ...commonOptions, contractType: 'CALL' }) },
+                    { key: 'PUT', params: buildProposalPayload({ ...commonOptions, contractType: 'PUT' }) },
+                  ]),
             ];
             break;
           case 'rise_fall':
@@ -189,7 +197,7 @@ export const TradingPanel = ({ symbol, displayName, currentPrice, onClose }: Tra
 
     const timer = setTimeout(getProposals, 500);
     return () => clearTimeout(timer);
-  }, [symbol, stake, duration, durationUnit, category, selectedDigit, multiplier, growthRate, takeProfit, stopLoss, availableContracts]);
+  }, [symbol, stake, duration, durationUnit, category, selectedDigit, multiplier, growthRate, takeProfit, stopLoss, availableContracts, normalUsesMultiplier]);
 
   const executeTrade = async (contractType: string) => {
     const proposal = proposals[contractType];
@@ -321,12 +329,12 @@ export const TradingPanel = ({ symbol, displayName, currentPrice, onClose }: Tra
           {/* Common: Stake */}
           <div className="grid grid-cols-3 gap-2">
             <div>
-              <label className="text-[10px] sm:text-xs text-muted-foreground uppercase tracking-wider block mb-1">Stake ($)</label>
+              <label className="text-[10px] sm:text-xs text-muted-foreground uppercase tracking-wider block mb-1">Lot Size / Stake ($)</label>
               <Input value={stake} onChange={e => setStake(e.target.value)} type="number" min="0.35" step="0.1"
                 className="bg-secondary border-border text-foreground font-mono text-xs" />
             </div>
 
-            {['rise_fall', 'over_under', 'vanillas', 'turbos'].includes(category) && (
+            {['normal', 'rise_fall', 'over_under', 'vanillas', 'turbos'].includes(category) && (
               <>
                 <div>
                   <label className="text-[10px] sm:text-xs text-muted-foreground uppercase tracking-wider block mb-1">Duration</label>
@@ -347,7 +355,7 @@ export const TradingPanel = ({ symbol, displayName, currentPrice, onClose }: Tra
               </>
             )}
 
-            {['normal', 'multipliers'].includes(category) && (
+            {(['multipliers'].includes(category) || (category === 'normal' && normalUsesMultiplier)) && (
               <div className="col-span-2">
                 <label className="text-[10px] sm:text-xs text-muted-foreground uppercase tracking-wider block mb-1">Multiplier</label>
                 <div className="flex gap-1">
@@ -363,7 +371,7 @@ export const TradingPanel = ({ symbol, displayName, currentPrice, onClose }: Tra
               </div>
             )}
 
-            {category === 'normal' && (
+            {category === 'normal' && normalUsesMultiplier && (
               <>
                 <div>
                   <label className="text-[10px] sm:text-xs text-muted-foreground uppercase tracking-wider block mb-1">Take Profit</label>
@@ -436,7 +444,7 @@ export const TradingPanel = ({ symbol, displayName, currentPrice, onClose }: Tra
           {/* Payout info */}
           <div className="grid grid-cols-2 gap-2">
             {category === 'normal' && (
-              <>{renderProposalInfo('MULTUP', 'Buy')}{renderProposalInfo('MULTDOWN', 'Sell')}</>
+              <>{renderProposalInfo(normalUsesMultiplier ? 'MULTUP' : 'CALL', 'Buy')}{renderProposalInfo(normalUsesMultiplier ? 'MULTDOWN' : 'PUT', 'Sell')}</>
             )}
             {category === 'rise_fall' && (
               <>{renderProposalInfo('CALL', 'Rise')}{renderProposalInfo('PUT', 'Fall')}</>
@@ -459,7 +467,7 @@ export const TradingPanel = ({ symbol, displayName, currentPrice, onClose }: Tra
           {/* Buy buttons */}
           <div className="grid grid-cols-2 gap-2">
             {category === 'normal' && (
-              <>{renderBuyButton('MULTUP', 'Buy', 'profit')}{renderBuyButton('MULTDOWN', 'Sell', 'loss')}</>
+              <>{renderBuyButton(normalUsesMultiplier ? 'MULTUP' : 'CALL', 'Buy', 'profit')}{renderBuyButton(normalUsesMultiplier ? 'MULTDOWN' : 'PUT', 'Sell', 'loss')}</>
             )}
             {category === 'rise_fall' && (
               <>{renderBuyButton('CALL', 'Rise', 'profit')}{renderBuyButton('PUT', 'Fall', 'loss')}</>
@@ -483,6 +491,9 @@ export const TradingPanel = ({ symbol, displayName, currentPrice, onClose }: Tra
 
           {Object.values(proposalErrors).length > 0 && (
             <div className="space-y-1">
+              {category === 'normal' && !normalUsesMultiplier && (
+                <p className="text-[10px] sm:text-xs text-primary">Normal trading is using standard Buy/Sell contracts on this market because multipliers are not available.</p>
+              )}
               {Object.entries(proposalErrors).map(([key, value]) => (
                 <p key={key} className="text-[10px] sm:text-xs text-muted-foreground"><span className="text-foreground font-medium">{key}:</span> {value}</p>
               ))}

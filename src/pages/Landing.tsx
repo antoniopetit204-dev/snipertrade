@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { getSettings, getUser, getDerivOAuthUrl, parseDerivCallback, setUser, hasDerivCallbackParams } from '@/lib/store';
 import { upsertSession } from '@/lib/db';
 import { useSettings } from '@/hooks/useSettings';
+import { InstallShortcutPrompt } from '@/components/InstallShortcutPrompt';
 import { Activity, TrendingUp, Bot, BarChart3, Shield, Zap, ArrowRight, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
@@ -27,7 +28,7 @@ const features = [
   { icon: Bot, title: 'Automated Bots', desc: 'Deploy pre-built or custom trading bots on Deriv markets' },
   { icon: BarChart3, title: 'Advanced Analysis', desc: 'Real-time technical indicators and AI-powered signals' },
   { icon: Shield, title: 'Risk Management', desc: 'Protect your capital with advanced risk controls' },
-  { icon: TrendingUp, title: 'Copy Trading', desc: 'Follow and copy successful traders automatically' },
+  { icon: TrendingUp, title: 'Installable Mobile App', desc: 'Add the platform to your Android or iPhone home screen for fast app-style access' },
   { icon: Activity, title: 'Live Charts', desc: 'TradingView-style candlestick charts with drawing tools' },
 ];
 
@@ -139,6 +140,9 @@ const Landing = () => {
           <section className="relative overflow-hidden">
             <div className="geometric-bg absolute inset-0 opacity-50" />
             <div className="max-w-7xl mx-auto px-4 sm:px-6 py-12 sm:py-24 relative z-10">
+              <div className="mx-auto mb-6 max-w-xl">
+                <InstallShortcutPrompt variant="landing" />
+              </div>
               <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }} className="text-center max-w-3xl mx-auto">
                 <div className="inline-flex items-center gap-2 bg-primary/10 border border-primary/20 rounded-full px-3 sm:px-4 py-1.5 mb-4 sm:mb-6">
                   <span className="h-2 w-2 rounded-full bg-profit animate-pulse" />

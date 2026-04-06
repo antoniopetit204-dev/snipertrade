@@ -1,4 +1,4 @@
-import { Activity, BarChart3, Bot, LineChart, LogOut, TrendingUp, Wallet, ChevronLeft, ChevronRight, BookOpen, Copy, Shield, Lightbulb, Wrench, X, Crosshair } from 'lucide-react';
+import { Activity, BarChart3, Bot, LineChart, LogOut, TrendingUp, Wallet, ChevronLeft, ChevronRight, BookOpen, Shield, Lightbulb, Wrench, X, Crosshair } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { setUser, getSettings, getUser } from '@/lib/store';
 import { useState } from 'react';
@@ -14,7 +14,6 @@ const navItems = [
   { label: 'Strategy', icon: Lightbulb, path: '/dashboard/strategy' },
   { label: 'Charts', icon: LineChart, path: '/dashboard/charts' },
   { label: 'Portfolio', icon: Wallet, path: '/dashboard/portfolio' },
-  { label: 'Copy Trading', icon: Copy, path: '/dashboard/copy-trading' },
   { label: 'Risk Mgmt', icon: Shield, path: '/dashboard/risk' },
   { label: 'Tutorial', icon: BookOpen, path: '/dashboard/tutorial' },
 ];

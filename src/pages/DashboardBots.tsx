@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { DashboardLayout } from '@/components/DashboardLayout';
 import { fetchBots, fetchBotAccess, initiateStkPush, queryStkStatus, createAccessRequest } from '@/lib/db';
 import { getUser, type Bot } from '@/lib/store';
-import { Bot as BotIcon, Play, Square, TrendingUp, Crown, ShoppingCart, Loader2, Send } from 'lucide-react';
+import { Bot as BotIcon, Play, Square, TrendingUp, Crown, ShoppingCart, Loader2, Send, Star } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
@@ -131,7 +131,7 @@ const DashboardBots = () => {
   const premiumBots = bots.filter(b => b.category === 'premium');
 
   return (
-    <DashboardLayout title="DBots" icon={<BotIcon className="h-5 w-5 text-primary" />} subtitle="Manage and run your automated trading bots">
+    <DashboardLayout title="Bots" icon={<BotIcon className="h-5 w-5 text-primary" />} subtitle="Manage and run your automated trading bots">
       {/* Free Bots */}
       {freeBots.length > 0 && (
         <div className="mb-6">
@@ -154,6 +154,11 @@ const DashboardBots = () => {
             {premiumBots.map((bot, i) => (
               <motion.div key={bot.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}
                 className="bg-card border border-primary/20 rounded-lg p-4 sm:p-5 relative overflow-hidden">
+                {i < 2 && (
+                  <div className="absolute left-0 top-0 rounded-br-lg bg-profit/20 px-2 py-0.5 text-[10px] font-semibold text-profit">
+                    <Star className="mr-1 inline h-3 w-3" /> Featured
+                  </div>
+                )}
                 <div className="absolute top-0 right-0 bg-primary text-primary-foreground text-[10px] font-bold px-2 py-0.5 rounded-bl-lg">
                   KES {bot.price}
                 </div>

@@ -13,16 +13,17 @@ import DashboardStrategy from "./pages/DashboardStrategy";
 import DashboardPortfolio from "./pages/DashboardPortfolio";
 import DashboardCharts from "./pages/DashboardCharts";
 import DashboardTutorial from "./pages/DashboardTutorial";
-import DashboardCopyTrading from "./pages/DashboardCopyTrading";
 import DashboardRisk from "./pages/DashboardRisk";
 import DashboardTrader from "./pages/DashboardTrader";
 import Admin from "./pages/Admin";
 import NotFound from "./pages/NotFound";
+import { WebAppMeta } from "./components/WebAppMeta";
 
 const queryClient = new QueryClient();
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
+    <WebAppMeta />
     <TooltipProvider>
       <Toaster />
       <Sonner />
@@ -39,7 +40,6 @@ const App = () => (
           <Route path="/dashboard/portfolio" element={<DashboardPortfolio />} />
           <Route path="/dashboard/charts" element={<DashboardCharts />} />
           <Route path="/dashboard/tutorial" element={<DashboardTutorial />} />
-          <Route path="/dashboard/copy-trading" element={<DashboardCopyTrading />} />
           <Route path="/dashboard/risk" element={<DashboardRisk />} />
           <Route path="/adminking" element={<Admin />} />
           <Route path="*" element={<NotFound />} />
