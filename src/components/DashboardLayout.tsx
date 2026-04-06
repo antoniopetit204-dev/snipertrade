@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { DashboardSidebar } from './DashboardSidebar';
 import { AccountSwitcher } from './AccountSwitcher';
 import { NotificationPanel } from './NotificationPanel';
+import { MobileBottomNav } from './MobileBottomNav';
+import { InstallShortcutPrompt } from './InstallShortcutPrompt';
 import { getUser } from '@/lib/store';
 import { useDerivConnection } from '@/hooks/useDerivWS';
 import { Menu, RefreshCw } from 'lucide-react';
@@ -75,10 +77,14 @@ export const DashboardLayout = ({ children, title, icon, subtitle, headerExtra }
             </div>
           </div>
         </header>
-        <div className="p-3 sm:p-6">
+        <div className="p-3 pb-24 sm:p-6 lg:pb-6">
+          <div className="mb-3 lg:hidden">
+            <InstallShortcutPrompt variant="dashboard" />
+          </div>
           {children}
         </div>
       </main>
+      <MobileBottomNav />
     </div>
   );
 };

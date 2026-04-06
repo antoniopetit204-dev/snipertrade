@@ -214,11 +214,11 @@ export const OpenPositions = () => {
                       {selling === c.contract_id ? (
                         <Loader2 className="h-3 w-3 animate-spin" />
                       ) : (
-                        <><DollarSign className="h-3 w-3 mr-1" /> Sell</>
+                        <><DollarSign className="h-3 w-3 mr-1" /> Close</>
                       )}
                     </Button>
                   ) : (
-                    <span className="text-[10px] text-muted-foreground">Cannot sell yet</span>
+                    <span className="text-[10px] text-muted-foreground">Waiting for contract to become closable</span>
                   )}
                   {c.date_expiry && (
                     <span className="text-[10px] text-muted-foreground">

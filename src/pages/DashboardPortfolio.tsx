@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { DashboardLayout } from '@/components/DashboardLayout';
+import { OpenPositions } from '@/components/OpenPositions';
 import { useDerivConnection } from '@/hooks/useDerivWS';
 import { derivWS } from '@/lib/deriv-ws';
 import { getUser } from '@/lib/store';
@@ -63,28 +64,7 @@ const DashboardPortfolio = () => {
           </div>
         </div>
 
-        {/* Open Positions */}
-        {openContracts.length > 0 && (
-          <div className="bg-card border border-border rounded-lg">
-            <div className="px-3 sm:px-4 py-2 sm:py-3 border-b border-border">
-              <h2 className="text-xs sm:text-sm font-semibold text-foreground">Open Positions</h2>
-            </div>
-            <div className="divide-y divide-border">
-              {openContracts.map((c: any, i: number) => (
-                <motion.div key={i} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: i * 0.03 }}
-                  className="px-3 sm:px-4 py-3 flex items-center justify-between">
-                  <div>
-                    <p className="text-xs sm:text-sm font-medium text-foreground">{c.symbol}</p>
-                    <p className="text-[10px] sm:text-xs text-muted-foreground">{c.contract_type} • Buy: {c.buy_price}</p>
-                  </div>
-                  <span className={`text-xs sm:text-sm font-mono font-medium ${(c.payout - c.buy_price) >= 0 ? 'text-profit' : 'text-loss'}`}>
-                    {(c.payout - c.buy_price) >= 0 ? '+' : ''}{(c.payout - c.buy_price).toFixed(2)}
-                  </span>
-                </motion.div>
-              ))}
-            </div>
-          </div>
-        )}
+        <OpenPositions />
 
         {/* Profit Table */}
         <div className="bg-card border border-border rounded-lg">
