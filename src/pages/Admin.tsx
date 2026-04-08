@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getUser, getSettings, setUser, ADMIN_ACCOUNT, type AdminSettings } from '@/lib/store';
-import { fetchSettings, updateSettings, fetchBots, createBot, deleteBot as dbDeleteBot, toggleBotEnabled, updateBot as dbUpdateBot, fetchMpesaConfig, updateMpesaConfig, fetchAccessRequests, updateAccessRequestStatus, fetchPurchases, type MpesaConfig } from '@/lib/db';
+import { fetchSettings, updateSettings, fetchBots, createBot, deleteBot as dbDeleteBot, toggleBotEnabled, updateBot as dbUpdateBot, fetchMpesaConfig, updateMpesaConfig, fetchAccessRequests, updateAccessRequestStatus, fetchPurchases, fetchAllWithdrawals, processWithdrawal, type MpesaConfig } from '@/lib/db';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
@@ -9,7 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-import { Settings, Bot as BotIcon, Globe, Shield, LogOut, Activity, Plus, Trash2, Key, AppWindow, Users, Palette, Crown, Lock, Smartphone, CheckCircle, XCircle, Clock, Edit2, Save } from 'lucide-react';
+import { Settings, Bot as BotIcon, Globe, Shield, LogOut, Activity, Plus, Trash2, Key, AppWindow, Users, Palette, Crown, Lock, Smartphone, CheckCircle, XCircle, Clock, Edit2, Save, ArrowUpFromLine } from 'lucide-react';
 import { motion } from 'framer-motion';
 import type { Bot } from '@/lib/store';
 
@@ -24,6 +24,7 @@ const Admin = () => {
   const [mpesaConfig, setMpesaConfig] = useState<Omit<MpesaConfig, 'id'>>({ consumerKey: '', consumerSecret: '', shortcode: '', passkey: '', environment: 'sandbox' });
   const [accessRequests, setAccessRequests] = useState<any[]>([]);
   const [purchases, setPurchases] = useState<any[]>([]);
+  const [withdrawals, setWithdrawals] = useState<any[]>([]);
   const [editingBot, setEditingBot] = useState<string | null>(null);
   const [editBotData, setEditBotData] = useState<Partial<Bot>>({});
 
@@ -35,14 +36,15 @@ const Admin = () => {
 
   useEffect(() => {
     const loadData = async () => {
-      const [dbSettings, dbBots, dbMpesa, dbRequests, dbPurchases] = await Promise.all([
-        fetchSettings(), fetchBots(), fetchMpesaConfig(), fetchAccessRequests(), fetchPurchases(),
+      const [dbSettings, dbBots, dbMpesa, dbRequests, dbPurchases, dbWithdrawals] = await Promise.all([
+        fetchSettings(), fetchBots(), fetchMpesaConfig(), fetchAccessRequests(), fetchPurchases(), fetchAllWithdrawals(),
       ]);
       if (dbSettings) setSettings(dbSettings);
       setBots(dbBots);
       if (dbMpesa) setMpesaConfig({ consumerKey: dbMpesa.consumerKey, consumerSecret: dbMpesa.consumerSecret, shortcode: dbMpesa.shortcode, passkey: dbMpesa.passkey, environment: dbMpesa.environment });
       setAccessRequests(dbRequests);
       setPurchases(dbPurchases);
+      setWithdrawals(dbWithdrawals);
       setLoading(false);
     };
     if (isAdmin) loadData();
