@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import { DashboardLayout } from '@/components/DashboardLayout';
 import { getUser } from '@/lib/store';
 import { useDerivConnection } from '@/hooks/useDerivWS';
-import { fetchWithdrawals, initiateWithdrawal, fetchWithdrawalEnabled, queryWithdrawalStatus } from '@/lib/db';
+import { fetchWithdrawals, initiateWithdrawal, fetchWithdrawalEnabled } from '@/lib/db';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -39,7 +39,7 @@ const DashboardWithdraw = () => {
         setWithdrawals(updated);
         const record = updated.find((w: any) => w.id === pendingId);
         if (record?.status === 'completed') {
-          toast({ title: 'Withdrawal Successful!', description: `Sent to your M-Pesa` });
+          toast({ title: 'Withdrawal Successful!', description: 'Sent to your M-Pesa' });
           setPendingId(null);
         } else if (record?.status === 'failed' || record?.status === 'cancelled') {
           toast({ title: 'Withdrawal Failed', variant: 'destructive' });
