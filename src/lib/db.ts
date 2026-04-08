@@ -18,7 +18,7 @@ export const fetchSettings = async (): Promise<AdminSettings | null> => {
     logoUrl: data.logo_url, favicon: data.favicon, primaryColor: data.primary_color, footerText: data.footer_text,
     announcementBar: data.announcement_bar, maintenanceMode: data.maintenance_mode, allowSignups: data.allow_signups,
     maxBotPerUser: data.max_bot_per_user, defaultCurrency: data.default_currency, termsUrl: data.terms_url,
-    privacyUrl: data.privacy_url,
+    privacyUrl: data.privacy_url, depositEnabled: (data as any).deposit_enabled ?? false, appIconUrl: (data as any).app_icon_url ?? '',
   };
 };
 
@@ -32,8 +32,8 @@ export const updateSettings = async (settings: AdminSettings) => {
       logo_url: settings.logoUrl, favicon: settings.favicon, primary_color: settings.primaryColor, footer_text: settings.footerText,
       announcement_bar: settings.announcementBar, maintenance_mode: settings.maintenanceMode, allow_signups: settings.allowSignups,
       max_bot_per_user: settings.maxBotPerUser, default_currency: settings.defaultCurrency, terms_url: settings.termsUrl,
-      privacy_url: settings.privacyUrl,
-    })
+      privacy_url: settings.privacyUrl, deposit_enabled: settings.depositEnabled, app_icon_url: settings.appIconUrl,
+    } as any)
     .not('id', 'is', null);
   return !error;
 };
