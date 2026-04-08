@@ -66,7 +66,11 @@ export const createBot = async (bot: Omit<Bot, 'id' | 'createdAt' | 'profitLoss'
 };
 
 export const updateBot = async (id: string, updates: Partial<Bot>) => {
-  const dbUpdates: Record<string, any> = {};
+  const dbUpdates: {
+    name?: string; description?: string; strategy?: string; category?: string;
+    price?: number; enabled?: boolean; profit_loss?: number; trades?: number;
+    win_rate?: number; featured?: boolean;
+  } = {};
   if (updates.name !== undefined) dbUpdates.name = updates.name;
   if (updates.description !== undefined) dbUpdates.description = updates.description;
   if (updates.strategy !== undefined) dbUpdates.strategy = updates.strategy;
@@ -212,4 +216,30 @@ export const queryStkStatus = async (checkoutRequestId: string) => {
   });
   if (error) throw error;
   return data;
+};
+
+// ---- Deposits ----
+
+export const initiateDeposit = async (phoneNumber: string, amount: number, derivAccount: string) => {
+  const { data, error } = await supabase.functions.invoke('mpesa-stk', {
+    body: { phone_number: phoneNumber, amount, deriv_account: derivAccount, action_type: 'deposit' },
+  });
+  if (error) throw error;
+  return data;
+};
+
+export const fetchDeposits = async (derivAccount?: string) => {
+  let query = supabase.from('deposits').select('*');
+  if (derivAccount) query = query.eq('deriv_account', derivAccount);
+  const { data } = await query.order('created_at', { ascending: false });
+  return data || [];
+};
+
+export const fetchDepositEnabled = async (): Promise<boolean> => {
+  const { data } = await supabase
+    .from('admin_settings')
+    .select('deposit_enabled')
+    .limit(1)
+    .single();
+  return data?.deposit_enabled ?? false;
 };
