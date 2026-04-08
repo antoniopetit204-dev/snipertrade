@@ -266,6 +266,10 @@ const Admin = () => {
                   <Switch checked={settings.allowSignups} onCheckedChange={v => setSettings({ ...settings, allowSignups: v })} />
                   <Label className="text-xs sm:text-sm text-foreground">Allow Signups</Label>
                 </div>
+                <div className="flex items-center gap-3">
+                  <Switch checked={settings.depositEnabled} onCheckedChange={v => setSettings({ ...settings, depositEnabled: v })} />
+                  <Label className="text-xs sm:text-sm text-foreground">Enable Deposits</Label>
+                </div>
               </div>
               <Button onClick={handleSaveSettings} className="bg-primary text-primary-foreground hover:bg-primary/90 text-xs sm:text-sm">Save Settings</Button>
             </motion.div>

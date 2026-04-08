@@ -22,6 +22,8 @@ export interface AdminSettings {
   defaultCurrency: string;
   termsUrl: string;
   privacyUrl: string;
+  depositEnabled: boolean;
+  appIconUrl: string;
 }
 
 export interface Bot {
@@ -73,6 +75,8 @@ const DEFAULT_SETTINGS: AdminSettings = {
   defaultCurrency: 'USD',
   termsUrl: '',
   privacyUrl: '',
+  depositEnabled: false,
+  appIconUrl: '',
 };
 
 let cachedSettings: AdminSettings | null = null;

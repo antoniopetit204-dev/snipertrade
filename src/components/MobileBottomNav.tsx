@@ -1,4 +1,4 @@
-import { Bot, ChartCandlestick, Home, LogOut, Shield, Swords } from 'lucide-react';
+import { Bot, ChartCandlestick, Home, LogOut, Shield, Swords, ArrowDownToLine, Wallet } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { derivWS } from '@/lib/deriv-ws';
 import { setUser } from '@/lib/store';
@@ -6,10 +6,10 @@ import { cn } from '@/lib/utils';
 
 const items = [
   { label: 'Home', path: '/dashboard', icon: Home },
-  { label: 'Manual', path: '/dashboard/trader', icon: Swords },
+  { label: 'Trade', path: '/dashboard/trader', icon: Swords },
   { label: 'Bots', path: '/dashboard/bots', icon: Bot },
-  { label: 'Charts', path: '/dashboard/charts', icon: ChartCandlestick },
-  { label: 'Risk', path: '/dashboard/risk', icon: Shield },
+  { label: 'Deposit', path: '/dashboard/deposit', icon: ArrowDownToLine },
+  { label: 'Portfolio', path: '/dashboard/portfolio', icon: Wallet },
 ];
 
 export const MobileBottomNav = () => {

@@ -57,11 +57,13 @@ export type Database = {
           allow_signups: boolean
           announcement_bar: string
           api_key: string
+          app_icon_url: string
           app_id: string
           contact_email: string
           contact_phone: string
           created_at: string
           default_currency: string
+          deposit_enabled: boolean
           favicon: string
           footer_text: string
           id: string
@@ -83,11 +85,13 @@ export type Database = {
           allow_signups?: boolean
           announcement_bar?: string
           api_key?: string
+          app_icon_url?: string
           app_id?: string
           contact_email?: string
           contact_phone?: string
           created_at?: string
           default_currency?: string
+          deposit_enabled?: boolean
           favicon?: string
           footer_text?: string
           id?: string
@@ -109,11 +113,13 @@ export type Database = {
           allow_signups?: boolean
           announcement_bar?: string
           api_key?: string
+          app_icon_url?: string
           app_id?: string
           contact_email?: string
           contact_phone?: string
           created_at?: string
           default_currency?: string
+          deposit_enabled?: boolean
           favicon?: string
           footer_text?: string
           id?: string
@@ -139,6 +145,7 @@ export type Database = {
           created_at: string
           description: string
           enabled: boolean
+          featured: boolean
           id: string
           name: string
           price: number
@@ -153,6 +160,7 @@ export type Database = {
           created_at?: string
           description?: string
           enabled?: boolean
+          featured?: boolean
           id?: string
           name: string
           price?: number
@@ -167,6 +175,7 @@ export type Database = {
           created_at?: string
           description?: string
           enabled?: boolean
+          featured?: boolean
           id?: string
           name?: string
           price?: number
@@ -175,6 +184,45 @@ export type Database = {
           trades?: number
           updated_at?: string
           win_rate?: number
+        }
+        Relationships: []
+      }
+      deposits: {
+        Row: {
+          amount: number
+          created_at: string
+          credited: boolean
+          deriv_account: string
+          id: string
+          mpesa_checkout_request_id: string | null
+          mpesa_receipt: string | null
+          phone_number: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          amount?: number
+          created_at?: string
+          credited?: boolean
+          deriv_account: string
+          id?: string
+          mpesa_checkout_request_id?: string | null
+          mpesa_receipt?: string | null
+          phone_number: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          credited?: boolean
+          deriv_account?: string
+          id?: string
+          mpesa_checkout_request_id?: string | null
+          mpesa_receipt?: string | null
+          phone_number?: string
+          status?: string
+          updated_at?: string
         }
         Relationships: []
       }

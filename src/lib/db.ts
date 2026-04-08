@@ -18,7 +18,7 @@ export const fetchSettings = async (): Promise<AdminSettings | null> => {
     logoUrl: data.logo_url, favicon: data.favicon, primaryColor: data.primary_color, footerText: data.footer_text,
     announcementBar: data.announcement_bar, maintenanceMode: data.maintenance_mode, allowSignups: data.allow_signups,
     maxBotPerUser: data.max_bot_per_user, defaultCurrency: data.default_currency, termsUrl: data.terms_url,
-    privacyUrl: data.privacy_url,
+    privacyUrl: data.privacy_url, depositEnabled: (data as any).deposit_enabled ?? false, appIconUrl: (data as any).app_icon_url ?? '',
   };
 };
 
@@ -32,8 +32,8 @@ export const updateSettings = async (settings: AdminSettings) => {
       logo_url: settings.logoUrl, favicon: settings.favicon, primary_color: settings.primaryColor, footer_text: settings.footerText,
       announcement_bar: settings.announcementBar, maintenance_mode: settings.maintenanceMode, allow_signups: settings.allowSignups,
       max_bot_per_user: settings.maxBotPerUser, default_currency: settings.defaultCurrency, terms_url: settings.termsUrl,
-      privacy_url: settings.privacyUrl,
-    })
+      privacy_url: settings.privacyUrl, deposit_enabled: settings.depositEnabled, app_icon_url: settings.appIconUrl,
+    } as any)
     .not('id', 'is', null);
   return !error;
 };
@@ -66,7 +66,11 @@ export const createBot = async (bot: Omit<Bot, 'id' | 'createdAt' | 'profitLoss'
 };
 
 export const updateBot = async (id: string, updates: Partial<Bot>) => {
-  const dbUpdates: Record<string, any> = {};
+  const dbUpdates: {
+    name?: string; description?: string; strategy?: string; category?: string;
+    price?: number; enabled?: boolean; profit_loss?: number; trades?: number;
+    win_rate?: number; featured?: boolean;
+  } = {};
   if (updates.name !== undefined) dbUpdates.name = updates.name;
   if (updates.description !== undefined) dbUpdates.description = updates.description;
   if (updates.strategy !== undefined) dbUpdates.strategy = updates.strategy;
@@ -212,4 +216,30 @@ export const queryStkStatus = async (checkoutRequestId: string) => {
   });
   if (error) throw error;
   return data;
+};
+
+// ---- Deposits ----
+
+export const initiateDeposit = async (phoneNumber: string, amount: number, derivAccount: string) => {
+  const { data, error } = await supabase.functions.invoke('mpesa-stk', {
+    body: { phone_number: phoneNumber, amount, deriv_account: derivAccount, action_type: 'deposit' },
+  });
+  if (error) throw error;
+  return data;
+};
+
+export const fetchDeposits = async (derivAccount?: string) => {
+  let query = supabase.from('deposits').select('*');
+  if (derivAccount) query = query.eq('deriv_account', derivAccount);
+  const { data } = await query.order('created_at', { ascending: false });
+  return data || [];
+};
+
+export const fetchDepositEnabled = async (): Promise<boolean> => {
+  const { data } = await supabase
+    .from('admin_settings')
+    .select('deposit_enabled')
+    .limit(1)
+    .single();
+  return data?.deposit_enabled ?? false;
 };
