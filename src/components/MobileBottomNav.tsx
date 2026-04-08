@@ -1,4 +1,4 @@
-import { Bot, ChartCandlestick, Home, LogOut, Shield, Swords, ArrowDownToLine, Wallet } from 'lucide-react';
+import { Bot, ChartCandlestick, Home, LogOut, Shield, Swords, ArrowDownToLine, ArrowUpFromLine, Wallet } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { derivWS } from '@/lib/deriv-ws';
 import { setUser } from '@/lib/store';
@@ -9,6 +9,7 @@ const items = [
   { label: 'Trade', path: '/dashboard/trader', icon: Swords },
   { label: 'Bots', path: '/dashboard/bots', icon: Bot },
   { label: 'Deposit', path: '/dashboard/deposit', icon: ArrowDownToLine },
+  { label: 'Withdraw', path: '/dashboard/withdraw', icon: ArrowUpFromLine },
   { label: 'Portfolio', path: '/dashboard/portfolio', icon: Wallet },
 ];
 

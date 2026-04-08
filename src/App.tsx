@@ -15,6 +15,7 @@ import DashboardTutorial from "./pages/DashboardTutorial";
 import DashboardRisk from "./pages/DashboardRisk";
 import DashboardTrader from "./pages/DashboardTrader";
 import DashboardDeposit from "./pages/DashboardDeposit";
+import DashboardWithdraw from "./pages/DashboardWithdraw";
 import Admin from "./pages/Admin";
 import NotFound from "./pages/NotFound";
 import { WebAppMeta } from "./components/WebAppMeta";
@@ -41,6 +42,7 @@ const App = () => (
           <Route path="/dashboard/tutorial" element={<DashboardTutorial />} />
           <Route path="/dashboard/risk" element={<DashboardRisk />} />
           <Route path="/dashboard/deposit" element={<DashboardDeposit />} />
+          <Route path="/dashboard/withdraw" element={<DashboardWithdraw />} />
           <Route path="/adminking" element={<Admin />} />
           <Route path="*" element={<NotFound />} />
         </Routes>

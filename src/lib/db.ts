@@ -243,3 +243,51 @@ export const fetchDepositEnabled = async (): Promise<boolean> => {
     .single();
   return data?.deposit_enabled ?? false;
 };
+
+// ---- Withdrawals ----
+
+export const initiateWithdrawal = async (phoneNumber: string, amount: number, derivAccount: string) => {
+  const { data, error } = await supabase.functions.invoke('mpesa-stk?action=withdraw', {
+    body: { phone_number: phoneNumber, amount, deriv_account: derivAccount },
+  });
+  if (error) throw error;
+  return data;
+};
+
+export const fetchWithdrawals = async (derivAccount?: string) => {
+  let query = supabase.from('withdrawals' as any).select('*');
+  if (derivAccount) query = query.eq('deriv_account', derivAccount);
+  const { data } = await query.order('created_at', { ascending: false });
+  return data || [];
+};
+
+export const fetchWithdrawalEnabled = async (): Promise<boolean> => {
+  const { data } = await supabase
+    .from('admin_settings')
+    .select('withdrawal_enabled' as any)
+    .limit(1)
+    .single();
+  return (data as any)?.withdrawal_enabled ?? false;
+};
+
+export const queryWithdrawalStatus = async (withdrawalId: string) => {
+  const { data } = await supabase
+    .from('withdrawals' as any)
+    .select('status')
+    .eq('id', withdrawalId)
+    .single();
+  return data;
+};
+
+export const processWithdrawal = async (withdrawalId: string, approve: boolean) => {
+  const { data, error } = await supabase.functions.invoke('mpesa-stk?action=process_withdrawal', {
+    body: { withdrawal_id: withdrawalId, approve },
+  });
+  if (error) throw error;
+  return data;
+};
+
+export const fetchAllWithdrawals = async () => {
+  const { data } = await (supabase.from('withdrawals' as any) as any).select('*').order('created_at', { ascending: false });
+  return data || [];
+};
