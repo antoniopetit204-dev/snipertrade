@@ -254,8 +254,8 @@ export const initiateWithdrawal = async (phoneNumber: string, amount: number, de
   return data;
 };
 
-export const fetchWithdrawals = async (derivAccount?: string) => {
-  let query = supabase.from('withdrawals' as any).select('*');
+export const fetchWithdrawals = async (derivAccount?: string): Promise<any[]> => {
+  let query = (supabase as any).from('withdrawals').select('*');
   if (derivAccount) query = query.eq('deriv_account', derivAccount);
   const { data } = await query.order('created_at', { ascending: false });
   return data || [];
@@ -264,7 +264,7 @@ export const fetchWithdrawals = async (derivAccount?: string) => {
 export const fetchWithdrawalEnabled = async (): Promise<boolean> => {
   const { data } = await supabase
     .from('admin_settings')
-    .select('withdrawal_enabled' as any)
+    .select('*')
     .limit(1)
     .single();
   return (data as any)?.withdrawal_enabled ?? false;
