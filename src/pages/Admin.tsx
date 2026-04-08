@@ -199,6 +199,7 @@ const Admin = () => {
               { value: 'general', icon: Globe, label: 'General' },
               { value: 'bots', icon: BotIcon, label: 'Bots' },
               { value: 'mpesa', icon: Smartphone, label: 'M-Pesa' },
+              { value: 'withdrawals', icon: ArrowUpFromLine, label: 'Withdrawals' },
               { value: 'requests', icon: Users, label: 'Requests' },
               { value: 'seo', icon: AppWindow, label: 'SEO' },
               { value: 'appearance', icon: Palette, label: 'Look' },
