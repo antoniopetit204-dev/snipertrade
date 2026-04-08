@@ -25,7 +25,7 @@ export const MobileBottomNav = () => {
 
   return (
     <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-card/95 px-2 pb-[calc(0.4rem+env(safe-area-inset-bottom))] pt-2 backdrop-blur-lg lg:hidden">
-      <div className="grid grid-cols-6 gap-1 rounded-2xl border border-border bg-background/70 p-1.5 shadow-2xl">
+      <div className="grid grid-cols-7 gap-0.5 rounded-2xl border border-border bg-background/70 p-1 shadow-2xl">
         {items.map((item) => {
           const active = location.pathname === item.path;
 
