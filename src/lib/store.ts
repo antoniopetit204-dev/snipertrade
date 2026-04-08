@@ -22,6 +22,8 @@ export interface AdminSettings {
   defaultCurrency: string;
   termsUrl: string;
   privacyUrl: string;
+  depositEnabled: boolean;
+  appIconUrl: string;
 }
 
 export interface Bot {
