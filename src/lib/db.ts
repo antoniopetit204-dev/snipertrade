@@ -18,7 +18,8 @@ export const fetchSettings = async (): Promise<AdminSettings | null> => {
     logoUrl: data.logo_url, favicon: data.favicon, primaryColor: data.primary_color, footerText: data.footer_text,
     announcementBar: data.announcement_bar, maintenanceMode: data.maintenance_mode, allowSignups: data.allow_signups,
     maxBotPerUser: data.max_bot_per_user, defaultCurrency: data.default_currency, termsUrl: data.terms_url,
-    privacyUrl: data.privacy_url, depositEnabled: (data as any).deposit_enabled ?? false, appIconUrl: (data as any).app_icon_url ?? '',
+    privacyUrl: data.privacy_url, depositEnabled: (data as any).deposit_enabled ?? false,
+    withdrawalEnabled: (data as any).withdrawal_enabled ?? false, appIconUrl: (data as any).app_icon_url ?? '',
   };
 };
 
@@ -32,7 +33,8 @@ export const updateSettings = async (settings: AdminSettings) => {
       logo_url: settings.logoUrl, favicon: settings.favicon, primary_color: settings.primaryColor, footer_text: settings.footerText,
       announcement_bar: settings.announcementBar, maintenance_mode: settings.maintenanceMode, allow_signups: settings.allowSignups,
       max_bot_per_user: settings.maxBotPerUser, default_currency: settings.defaultCurrency, terms_url: settings.termsUrl,
-      privacy_url: settings.privacyUrl, deposit_enabled: settings.depositEnabled, app_icon_url: settings.appIconUrl,
+      privacy_url: settings.privacyUrl, deposit_enabled: settings.depositEnabled,
+      withdrawal_enabled: (settings as any).withdrawalEnabled ?? false, app_icon_url: settings.appIconUrl,
     } as any)
     .not('id', 'is', null);
   return !error;
@@ -242,4 +244,52 @@ export const fetchDepositEnabled = async (): Promise<boolean> => {
     .limit(1)
     .single();
   return data?.deposit_enabled ?? false;
+};
+
+// ---- Withdrawals ----
+
+export const initiateWithdrawal = async (phoneNumber: string, amount: number, derivAccount: string) => {
+  const { data, error } = await supabase.functions.invoke('mpesa-stk?action=withdraw', {
+    body: { phone_number: phoneNumber, amount, deriv_account: derivAccount },
+  });
+  if (error) throw error;
+  return data;
+};
+
+export const fetchWithdrawals = async (derivAccount?: string): Promise<any[]> => {
+  let query = (supabase as any).from('withdrawals').select('*');
+  if (derivAccount) query = query.eq('deriv_account', derivAccount);
+  const { data } = await query.order('created_at', { ascending: false });
+  return data || [];
+};
+
+export const fetchWithdrawalEnabled = async (): Promise<boolean> => {
+  const { data } = await supabase
+    .from('admin_settings')
+    .select('*')
+    .limit(1)
+    .single();
+  return (data as any)?.withdrawal_enabled ?? false;
+};
+
+export const queryWithdrawalStatus = async (withdrawalId: string) => {
+  const { data } = await supabase
+    .from('withdrawals' as any)
+    .select('status')
+    .eq('id', withdrawalId)
+    .single();
+  return data;
+};
+
+export const processWithdrawal = async (withdrawalId: string, approve: boolean) => {
+  const { data, error } = await supabase.functions.invoke('mpesa-stk?action=process_withdrawal', {
+    body: { withdrawal_id: withdrawalId, approve },
+  });
+  if (error) throw error;
+  return data;
+};
+
+export const fetchAllWithdrawals = async () => {
+  const { data } = await (supabase.from('withdrawals' as any) as any).select('*').order('created_at', { ascending: false });
+  return data || [];
 };

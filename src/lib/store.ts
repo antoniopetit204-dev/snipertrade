@@ -23,6 +23,7 @@ export interface AdminSettings {
   termsUrl: string;
   privacyUrl: string;
   depositEnabled: boolean;
+  withdrawalEnabled: boolean;
   appIconUrl: string;
 }
 
@@ -76,6 +77,7 @@ const DEFAULT_SETTINGS: AdminSettings = {
   termsUrl: '',
   privacyUrl: '',
   depositEnabled: false,
+  withdrawalEnabled: false,
   appIconUrl: '',
 };
 

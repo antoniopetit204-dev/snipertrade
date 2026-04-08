@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getUser, getSettings, setUser, ADMIN_ACCOUNT, type AdminSettings } from '@/lib/store';
-import { fetchSettings, updateSettings, fetchBots, createBot, deleteBot as dbDeleteBot, toggleBotEnabled, updateBot as dbUpdateBot, fetchMpesaConfig, updateMpesaConfig, fetchAccessRequests, updateAccessRequestStatus, fetchPurchases, type MpesaConfig } from '@/lib/db';
+import { fetchSettings, updateSettings, fetchBots, createBot, deleteBot as dbDeleteBot, toggleBotEnabled, updateBot as dbUpdateBot, fetchMpesaConfig, updateMpesaConfig, fetchAccessRequests, updateAccessRequestStatus, fetchPurchases, fetchAllWithdrawals, processWithdrawal, type MpesaConfig } from '@/lib/db';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
@@ -9,7 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-import { Settings, Bot as BotIcon, Globe, Shield, LogOut, Activity, Plus, Trash2, Key, AppWindow, Users, Palette, Crown, Lock, Smartphone, CheckCircle, XCircle, Clock, Edit2, Save } from 'lucide-react';
+import { Settings, Bot as BotIcon, Globe, Shield, LogOut, Activity, Plus, Trash2, Key, AppWindow, Users, Palette, Crown, Lock, Smartphone, CheckCircle, XCircle, Clock, Edit2, Save, ArrowUpFromLine } from 'lucide-react';
 import { motion } from 'framer-motion';
 import type { Bot } from '@/lib/store';
 
@@ -24,6 +24,7 @@ const Admin = () => {
   const [mpesaConfig, setMpesaConfig] = useState<Omit<MpesaConfig, 'id'>>({ consumerKey: '', consumerSecret: '', shortcode: '', passkey: '', environment: 'sandbox' });
   const [accessRequests, setAccessRequests] = useState<any[]>([]);
   const [purchases, setPurchases] = useState<any[]>([]);
+  const [withdrawals, setWithdrawals] = useState<any[]>([]);
   const [editingBot, setEditingBot] = useState<string | null>(null);
   const [editBotData, setEditBotData] = useState<Partial<Bot>>({});
 
@@ -35,14 +36,15 @@ const Admin = () => {
 
   useEffect(() => {
     const loadData = async () => {
-      const [dbSettings, dbBots, dbMpesa, dbRequests, dbPurchases] = await Promise.all([
-        fetchSettings(), fetchBots(), fetchMpesaConfig(), fetchAccessRequests(), fetchPurchases(),
+      const [dbSettings, dbBots, dbMpesa, dbRequests, dbPurchases, dbWithdrawals] = await Promise.all([
+        fetchSettings(), fetchBots(), fetchMpesaConfig(), fetchAccessRequests(), fetchPurchases(), fetchAllWithdrawals(),
       ]);
       if (dbSettings) setSettings(dbSettings);
       setBots(dbBots);
       if (dbMpesa) setMpesaConfig({ consumerKey: dbMpesa.consumerKey, consumerSecret: dbMpesa.consumerSecret, shortcode: dbMpesa.shortcode, passkey: dbMpesa.passkey, environment: dbMpesa.environment });
       setAccessRequests(dbRequests);
       setPurchases(dbPurchases);
+      setWithdrawals(dbWithdrawals);
       setLoading(false);
     };
     if (isAdmin) loadData();
@@ -197,6 +199,7 @@ const Admin = () => {
               { value: 'general', icon: Globe, label: 'General' },
               { value: 'bots', icon: BotIcon, label: 'Bots' },
               { value: 'mpesa', icon: Smartphone, label: 'M-Pesa' },
+              { value: 'withdrawals', icon: ArrowUpFromLine, label: 'Withdrawals' },
               { value: 'requests', icon: Users, label: 'Requests' },
               { value: 'seo', icon: AppWindow, label: 'SEO' },
               { value: 'appearance', icon: Palette, label: 'Look' },
@@ -269,6 +272,10 @@ const Admin = () => {
                 <div className="flex items-center gap-3">
                   <Switch checked={settings.depositEnabled} onCheckedChange={v => setSettings({ ...settings, depositEnabled: v })} />
                   <Label className="text-xs sm:text-sm text-foreground">Enable Deposits</Label>
+                </div>
+                <div className="flex items-center gap-3">
+                  <Switch checked={(settings as any).withdrawalEnabled} onCheckedChange={v => setSettings({ ...settings, withdrawalEnabled: v } as any)} />
+                  <Label className="text-xs sm:text-sm text-foreground">Enable Withdrawals</Label>
                 </div>
               </div>
               <Button onClick={handleSaveSettings} className="bg-primary text-primary-foreground hover:bg-primary/90 text-xs sm:text-sm">Save Settings</Button>
@@ -410,6 +417,50 @@ const Admin = () => {
                       </div>
                     ))}
                   </div>
+                </div>
+              )}
+            </motion.div>
+          </TabsContent>
+
+          {/* Withdrawals Management */}
+          <TabsContent value="withdrawals">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="bg-card border border-border rounded-lg p-4 sm:p-6 space-y-4">
+              <h2 className="text-sm sm:text-base font-semibold text-foreground flex items-center gap-2">
+                <ArrowUpFromLine className="h-4 w-4 text-primary" /> Withdrawal Requests
+              </h2>
+              <p className="text-[10px] sm:text-xs text-muted-foreground">
+                Review and process user withdrawal requests. Approved withdrawals are sent via M-Pesa B2C.
+              </p>
+              {withdrawals.length === 0 ? (
+                <p className="text-xs text-muted-foreground text-center py-4">No withdrawal requests yet.</p>
+              ) : (
+                <div className="space-y-2 max-h-[400px] overflow-y-auto">
+                  {withdrawals.map((w: any) => (
+                    <div key={w.id} className="flex items-center justify-between bg-secondary/50 rounded-lg p-3 gap-3">
+                      <div className="min-w-0">
+                        <p className="text-xs sm:text-sm font-medium text-foreground">KES {w.amount} → {w.phone_number}</p>
+                        <p className="text-[10px] text-muted-foreground">Account: {w.deriv_account} • {new Date(w.created_at).toLocaleDateString()}</p>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        {w.status === 'pending' ? (
+                          <>
+                            <Button size="sm" onClick={async () => { await processWithdrawal(w.id, true); setWithdrawals(withdrawals.map((x: any) => x.id === w.id ? { ...x, status: 'completed' } : x)); }}
+                              className="bg-profit/20 text-profit hover:bg-profit/30 h-7 text-xs">
+                              <CheckCircle className="h-3 w-3 mr-1" /> Approve
+                            </Button>
+                            <Button size="sm" onClick={async () => { await processWithdrawal(w.id, false); setWithdrawals(withdrawals.map((x: any) => x.id === w.id ? { ...x, status: 'cancelled' } : x)); }}
+                              className="bg-loss/20 text-loss hover:bg-loss/30 h-7 text-xs">
+                              <XCircle className="h-3 w-3 mr-1" /> Reject
+                            </Button>
+                          </>
+                        ) : (
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${
+                            w.status === 'completed' ? 'bg-profit/20 text-profit' : w.status === 'cancelled' ? 'bg-loss/20 text-loss' : 'bg-primary/20 text-primary'
+                          }`}>{w.status}</span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
             </motion.div>
