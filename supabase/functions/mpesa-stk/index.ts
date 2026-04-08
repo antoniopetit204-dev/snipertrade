@@ -46,7 +46,8 @@ Deno.serve(async (req) => {
 
     if (action === 'stk_push') {
       const body = await req.json();
-      const { phone_number, amount, bot_id, deriv_account } = body;
+      const { phone_number, amount, bot_id, deriv_account, action_type } = body;
+      const isDeposit = action_type === 'deposit';
 
       if (!phone_number || !amount) {
         return new Response(JSON.stringify({ error: 'phone_number and amount required' }), {
@@ -61,7 +62,6 @@ Deno.serve(async (req) => {
       const timestamp = new Date().toISOString().replace(/[-T:.Z]/g, '').slice(0, 14);
       const password = btoa(`${config.shortcode}${config.passkey}${timestamp}`);
 
-      // Use the edge function URL as callback
       const callbackUrl = `${supabaseUrl}/functions/v1/mpesa-stk?action=callback`;
 
       const stkPayload = {
@@ -74,8 +74,8 @@ Deno.serve(async (req) => {
         PartyB: config.shortcode,
         PhoneNumber: formattedPhone,
         CallBackURL: callbackUrl,
-        AccountReference: 'HFTPro',
-        TransactionDesc: `Bot purchase - ${bot_id || 'premium'}`,
+        AccountReference: isDeposit ? 'HFTDeposit' : 'HFTPro',
+        TransactionDesc: isDeposit ? `Deposit - ${deriv_account}` : `Bot purchase - ${bot_id || 'premium'}`,
       };
 
       const stkResp = await fetch(`${baseUrl}/mpesa/stkpush/v1/processrequest`, {
@@ -90,15 +90,25 @@ Deno.serve(async (req) => {
       const stkData = await stkResp.json();
 
       if (stkData.ResponseCode === '0') {
-        // Save purchase record
-        await supabase.from('purchases').insert({
-          deriv_account: deriv_account || 'unknown',
-          bot_id: bot_id || null,
-          phone_number: formattedPhone,
-          amount: Number(amount),
-          mpesa_checkout_request_id: stkData.CheckoutRequestID,
-          status: 'pending',
-        });
+        // Save to appropriate table
+        if (isDeposit) {
+          await supabase.from('deposits').insert({
+            deriv_account: deriv_account || 'unknown',
+            phone_number: formattedPhone,
+            amount: Number(amount),
+            mpesa_checkout_request_id: stkData.CheckoutRequestID,
+            status: 'pending',
+          });
+        } else {
+          await supabase.from('purchases').insert({
+            deriv_account: deriv_account || 'unknown',
+            bot_id: bot_id || null,
+            phone_number: formattedPhone,
+            amount: Number(amount),
+            mpesa_checkout_request_id: stkData.CheckoutRequestID,
+            status: 'pending',
+          });
+        }
 
         return new Response(JSON.stringify({
           success: true,
@@ -117,7 +127,6 @@ Deno.serve(async (req) => {
     }
 
     if (action === 'callback') {
-      // M-Pesa callback handler
       const body = await req.json();
       const result = body?.Body?.stkCallback;
       if (result) {
@@ -125,15 +134,24 @@ Deno.serve(async (req) => {
         const resultCode = result.ResultCode;
 
         if (resultCode === 0) {
-          // Success - extract receipt
           const items = result.CallbackMetadata?.Item || [];
           const receipt = items.find((i: any) => i.Name === 'MpesaReceiptNumber')?.Value || '';
           
+          // Update purchases
           await supabase.from('purchases')
             .update({ status: 'completed', mpesa_receipt: receipt })
             .eq('mpesa_checkout_request_id', checkoutId);
+
+          // Update deposits
+          await supabase.from('deposits')
+            .update({ status: 'completed', mpesa_receipt: receipt, credited: true })
+            .eq('mpesa_checkout_request_id', checkoutId);
         } else {
           await supabase.from('purchases')
+            .update({ status: 'cancelled' })
+            .eq('mpesa_checkout_request_id', checkoutId);
+
+          await supabase.from('deposits')
             .update({ status: 'cancelled' })
             .eq('mpesa_checkout_request_id', checkoutId);
         }
@@ -144,7 +162,6 @@ Deno.serve(async (req) => {
     }
 
     if (action === 'query') {
-      // Query STK push status
       const body = await req.json();
       const { checkout_request_id } = body;
 
@@ -173,17 +190,24 @@ Deno.serve(async (req) => {
 
       const queryData = await queryResp.json();
 
-      // Also check DB status
+      // Check both tables
       const { data: purchase } = await supabase.from('purchases')
         .select('status, mpesa_receipt')
         .eq('mpesa_checkout_request_id', checkout_request_id)
         .single();
 
+      const { data: deposit } = await supabase.from('deposits')
+        .select('status, mpesa_receipt')
+        .eq('mpesa_checkout_request_id', checkout_request_id)
+        .single();
+
+      const record = deposit || purchase;
+
       return new Response(JSON.stringify({
         result_code: queryData.ResultCode,
         result_desc: queryData.ResultDesc,
-        db_status: purchase?.status || 'unknown',
-        receipt: purchase?.mpesa_receipt || null,
+        db_status: record?.status || 'unknown',
+        receipt: record?.mpesa_receipt || null,
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
