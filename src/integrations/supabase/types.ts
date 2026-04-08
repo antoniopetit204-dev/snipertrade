@@ -80,6 +80,7 @@ export type Database = {
           telegram_link: string
           terms_url: string
           updated_at: string
+          withdrawal_enabled: boolean
         }
         Insert: {
           allow_signups?: boolean
@@ -108,6 +109,7 @@ export type Database = {
           telegram_link?: string
           terms_url?: string
           updated_at?: string
+          withdrawal_enabled?: boolean
         }
         Update: {
           allow_signups?: boolean
@@ -136,6 +138,7 @@ export type Database = {
           telegram_link?: string
           terms_url?: string
           updated_at?: string
+          withdrawal_enabled?: boolean
         }
         Relationships: []
       }
@@ -335,6 +338,42 @@ export type Database = {
           id?: string
           is_active?: boolean
           last_login?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      withdrawals: {
+        Row: {
+          amount: number
+          created_at: string
+          deriv_account: string
+          id: string
+          mpesa_receipt: string | null
+          mpesa_transaction_id: string | null
+          phone_number: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          amount?: number
+          created_at?: string
+          deriv_account: string
+          id?: string
+          mpesa_receipt?: string | null
+          mpesa_transaction_id?: string | null
+          phone_number: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          deriv_account?: string
+          id?: string
+          mpesa_receipt?: string | null
+          mpesa_transaction_id?: string | null
+          phone_number?: string
+          status?: string
           updated_at?: string
         }
         Relationships: []
