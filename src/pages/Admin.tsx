@@ -422,6 +422,50 @@ const Admin = () => {
             </motion.div>
           </TabsContent>
 
+          {/* Withdrawals Management */}
+          <TabsContent value="withdrawals">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="bg-card border border-border rounded-lg p-4 sm:p-6 space-y-4">
+              <h2 className="text-sm sm:text-base font-semibold text-foreground flex items-center gap-2">
+                <ArrowUpFromLine className="h-4 w-4 text-primary" /> Withdrawal Requests
+              </h2>
+              <p className="text-[10px] sm:text-xs text-muted-foreground">
+                Review and process user withdrawal requests. Approved withdrawals are sent via M-Pesa B2C.
+              </p>
+              {withdrawals.length === 0 ? (
+                <p className="text-xs text-muted-foreground text-center py-4">No withdrawal requests yet.</p>
+              ) : (
+                <div className="space-y-2 max-h-[400px] overflow-y-auto">
+                  {withdrawals.map((w: any) => (
+                    <div key={w.id} className="flex items-center justify-between bg-secondary/50 rounded-lg p-3 gap-3">
+                      <div className="min-w-0">
+                        <p className="text-xs sm:text-sm font-medium text-foreground">KES {w.amount} → {w.phone_number}</p>
+                        <p className="text-[10px] text-muted-foreground">Account: {w.deriv_account} • {new Date(w.created_at).toLocaleDateString()}</p>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        {w.status === 'pending' ? (
+                          <>
+                            <Button size="sm" onClick={async () => { await processWithdrawal(w.id, true); setWithdrawals(withdrawals.map((x: any) => x.id === w.id ? { ...x, status: 'completed' } : x)); }}
+                              className="bg-profit/20 text-profit hover:bg-profit/30 h-7 text-xs">
+                              <CheckCircle className="h-3 w-3 mr-1" /> Approve
+                            </Button>
+                            <Button size="sm" onClick={async () => { await processWithdrawal(w.id, false); setWithdrawals(withdrawals.map((x: any) => x.id === w.id ? { ...x, status: 'cancelled' } : x)); }}
+                              className="bg-loss/20 text-loss hover:bg-loss/30 h-7 text-xs">
+                              <XCircle className="h-3 w-3 mr-1" /> Reject
+                            </Button>
+                          </>
+                        ) : (
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${
+                            w.status === 'completed' ? 'bg-profit/20 text-profit' : w.status === 'cancelled' ? 'bg-loss/20 text-loss' : 'bg-primary/20 text-primary'
+                          }`}>{w.status}</span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </motion.div>
+          </TabsContent>
+
           {/* Access Requests */}
           <TabsContent value="requests">
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="bg-card border border-border rounded-lg p-4 sm:p-6 space-y-4">
