@@ -14,6 +14,7 @@ import DashboardCharts from "./pages/DashboardCharts";
 import DashboardTutorial from "./pages/DashboardTutorial";
 import DashboardRisk from "./pages/DashboardRisk";
 import DashboardTrader from "./pages/DashboardTrader";
+import DashboardManualTrader from "./pages/DashboardManualTrader";
 import DashboardDeposit from "./pages/DashboardDeposit";
 import DashboardWithdraw from "./pages/DashboardWithdraw";
 import Admin from "./pages/Admin";
@@ -33,6 +34,7 @@ const App = () => (
           <Route path="/" element={<Landing />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/dashboard/trader" element={<DashboardTrader />} />
+          <Route path="/dashboard/manual-trader" element={<DashboardManualTrader />} />
           <Route path="/dashboard/bots" element={<DashboardBots />} />
           <Route path="/dashboard/bot-builder" element={<DashboardBotBuilder />} />
           <Route path="/dashboard/analysis" element={<DashboardAnalysis />} />
