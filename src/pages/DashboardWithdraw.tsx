@@ -168,7 +168,7 @@ const DashboardWithdraw = () => {
             </p>
           </div>
 
-          <Button onClick={handleWithdraw} disabled={loading || !phone || !amount || !authorized}
+          <Button onClick={handleWithdraw} disabled={loading || !phone || !amount || !account}
             className="w-full bg-primary text-primary-foreground hover:bg-primary/90 font-semibold text-sm">
             {loading ? 'Processing...' : pendingId ? 'Withdrawal in progress...' : 'Withdraw to M-Pesa'}
           </Button>

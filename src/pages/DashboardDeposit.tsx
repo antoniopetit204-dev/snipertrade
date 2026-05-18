@@ -157,7 +157,7 @@ const DashboardDeposit = () => {
             </div>
           </div>
 
-          <Button onClick={handleDeposit} disabled={loading || !phone || !amount || !authorized}
+          <Button onClick={handleDeposit} disabled={loading || !phone || !amount || !account}
             className="w-full bg-primary text-primary-foreground hover:bg-primary/90 font-semibold text-sm">
             {loading ? 'Sending STK Push...' : pendingCheckout ? 'Waiting for payment...' : 'Deposit via M-Pesa'}
           </Button>
