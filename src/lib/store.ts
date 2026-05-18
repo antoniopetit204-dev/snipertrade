@@ -25,6 +25,8 @@ export interface AdminSettings {
   depositEnabled: boolean;
   withdrawalEnabled: boolean;
   appIconUrl: string;
+  minDeposit: number;
+  minWithdrawal: number;
 }
 
 export interface Bot {
@@ -79,6 +81,8 @@ const DEFAULT_SETTINGS: AdminSettings = {
   depositEnabled: false,
   withdrawalEnabled: false,
   appIconUrl: '',
+  minDeposit: 10,
+  minWithdrawal: 50,
 };
 
 let cachedSettings: AdminSettings | null = null;

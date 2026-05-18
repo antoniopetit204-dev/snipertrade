@@ -75,6 +75,26 @@ const Dashboard = () => {
       <div className="space-y-4 sm:space-y-6">
         <InstallShortcutPrompt variant="dashboard" />
 
+        {/* Manual Trader hero CTA */}
+        <motion.button
+          initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
+          onClick={() => (window.location.href = '/dashboard/manual-trader')}
+          className="w-full text-left bg-gradient-to-r from-primary/20 via-primary/10 to-transparent border border-primary/40 rounded-lg p-4 sm:p-5 flex items-center justify-between hover:from-primary/30 transition-colors group"
+        >
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
+              <Zap className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-sm sm:text-base font-bold text-foreground flex items-center gap-2 flex-wrap">
+                Manual Trader <span className="text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-primary text-primary-foreground">NEW</span>
+              </p>
+              <p className="text-[10px] sm:text-xs text-muted-foreground truncate">Pick a bot, set runs, trade your balance — instant results.</p>
+            </div>
+          </div>
+          <span className="text-xs text-primary font-semibold shrink-0 ml-2 group-hover:translate-x-1 transition-transform">Open →</span>
+        </motion.button>
+
         {/* Stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-4">
           {[

@@ -2,7 +2,8 @@ import { useEffect, useState, useRef } from 'react';
 import { DashboardLayout } from '@/components/DashboardLayout';
 import { getUser } from '@/lib/store';
 import { useDerivConnection } from '@/hooks/useDerivWS';
-import { fetchWithdrawals, initiateWithdrawal, fetchWithdrawalEnabled } from '@/lib/db';
+import { fetchWithdrawals, initiateWithdrawal, fetchWithdrawalEnabled, fetchSettings } from '@/lib/db';
+import { fetchUserBalance } from '@/lib/balance';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -12,7 +13,7 @@ import { motion } from 'framer-motion';
 
 const DashboardWithdraw = () => {
   const user = getUser();
-  const { balance, currency, authorized } = useDerivConnection();
+  const { authorized } = useDerivConnection();
   const { toast } = useToast();
 
   const [withdrawEnabled, setWithdrawEnabled] = useState<boolean | null>(null);
@@ -21,13 +22,25 @@ const DashboardWithdraw = () => {
   const [loading, setLoading] = useState(false);
   const [withdrawals, setWithdrawals] = useState<any[]>([]);
   const [pendingId, setPendingId] = useState<string | null>(null);
+  const [internalBalance, setInternalBalance] = useState(0);
+  const [minWithdrawal, setMinWithdrawal] = useState(50);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const account = user?.activeAccount?.acct || '';
 
+  const refreshBalance = async () => {
+    if (!account) return;
+    const b = await fetchUserBalance(account);
+    setInternalBalance(b.balance);
+  };
+
   useEffect(() => {
     fetchWithdrawalEnabled().then(setWithdrawEnabled);
-    if (account) fetchWithdrawals(account).then(setWithdrawals);
+    fetchSettings().then(s => s && setMinWithdrawal(s.minWithdrawal ?? 50));
+    if (account) {
+      fetchWithdrawals(account).then(setWithdrawals);
+      refreshBalance();
+    }
   }, [account]);
 
   // Poll for pending withdrawal
@@ -53,9 +66,9 @@ const DashboardWithdraw = () => {
   const handleWithdraw = async () => {
     if (!phone || !amount || !account) return;
     const amt = Number(amount);
-    if (amt < 10) { toast({ title: 'Minimum withdrawal is KES 10', variant: 'destructive' }); return; }
-    if (balance !== null && amt > balance * 130) {
-      toast({ title: 'Insufficient balance', description: `Max withdrawal based on your balance`, variant: 'destructive' });
+    if (amt < minWithdrawal) { toast({ title: `Minimum withdrawal is KES ${minWithdrawal}`, variant: 'destructive' }); return; }
+    if (amt > internalBalance) {
+      toast({ title: 'Insufficient balance', description: `Available: KES ${internalBalance.toFixed(2)}`, variant: 'destructive' });
       return;
     }
 
@@ -63,10 +76,11 @@ const DashboardWithdraw = () => {
     try {
       const result = await initiateWithdrawal(phone, amt, account);
       if (result.success) {
-        toast({ title: 'Withdrawal Initiated', description: 'Processing your M-Pesa payout...' });
+        toast({ title: 'Withdrawal Submitted', description: 'Pending admin approval' });
         setPendingId(result.withdrawal_id);
         setPhone(''); setAmount('');
         fetchWithdrawals(account).then(setWithdrawals);
+        refreshBalance();
       } else {
         toast({ title: 'Failed', description: result.error || 'Could not process withdrawal', variant: 'destructive' });
       }
@@ -108,12 +122,13 @@ const DashboardWithdraw = () => {
         </motion.div>
 
         {/* Balance Card */}
-        <div className="bg-card border border-border rounded-lg p-4 sm:p-6 text-center">
+        <div className="bg-gradient-to-br from-primary/15 to-primary/5 border border-primary/30 rounded-lg p-4 sm:p-6 text-center">
           <p className="text-xs text-muted-foreground mb-1">Available Balance</p>
           <p className="text-2xl sm:text-3xl font-bold font-mono text-foreground">
-            {balance !== null ? balance.toFixed(2) : '—'} <span className="text-sm text-primary">{currency}</span>
+            KES {internalBalance.toFixed(2)}
           </p>
           <p className="text-[10px] text-muted-foreground mt-1">Account: {account}</p>
+          <p className="text-[10px] text-muted-foreground">Min withdrawal: KES {minWithdrawal}</p>
         </div>
 
         {/* Withdrawal Form */}
@@ -153,7 +168,7 @@ const DashboardWithdraw = () => {
             </p>
           </div>
 
-          <Button onClick={handleWithdraw} disabled={loading || !phone || !amount || !authorized}
+          <Button onClick={handleWithdraw} disabled={loading || !phone || !amount || !account}
             className="w-full bg-primary text-primary-foreground hover:bg-primary/90 font-semibold text-sm">
             {loading ? 'Processing...' : pendingId ? 'Withdrawal in progress...' : 'Withdraw to M-Pesa'}
           </Button>

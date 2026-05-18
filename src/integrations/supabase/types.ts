@@ -72,6 +72,8 @@ export type Database = {
           max_bot_per_user: number
           meta_description: string
           meta_keywords: string
+          min_deposit: number
+          min_withdrawal: number
           primary_color: string
           privacy_url: string
           site_name: string
@@ -101,6 +103,8 @@ export type Database = {
           max_bot_per_user?: number
           meta_description?: string
           meta_keywords?: string
+          min_deposit?: number
+          min_withdrawal?: number
           primary_color?: string
           privacy_url?: string
           site_name?: string
@@ -130,6 +134,8 @@ export type Database = {
           max_bot_per_user?: number
           meta_description?: string
           meta_keywords?: string
+          min_deposit?: number
+          min_withdrawal?: number
           primary_color?: string
           privacy_url?: string
           site_name?: string
@@ -229,6 +235,48 @@ export type Database = {
         }
         Relationships: []
       }
+      manual_trades: {
+        Row: {
+          balance_after: number
+          bot_id: string | null
+          bot_name: string
+          created_at: string
+          deriv_account: string
+          id: string
+          payout: number
+          profit: number
+          result: string
+          run_id: string | null
+          stake: number
+        }
+        Insert: {
+          balance_after?: number
+          bot_id?: string | null
+          bot_name?: string
+          created_at?: string
+          deriv_account: string
+          id?: string
+          payout?: number
+          profit?: number
+          result?: string
+          run_id?: string | null
+          stake?: number
+        }
+        Update: {
+          balance_after?: number
+          bot_id?: string | null
+          bot_name?: string
+          created_at?: string
+          deriv_account?: string
+          id?: string
+          payout?: number
+          profit?: number
+          result?: string
+          run_id?: string | null
+          stake?: number
+        }
+        Relationships: []
+      }
       mpesa_config: {
         Row: {
           consumer_key: string
@@ -308,6 +356,36 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      user_balances: {
+        Row: {
+          balance: number
+          created_at: string
+          deriv_account: string
+          id: string
+          total_deposited: number
+          total_withdrawn: number
+          updated_at: string
+        }
+        Insert: {
+          balance?: number
+          created_at?: string
+          deriv_account: string
+          id?: string
+          total_deposited?: number
+          total_withdrawn?: number
+          updated_at?: string
+        }
+        Update: {
+          balance?: number
+          created_at?: string
+          deriv_account?: string
+          id?: string
+          total_deposited?: number
+          total_withdrawn?: number
+          updated_at?: string
+        }
+        Relationships: []
       }
       user_sessions: {
         Row: {

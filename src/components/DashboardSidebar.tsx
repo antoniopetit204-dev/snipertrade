@@ -1,4 +1,4 @@
-import { Activity, BarChart3, Bot, LineChart, LogOut, TrendingUp, Wallet, ChevronLeft, ChevronRight, BookOpen, Shield, Lightbulb, Wrench, X, Crosshair, ArrowDownToLine, ArrowUpFromLine } from 'lucide-react';
+import { Activity, BarChart3, Bot, LineChart, LogOut, TrendingUp, Wallet, ChevronLeft, ChevronRight, BookOpen, Shield, Lightbulb, Wrench, X, Crosshair, ArrowDownToLine, ArrowUpFromLine, Zap } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { setUser, getSettings, getUser } from '@/lib/store';
 import { useState } from 'react';
@@ -7,7 +7,8 @@ import { derivWS } from '@/lib/deriv-ws';
 
 const navItems = [
   { label: 'Dashboard', icon: TrendingUp, path: '/dashboard' },
-  { label: 'Manual Trader', icon: Crosshair, path: '/dashboard/trader' },
+  { label: 'Manual Trader', icon: Zap, path: '/dashboard/manual-trader', highlight: true },
+  { label: 'Live Trader', icon: Crosshair, path: '/dashboard/trader' },
   { label: 'Bots', icon: Bot, path: '/dashboard/bots' },
   { label: 'Bot Builder', icon: Wrench, path: '/dashboard/bot-builder' },
   { label: 'Analysis', icon: BarChart3, path: '/dashboard/analysis' },
@@ -76,12 +77,19 @@ export const DashboardSidebar = ({ onClose }: SidebarProps) => {
               key={item.path}
               onClick={() => handleNav(item.path)}
               className={cn(
-                "w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors",
-                active ? "bg-primary/10 text-primary font-medium" : "text-muted-foreground hover:text-foreground hover:bg-accent"
+                "w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors relative",
+                active
+                  ? "bg-primary/10 text-primary font-medium"
+                  : (item as any).highlight
+                    ? "text-primary bg-primary/5 hover:bg-primary/10"
+                    : "text-muted-foreground hover:text-foreground hover:bg-accent"
               )}
             >
               <item.icon className="h-4 w-4 shrink-0" />
               {!collapsed && <span>{item.label}</span>}
+              {(item as any).highlight && !active && !collapsed && (
+                <span className="ml-auto text-[9px] px-1.5 py-0.5 rounded-full bg-primary/20 text-primary font-semibold">NEW</span>
+              )}
             </button>
           );
         })}

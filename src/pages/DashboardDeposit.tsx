@@ -2,7 +2,8 @@ import { useEffect, useState, useRef } from 'react';
 import { DashboardLayout } from '@/components/DashboardLayout';
 import { getUser } from '@/lib/store';
 import { useDerivConnection } from '@/hooks/useDerivWS';
-import { initiateDeposit, fetchDeposits, fetchDepositEnabled, queryStkStatus } from '@/lib/db';
+import { initiateDeposit, fetchDeposits, fetchDepositEnabled, queryStkStatus, fetchSettings } from '@/lib/db';
+import { fetchUserBalance } from '@/lib/balance';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -12,7 +13,7 @@ import { motion } from 'framer-motion';
 
 const DashboardDeposit = () => {
   const user = getUser();
-  const { balance, currency, authorized } = useDerivConnection();
+  const { authorized } = useDerivConnection();
   const { toast } = useToast();
 
   const [depositEnabled, setDepositEnabled] = useState<boolean | null>(null);
@@ -21,13 +22,25 @@ const DashboardDeposit = () => {
   const [loading, setLoading] = useState(false);
   const [deposits, setDeposits] = useState<any[]>([]);
   const [pendingCheckout, setPendingCheckout] = useState<string | null>(null);
+  const [internalBalance, setInternalBalance] = useState(0);
+  const [minDeposit, setMinDeposit] = useState(10);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const account = user?.activeAccount?.acct || '';
 
+  const refreshBalance = async () => {
+    if (!account) return;
+    const b = await fetchUserBalance(account);
+    setInternalBalance(b.balance);
+  };
+
   useEffect(() => {
     fetchDepositEnabled().then(setDepositEnabled);
-    if (account) fetchDeposits(account).then(setDeposits);
+    fetchSettings().then(s => s && setMinDeposit(s.minDeposit ?? 10));
+    if (account) {
+      fetchDeposits(account).then(setDeposits);
+      refreshBalance();
+    }
   }, [account]);
 
   // Poll for pending STK
@@ -37,9 +50,12 @@ const DashboardDeposit = () => {
       try {
         const status = await queryStkStatus(pendingCheckout);
         if (status.db_status === 'completed' || status.db_status === 'credited') {
-          toast({ title: 'Deposit Successful!', description: `Receipt: ${status.receipt || 'Confirmed'}` });
+          toast({ title: 'Deposit Credited!', description: `+KES ${Number(amount || 0)} added to your balance` });
           setPendingCheckout(null);
-          if (account) fetchDeposits(account).then(setDeposits);
+          if (account) {
+            fetchDeposits(account).then(setDeposits);
+            refreshBalance();
+          }
         } else if (status.db_status === 'cancelled' || status.result_code === '1032') {
           toast({ title: 'Deposit Cancelled', variant: 'destructive' });
           setPendingCheckout(null);
@@ -52,7 +68,7 @@ const DashboardDeposit = () => {
   const handleDeposit = async () => {
     if (!phone || !amount || !account) return;
     const amt = Number(amount);
-    if (amt < 1) { toast({ title: 'Minimum deposit is KES 1', variant: 'destructive' }); return; }
+    if (amt < minDeposit) { toast({ title: `Minimum deposit is KES ${minDeposit}`, variant: 'destructive' }); return; }
 
     setLoading(true);
     try {
@@ -102,12 +118,13 @@ const DashboardDeposit = () => {
         </motion.div>
 
         {/* Balance Card */}
-        <div className="bg-card border border-border rounded-lg p-4 sm:p-6 text-center">
-          <p className="text-xs text-muted-foreground mb-1">Current Balance</p>
+        <div className="bg-gradient-to-br from-primary/15 to-primary/5 border border-primary/30 rounded-lg p-4 sm:p-6 text-center">
+          <p className="text-xs text-muted-foreground mb-1">Internal Balance</p>
           <p className="text-2xl sm:text-3xl font-bold font-mono text-foreground">
-            {balance !== null ? balance.toFixed(2) : '—'} <span className="text-sm text-primary">{currency}</span>
+            KES {internalBalance.toFixed(2)}
           </p>
           <p className="text-[10px] text-muted-foreground mt-1">Account: {account}</p>
+          <p className="text-[10px] text-muted-foreground">Min deposit: KES {minDeposit}</p>
         </div>
 
         {/* Deposit Form */}
@@ -140,7 +157,7 @@ const DashboardDeposit = () => {
             </div>
           </div>
 
-          <Button onClick={handleDeposit} disabled={loading || !phone || !amount || !authorized}
+          <Button onClick={handleDeposit} disabled={loading || !phone || !amount || !account}
             className="w-full bg-primary text-primary-foreground hover:bg-primary/90 font-semibold text-sm">
             {loading ? 'Sending STK Push...' : pendingCheckout ? 'Waiting for payment...' : 'Deposit via M-Pesa'}
           </Button>

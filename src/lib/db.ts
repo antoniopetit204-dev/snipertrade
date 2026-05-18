@@ -18,8 +18,10 @@ export const fetchSettings = async (): Promise<AdminSettings | null> => {
     logoUrl: data.logo_url, favicon: data.favicon, primaryColor: data.primary_color, footerText: data.footer_text,
     announcementBar: data.announcement_bar, maintenanceMode: data.maintenance_mode, allowSignups: data.allow_signups,
     maxBotPerUser: data.max_bot_per_user, defaultCurrency: data.default_currency, termsUrl: data.terms_url,
-    privacyUrl: data.privacy_url, depositEnabled: (data as any).deposit_enabled ?? false,
-    withdrawalEnabled: (data as any).withdrawal_enabled ?? false, appIconUrl: (data as any).app_icon_url ?? '',
+      privacyUrl: data.privacy_url, depositEnabled: (data as any).deposit_enabled ?? false,
+      withdrawalEnabled: (data as any).withdrawal_enabled ?? false, appIconUrl: (data as any).app_icon_url ?? '',
+      minDeposit: Number((data as any).min_deposit ?? 10),
+      minWithdrawal: Number((data as any).min_withdrawal ?? 50),
   };
 };
 
@@ -35,6 +37,7 @@ export const updateSettings = async (settings: AdminSettings) => {
       max_bot_per_user: settings.maxBotPerUser, default_currency: settings.defaultCurrency, terms_url: settings.termsUrl,
       privacy_url: settings.privacyUrl, deposit_enabled: settings.depositEnabled,
       withdrawal_enabled: (settings as any).withdrawalEnabled ?? false, app_icon_url: settings.appIconUrl,
+      min_deposit: settings.minDeposit ?? 10, min_withdrawal: settings.minWithdrawal ?? 50,
     } as any)
     .not('id', 'is', null);
   return !error;

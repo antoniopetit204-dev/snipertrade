@@ -1,4 +1,4 @@
-import { Bot, ChartCandlestick, Home, LogOut, Shield, Swords, ArrowDownToLine, ArrowUpFromLine, Wallet } from 'lucide-react';
+import { Bot, Home, LogOut, Zap, ArrowDownToLine, ArrowUpFromLine, Wallet } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { derivWS } from '@/lib/deriv-ws';
 import { setUser } from '@/lib/store';
@@ -6,11 +6,11 @@ import { cn } from '@/lib/utils';
 
 const items = [
   { label: 'Home', path: '/dashboard', icon: Home },
-  { label: 'Trade', path: '/dashboard/trader', icon: Swords },
+  { label: 'Manual', path: '/dashboard/manual-trader', icon: Zap, highlight: true },
   { label: 'Bots', path: '/dashboard/bots', icon: Bot },
   { label: 'Deposit', path: '/dashboard/deposit', icon: ArrowDownToLine },
   { label: 'Withdraw', path: '/dashboard/withdraw', icon: ArrowUpFromLine },
-  { label: 'Portfolio', path: '/dashboard/portfolio', icon: Wallet },
+  { label: 'Wallet', path: '/dashboard/portfolio', icon: Wallet },
 ];
 
 export const MobileBottomNav = () => {
@@ -28,18 +28,24 @@ export const MobileBottomNav = () => {
       <div className="grid grid-cols-7 gap-0.5 rounded-2xl border border-border bg-background/70 p-1 shadow-2xl">
         {items.map((item) => {
           const active = location.pathname === item.path;
-
           return (
             <button
               key={item.path}
               onClick={() => navigate(item.path)}
               className={cn(
-                'flex min-w-0 flex-col items-center gap-1 rounded-xl px-1 py-2 text-[10px] font-medium transition-colors',
-                active ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-accent hover:text-foreground'
+                'relative flex min-w-0 flex-col items-center gap-1 rounded-xl px-1 py-2 text-[10px] font-medium transition-colors',
+                active
+                  ? 'bg-primary text-primary-foreground'
+                  : item.highlight
+                    ? 'text-primary bg-primary/10 ring-1 ring-primary/30'
+                    : 'text-muted-foreground hover:bg-accent hover:text-foreground'
               )}
             >
               <item.icon className="h-4 w-4" />
               <span className="truncate">{item.label}</span>
+              {item.highlight && !active && (
+                <span className="absolute -top-1 -right-0.5 h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
+              )}
             </button>
           );
         })}
