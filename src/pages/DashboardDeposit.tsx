@@ -2,7 +2,8 @@ import { useEffect, useState, useRef } from 'react';
 import { DashboardLayout } from '@/components/DashboardLayout';
 import { getUser } from '@/lib/store';
 import { useDerivConnection } from '@/hooks/useDerivWS';
-import { initiateDeposit, fetchDeposits, fetchDepositEnabled, queryStkStatus } from '@/lib/db';
+import { initiateDeposit, fetchDeposits, fetchDepositEnabled, queryStkStatus, fetchSettings } from '@/lib/db';
+import { fetchUserBalance } from '@/lib/balance';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -12,7 +13,7 @@ import { motion } from 'framer-motion';
 
 const DashboardDeposit = () => {
   const user = getUser();
-  const { balance, currency, authorized } = useDerivConnection();
+  const { authorized } = useDerivConnection();
   const { toast } = useToast();
 
   const [depositEnabled, setDepositEnabled] = useState<boolean | null>(null);
@@ -21,6 +22,8 @@ const DashboardDeposit = () => {
   const [loading, setLoading] = useState(false);
   const [deposits, setDeposits] = useState<any[]>([]);
   const [pendingCheckout, setPendingCheckout] = useState<string | null>(null);
+  const [internalBalance, setInternalBalance] = useState(0);
+  const [minDeposit, setMinDeposit] = useState(10);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const account = user?.activeAccount?.acct || '';

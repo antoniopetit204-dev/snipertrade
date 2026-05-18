@@ -260,6 +260,20 @@ const Admin = () => {
                   </div>
                 ))}
               </div>
+              <div className="grid grid-cols-2 gap-3 sm:gap-4">
+                <div className="space-y-2">
+                  <Label className={labelClass}>Min Deposit (KES)</Label>
+                  <Input type="number" min={1} value={settings.minDeposit ?? 10}
+                    onChange={e => setSettings({ ...settings, minDeposit: Number(e.target.value) || 0 })}
+                    className={inputClass} />
+                </div>
+                <div className="space-y-2">
+                  <Label className={labelClass}>Min Withdrawal (KES)</Label>
+                  <Input type="number" min={1} value={settings.minWithdrawal ?? 50}
+                    onChange={e => setSettings({ ...settings, minWithdrawal: Number(e.target.value) || 0 })}
+                    className={inputClass} />
+                </div>
+              </div>
               <div className="flex flex-wrap items-center gap-4 sm:gap-6">
                 <div className="flex items-center gap-3">
                   <Switch checked={settings.maintenanceMode} onCheckedChange={v => setSettings({ ...settings, maintenanceMode: v })} />
