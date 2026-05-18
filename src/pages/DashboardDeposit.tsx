@@ -28,9 +28,19 @@ const DashboardDeposit = () => {
 
   const account = user?.activeAccount?.acct || '';
 
+  const refreshBalance = async () => {
+    if (!account) return;
+    const b = await fetchUserBalance(account);
+    setInternalBalance(b.balance);
+  };
+
   useEffect(() => {
     fetchDepositEnabled().then(setDepositEnabled);
-    if (account) fetchDeposits(account).then(setDeposits);
+    fetchSettings().then(s => s && setMinDeposit(s.minDeposit ?? 10));
+    if (account) {
+      fetchDeposits(account).then(setDeposits);
+      refreshBalance();
+    }
   }, [account]);
 
   // Poll for pending STK
@@ -40,9 +50,12 @@ const DashboardDeposit = () => {
       try {
         const status = await queryStkStatus(pendingCheckout);
         if (status.db_status === 'completed' || status.db_status === 'credited') {
-          toast({ title: 'Deposit Successful!', description: `Receipt: ${status.receipt || 'Confirmed'}` });
+          toast({ title: 'Deposit Credited!', description: `+KES ${Number(amount || 0)} added to your balance` });
           setPendingCheckout(null);
-          if (account) fetchDeposits(account).then(setDeposits);
+          if (account) {
+            fetchDeposits(account).then(setDeposits);
+            refreshBalance();
+          }
         } else if (status.db_status === 'cancelled' || status.result_code === '1032') {
           toast({ title: 'Deposit Cancelled', variant: 'destructive' });
           setPendingCheckout(null);
@@ -55,7 +68,7 @@ const DashboardDeposit = () => {
   const handleDeposit = async () => {
     if (!phone || !amount || !account) return;
     const amt = Number(amount);
-    if (amt < 1) { toast({ title: 'Minimum deposit is KES 1', variant: 'destructive' }); return; }
+    if (amt < minDeposit) { toast({ title: `Minimum deposit is KES ${minDeposit}`, variant: 'destructive' }); return; }
 
     setLoading(true);
     try {
@@ -105,12 +118,13 @@ const DashboardDeposit = () => {
         </motion.div>
 
         {/* Balance Card */}
-        <div className="bg-card border border-border rounded-lg p-4 sm:p-6 text-center">
-          <p className="text-xs text-muted-foreground mb-1">Current Balance</p>
+        <div className="bg-gradient-to-br from-primary/15 to-primary/5 border border-primary/30 rounded-lg p-4 sm:p-6 text-center">
+          <p className="text-xs text-muted-foreground mb-1">Internal Balance</p>
           <p className="text-2xl sm:text-3xl font-bold font-mono text-foreground">
-            {balance !== null ? balance.toFixed(2) : '—'} <span className="text-sm text-primary">{currency}</span>
+            KES {internalBalance.toFixed(2)}
           </p>
           <p className="text-[10px] text-muted-foreground mt-1">Account: {account}</p>
+          <p className="text-[10px] text-muted-foreground">Min deposit: KES {minDeposit}</p>
         </div>
 
         {/* Deposit Form */}
