@@ -148,6 +148,39 @@ export type Database = {
         }
         Relationships: []
       }
+      app_users: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+          name: string
+          password_hash: string
+          role: string
+          updated_at: string
+          verified: boolean
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          id?: string
+          name?: string
+          password_hash: string
+          role?: string
+          updated_at?: string
+          verified?: boolean
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: string
+          name?: string
+          password_hash?: string
+          role?: string
+          updated_at?: string
+          verified?: boolean
+        }
+        Relationships: []
+      }
       bots: {
         Row: {
           category: string
@@ -235,6 +268,72 @@ export type Database = {
         }
         Relationships: []
       }
+      email_log: {
+        Row: {
+          created_at: string
+          error: string
+          id: string
+          status: string
+          subject: string
+          template_key: string
+          to_email: string
+        }
+        Insert: {
+          created_at?: string
+          error?: string
+          id?: string
+          status?: string
+          subject?: string
+          template_key?: string
+          to_email: string
+        }
+        Update: {
+          created_at?: string
+          error?: string
+          id?: string
+          status?: string
+          subject?: string
+          template_key?: string
+          to_email?: string
+        }
+        Relationships: []
+      }
+      email_templates: {
+        Row: {
+          created_at: string
+          enabled: boolean
+          html: string
+          id: string
+          name: string
+          subject: string
+          template_key: string
+          text: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          enabled?: boolean
+          html?: string
+          id?: string
+          name: string
+          subject?: string
+          template_key: string
+          text?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          enabled?: boolean
+          html?: string
+          id?: string
+          name?: string
+          subject?: string
+          template_key?: string
+          text?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       manual_trades: {
         Row: {
           balance_after: number
@@ -310,6 +409,33 @@ export type Database = {
         }
         Relationships: []
       }
+      password_reset_tokens: {
+        Row: {
+          created_at: string
+          expires_at: string
+          id: string
+          token: string
+          used: boolean
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          expires_at: string
+          id?: string
+          token: string
+          used?: boolean
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string
+          id?: string
+          token?: string
+          used?: boolean
+          user_id?: string
+        }
+        Relationships: []
+      }
       purchases: {
         Row: {
           amount: number
@@ -357,6 +483,48 @@ export type Database = {
           },
         ]
       }
+      smtp_config: {
+        Row: {
+          created_at: string
+          enabled: boolean
+          from_email: string
+          from_name: string
+          host: string
+          id: string
+          password: string
+          port: number
+          secure: boolean
+          updated_at: string
+          username: string
+        }
+        Insert: {
+          created_at?: string
+          enabled?: boolean
+          from_email?: string
+          from_name?: string
+          host?: string
+          id?: string
+          password?: string
+          port?: number
+          secure?: boolean
+          updated_at?: string
+          username?: string
+        }
+        Update: {
+          created_at?: string
+          enabled?: boolean
+          from_email?: string
+          from_name?: string
+          host?: string
+          id?: string
+          password?: string
+          port?: number
+          secure?: boolean
+          updated_at?: string
+          username?: string
+        }
+        Relationships: []
+      }
       user_balances: {
         Row: {
           balance: number
@@ -383,6 +551,48 @@ export type Database = {
           id?: string
           total_deposited?: number
           total_withdrawn?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      user_email_preferences: {
+        Row: {
+          created_at: string
+          email: string
+          enabled: boolean
+          id: string
+          identifier: string
+          marketing: boolean
+          notify_deposits: boolean
+          notify_login: boolean
+          notify_trades: boolean
+          notify_withdrawals: boolean
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          email?: string
+          enabled?: boolean
+          id?: string
+          identifier: string
+          marketing?: boolean
+          notify_deposits?: boolean
+          notify_login?: boolean
+          notify_trades?: boolean
+          notify_withdrawals?: boolean
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          enabled?: boolean
+          id?: string
+          identifier?: string
+          marketing?: boolean
+          notify_deposits?: boolean
+          notify_login?: boolean
+          notify_trades?: boolean
+          notify_withdrawals?: boolean
           updated_at?: string
         }
         Relationships: []
