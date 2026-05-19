@@ -36,6 +36,10 @@ const App = () => (
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Landing />} />
+          <Route path="/auth" element={<Auth />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
+          <Route path="/dashboard/settings" element={<DashboardSettings />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/dashboard/trader" element={<DashboardTrader />} />
           <Route path="/dashboard/manual-trader" element={<DashboardManualTrader />} />
