@@ -18,6 +18,7 @@ const navItems = [
   { label: 'Deposit', icon: ArrowDownToLine, path: '/dashboard/deposit' },
   { label: 'Withdraw', icon: ArrowUpFromLine, path: '/dashboard/withdraw' },
   { label: 'Risk Mgmt', icon: Shield, path: '/dashboard/risk' },
+  { label: 'Settings', icon: Settings, path: '/dashboard/settings' },
   { label: 'Tutorial', icon: BookOpen, path: '/dashboard/tutorial' },
 ];
 
