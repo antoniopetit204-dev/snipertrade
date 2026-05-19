@@ -9,9 +9,11 @@ import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-import { Settings, Bot as BotIcon, Globe, Shield, LogOut, Activity, Plus, Trash2, Key, AppWindow, Users, Palette, Crown, Lock, Smartphone, CheckCircle, XCircle, Clock, Edit2, Save, ArrowUpFromLine } from 'lucide-react';
+import { Settings, Bot as BotIcon, Globe, Shield, LogOut, Activity, Plus, Trash2, Key, AppWindow, Users, Palette, Crown, Lock, Smartphone, CheckCircle, XCircle, Clock, Edit2, Save, ArrowUpFromLine, Mail, FileText } from 'lucide-react';
 import { motion } from 'framer-motion';
 import type { Bot } from '@/lib/store';
+import AdminSmtpTab from '@/components/admin/AdminSmtpTab';
+import AdminEmailTemplatesTab from '@/components/admin/AdminEmailTemplatesTab';
 
 const Admin = () => {
   const navigate = useNavigate();
@@ -191,24 +193,32 @@ const Admin = () => {
         </Button>
       </header>
 
-      <div className="max-w-5xl mx-auto p-3 sm:p-6">
+      <div className="max-w-6xl mx-auto p-3 sm:p-6">
         <Tabs defaultValue="api" className="space-y-4 sm:space-y-6">
-          <TabsList className="bg-card border border-border flex-wrap h-auto gap-1 p-1">
-            {[
-              { value: 'api', icon: Key, label: 'API' },
-              { value: 'general', icon: Globe, label: 'General' },
-              { value: 'bots', icon: BotIcon, label: 'Bots' },
-              { value: 'mpesa', icon: Smartphone, label: 'M-Pesa' },
-              { value: 'withdrawals', icon: ArrowUpFromLine, label: 'Withdrawals' },
-              { value: 'requests', icon: Users, label: 'Requests' },
-              { value: 'seo', icon: AppWindow, label: 'SEO' },
-              { value: 'appearance', icon: Palette, label: 'Look' },
-            ].map(tab => (
-              <TabsTrigger key={tab.value} value={tab.value} className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground text-[10px] sm:text-xs px-2 sm:px-3 py-1 sm:py-1.5">
-                <tab.icon className="h-3 w-3 mr-1" /> {tab.label}
-              </TabsTrigger>
-            ))}
-          </TabsList>
+          <div className="overflow-x-auto -mx-3 px-3 sm:mx-0 sm:px-0">
+            <TabsList className="bg-card border border-border flex-wrap h-auto gap-1 p-1 inline-flex min-w-full sm:min-w-0">
+              {[
+                { value: 'api', icon: Key, label: 'API' },
+                { value: 'general', icon: Globe, label: 'General' },
+                { value: 'bots', icon: BotIcon, label: 'Bots' },
+                { value: 'mpesa', icon: Smartphone, label: 'M-Pesa' },
+                { value: 'withdrawals', icon: ArrowUpFromLine, label: 'Withdrawals' },
+                { value: 'requests', icon: Users, label: 'Requests' },
+                { value: 'smtp', icon: Mail, label: 'SMTP' },
+                { value: 'emails', icon: FileText, label: 'Emails' },
+                { value: 'seo', icon: AppWindow, label: 'SEO' },
+                { value: 'appearance', icon: Palette, label: 'Look' },
+              ].map(tab => (
+                <TabsTrigger key={tab.value} value={tab.value} className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground text-[10px] sm:text-xs px-2 sm:px-3 py-1 sm:py-1.5 whitespace-nowrap">
+                  <tab.icon className="h-3 w-3 mr-1" /> {tab.label}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          </div>
+
+          <TabsContent value="smtp"><AdminSmtpTab /></TabsContent>
+          <TabsContent value="emails"><AdminEmailTemplatesTab /></TabsContent>
+
 
           {/* API */}
           <TabsContent value="api">

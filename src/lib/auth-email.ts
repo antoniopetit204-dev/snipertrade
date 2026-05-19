@@ -1,0 +1,70 @@
+// Email auth helpers
+import { supabase } from '@/integrations/supabase/client';
+import { setUser, type User } from './store';
+
+const invoke = async (action: string, body: Record<string, any> = {}) => {
+  const { data, error } = await supabase.functions.invoke(`auth-email?action=${action}`, {
+    body: { ...body, origin: window.location.origin },
+  });
+  if (error) throw error;
+  if (data?.error) throw new Error(data.error);
+  return data;
+};
+
+export const signupEmail = async (email: string, password: string, name: string) => {
+  const data = await invoke('signup', { email, password, name });
+  const u: User = { email: data.user.email, role: 'user' };
+  setUser(u);
+  return u;
+};
+
+export const loginEmail = async (email: string, password: string) => {
+  const data = await invoke('login', { email, password });
+  const u: User = { email: data.user.email, role: data.user.role === 'admin' ? 'admin' : 'user' };
+  setUser(u);
+  return u;
+};
+
+export const requestPasswordReset = (email: string) => invoke('forgot-password', { email });
+export const verifyResetToken = (token: string) => invoke('verify-token', { token });
+export const resetPassword = (token: string, password: string) => invoke('reset-password', { token, password });
+export const sendTestEmail = (to: string) => invoke('send-test', { to });
+export const sendTemplateEmail = (to: string, template: string, vars: Record<string, string> = {}) =>
+  invoke('send-template', { to, template, vars });
+
+// Email preferences
+export const fetchEmailPrefs = async (identifier: string) => {
+  const { data } = await supabase.from('user_email_preferences' as any).select('*').eq('identifier', identifier).maybeSingle();
+  return data as any;
+};
+
+export const upsertEmailPrefs = async (identifier: string, prefs: any) => {
+  return (supabase as any).from('user_email_preferences')
+    .upsert({ identifier, ...prefs, updated_at: new Date().toISOString() }, { onConflict: 'identifier' });
+};
+
+// SMTP config
+export const fetchSmtp = async () => {
+  const { data } = await (supabase as any).from('smtp_config').select('*').limit(1).maybeSingle();
+  return data;
+};
+export const updateSmtp = async (cfg: any) => {
+  const { data: existing } = await (supabase as any).from('smtp_config').select('id').limit(1).maybeSingle();
+  if (existing) return (supabase as any).from('smtp_config').update({ ...cfg, updated_at: new Date().toISOString() }).eq('id', existing.id);
+  return (supabase as any).from('smtp_config').insert(cfg);
+};
+
+// Email templates
+export const fetchEmailTemplates = async () => {
+  const { data } = await (supabase as any).from('email_templates').select('*').order('template_key');
+  return data || [];
+};
+export const updateEmailTemplate = async (id: string, patch: any) => {
+  return (supabase as any).from('email_templates').update({ ...patch, updated_at: new Date().toISOString() }).eq('id', id);
+};
+
+// Email log
+export const fetchEmailLog = async (limit = 50) => {
+  const { data } = await (supabase as any).from('email_log').select('*').order('created_at', { ascending: false }).limit(limit);
+  return data || [];
+};

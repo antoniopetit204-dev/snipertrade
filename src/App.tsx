@@ -18,6 +18,10 @@ import DashboardManualTrader from "./pages/DashboardManualTrader";
 import DashboardDeposit from "./pages/DashboardDeposit";
 import DashboardWithdraw from "./pages/DashboardWithdraw";
 import Admin from "./pages/Admin";
+import Auth from "./pages/Auth";
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
+import DashboardSettings from "./pages/DashboardSettings";
 import NotFound from "./pages/NotFound";
 import { WebAppMeta } from "./components/WebAppMeta";
 
@@ -32,6 +36,10 @@ const App = () => (
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Landing />} />
+          <Route path="/auth" element={<Auth />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
+          <Route path="/dashboard/settings" element={<DashboardSettings />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/dashboard/trader" element={<DashboardTrader />} />
           <Route path="/dashboard/manual-trader" element={<DashboardManualTrader />} />
