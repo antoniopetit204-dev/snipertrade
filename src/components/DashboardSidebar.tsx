@@ -1,4 +1,4 @@
-import { Activity, BarChart3, Bot, LineChart, LogOut, TrendingUp, Wallet, ChevronLeft, ChevronRight, BookOpen, Shield, Lightbulb, Wrench, X, Crosshair, ArrowDownToLine, ArrowUpFromLine, Zap } from 'lucide-react';
+import { Activity, BarChart3, Bot, LineChart, LogOut, TrendingUp, Wallet, ChevronLeft, ChevronRight, BookOpen, Shield, Lightbulb, Wrench, X, Crosshair, ArrowDownToLine, ArrowUpFromLine, Zap, Settings } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { setUser, getSettings, getUser } from '@/lib/store';
 import { useState } from 'react';
