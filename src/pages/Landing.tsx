@@ -157,9 +157,14 @@ const Landing = () => {
                 <p className="text-sm sm:text-lg text-muted-foreground mb-6 sm:mb-8 max-w-2xl mx-auto px-4">
                   {settings.metaDescription || 'Deploy automated trading bots on Deriv markets. Advanced analysis tools, real-time charts, and professional risk management.'}
                 </p>
-                <Button size="lg" onClick={handleLogin} className="bg-primary text-primary-foreground hover:bg-primary/90 font-bold text-sm sm:text-base px-6 sm:px-8">
-                  <Zap className="h-4 w-4 sm:h-5 sm:w-5 mr-2" /> Login with Deriv
-                </Button>
+                <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 justify-center">
+                  <Button size="lg" onClick={handleLogin} className="bg-primary text-primary-foreground hover:bg-primary/90 font-bold text-sm sm:text-base px-6 sm:px-8">
+                    <Zap className="h-4 w-4 sm:h-5 sm:w-5 mr-2" /> Sign In / Sign Up
+                  </Button>
+                  <Button size="lg" variant="outline" onClick={handleDerivLogin} className="font-semibold text-sm sm:text-base px-6 sm:px-8">
+                    Continue with Deriv
+                  </Button>
+                </div>
               </motion.div>
             </div>
             <div className="flex justify-center pb-6 sm:pb-8">
