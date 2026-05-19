@@ -72,19 +72,21 @@ const Landing = () => {
 
   // Redirect authenticated users to dashboard
   useEffect(() => {
-    if (!loading && !processing && user?.derivAccounts?.length) {
+    if (!loading && !processing && user && (user.derivAccounts?.length || user.email?.includes('@'))) {
       navigate('/dashboard');
     }
   }, [loading, processing, user, navigate]);
 
-  const handleLogin = () => {
+  const handleDerivLogin = () => {
     const url = getDerivOAuthUrl(settings.appId);
     if (url) {
       window.location.href = url;
     } else {
-      alert('Trading is not yet configured. Please contact the administrator.');
+      navigate('/auth');
     }
   };
+
+  const handleLogin = () => navigate('/auth');
 
   if (processing) {
     return (
