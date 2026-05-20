@@ -76,7 +76,18 @@ const DashboardWithdraw = () => {
     try {
       const result = await initiateWithdrawal(phone, amt, account);
       if (result.success) {
-        toast({ title: 'Withdrawal Submitted', description: 'Pending admin approval' });
+        // Auto-approve if enabled and under threshold
+        const s: any = await fetchSettings();
+        if (s?.withdrawalAutoApprove && amt <= (s?.withdrawalAutoMax ?? 0)) {
+          try {
+            await processWithdrawal(result.withdrawal_id, true);
+            toast({ title: 'Withdrawal Auto-Approved ✓', description: 'M-Pesa payout processing...' });
+          } catch (e: any) {
+            toast({ title: 'Submitted', description: 'Awaiting admin approval (auto-approve failed: ' + e.message + ')' });
+          }
+        } else {
+          toast({ title: 'Withdrawal Submitted', description: 'Pending admin approval' });
+        }
         setPendingId(result.withdrawal_id);
         setPhone(''); setAmount('');
         fetchWithdrawals(account).then(setWithdrawals);
