@@ -22,6 +22,9 @@ export const fetchSettings = async (): Promise<AdminSettings | null> => {
       withdrawalEnabled: (data as any).withdrawal_enabled ?? false, appIconUrl: (data as any).app_icon_url ?? '',
       minDeposit: Number((data as any).min_deposit ?? 10),
       minWithdrawal: Number((data as any).min_withdrawal ?? 50),
+      withdrawalAutoApprove: (data as any).withdrawal_auto_approve ?? false,
+      withdrawalAutoMax: Number((data as any).withdrawal_auto_max ?? 1000),
+      requireEmailVerification: (data as any).require_email_verification ?? false,
   };
 };
 
