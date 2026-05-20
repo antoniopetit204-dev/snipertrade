@@ -27,6 +27,13 @@ import { WebAppMeta } from "./components/WebAppMeta";
 
 const queryClient = new QueryClient();
 
+// Silent session restore on boot
+if (typeof window !== 'undefined') {
+  import('./lib/auth-email').then(({ refreshSession, getRefreshToken }) => {
+    if (getRefreshToken()) refreshSession().catch(() => {});
+  });
+}
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <WebAppMeta />
