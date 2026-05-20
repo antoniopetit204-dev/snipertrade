@@ -76,12 +76,15 @@ export type Database = {
           min_withdrawal: number
           primary_color: string
           privacy_url: string
+          require_email_verification: boolean
           site_name: string
           site_title: string
           support_url: string
           telegram_link: string
           terms_url: string
           updated_at: string
+          withdrawal_auto_approve: boolean
+          withdrawal_auto_max: number
           withdrawal_enabled: boolean
         }
         Insert: {
@@ -107,12 +110,15 @@ export type Database = {
           min_withdrawal?: number
           primary_color?: string
           privacy_url?: string
+          require_email_verification?: boolean
           site_name?: string
           site_title?: string
           support_url?: string
           telegram_link?: string
           terms_url?: string
           updated_at?: string
+          withdrawal_auto_approve?: boolean
+          withdrawal_auto_max?: number
           withdrawal_enabled?: boolean
         }
         Update: {
@@ -138,12 +144,15 @@ export type Database = {
           min_withdrawal?: number
           primary_color?: string
           privacy_url?: string
+          require_email_verification?: boolean
           site_name?: string
           site_title?: string
           support_url?: string
           telegram_link?: string
           terms_url?: string
           updated_at?: string
+          withdrawal_auto_approve?: boolean
+          withdrawal_auto_max?: number
           withdrawal_enabled?: boolean
         }
         Relationships: []
@@ -178,6 +187,45 @@ export type Database = {
           role?: string
           updated_at?: string
           verified?: boolean
+        }
+        Relationships: []
+      }
+      auth_sessions: {
+        Row: {
+          created_at: string
+          email: string
+          expires_at: string
+          id: string
+          ip: string
+          last_used_at: string
+          refresh_token: string
+          revoked: boolean
+          user_agent: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          email?: string
+          expires_at: string
+          id?: string
+          ip?: string
+          last_used_at?: string
+          refresh_token: string
+          revoked?: boolean
+          user_agent?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          expires_at?: string
+          id?: string
+          ip?: string
+          last_used_at?: string
+          refresh_token?: string
+          revoked?: boolean
+          user_agent?: string
+          user_id?: string
         }
         Relationships: []
       }
@@ -331,6 +379,63 @@ export type Database = {
           template_key?: string
           text?: string
           updated_at?: string
+        }
+        Relationships: []
+      }
+      email_verifications: {
+        Row: {
+          created_at: string
+          email: string
+          expires_at: string
+          id: string
+          token: string
+          used: boolean
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          expires_at: string
+          id?: string
+          token: string
+          used?: boolean
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          expires_at?: string
+          id?: string
+          token?: string
+          used?: boolean
+          user_id?: string
+        }
+        Relationships: []
+      }
+      login_attempts: {
+        Row: {
+          action: string
+          created_at: string
+          id: string
+          identifier: string
+          ip: string
+          success: boolean
+        }
+        Insert: {
+          action?: string
+          created_at?: string
+          id?: string
+          identifier: string
+          ip?: string
+          success?: boolean
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          id?: string
+          identifier?: string
+          ip?: string
+          success?: boolean
         }
         Relationships: []
       }
