@@ -41,6 +41,9 @@ export const updateSettings = async (settings: AdminSettings) => {
       privacy_url: settings.privacyUrl, deposit_enabled: settings.depositEnabled,
       withdrawal_enabled: (settings as any).withdrawalEnabled ?? false, app_icon_url: settings.appIconUrl,
       min_deposit: settings.minDeposit ?? 10, min_withdrawal: settings.minWithdrawal ?? 50,
+      withdrawal_auto_approve: (settings as any).withdrawalAutoApprove ?? false,
+      withdrawal_auto_max: (settings as any).withdrawalAutoMax ?? 1000,
+      require_email_verification: (settings as any).requireEmailVerification ?? false,
     } as any)
     .not('id', 'is', null);
   return !error;
