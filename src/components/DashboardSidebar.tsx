@@ -33,7 +33,8 @@ export const DashboardSidebar = ({ onClose }: SidebarProps) => {
   const user = getUser();
   const [collapsed, setCollapsed] = useState(false);
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    try { const { logoutSession } = await import('@/lib/auth-email'); await logoutSession(); } catch {}
     derivWS.disconnect();
     setUser(null);
     navigate('/');

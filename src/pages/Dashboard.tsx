@@ -148,7 +148,7 @@ const Dashboard = () => {
               })}
               {symbols.length === 0 && (
                 <div className="px-4 py-8 text-center text-muted-foreground text-xs sm:text-sm">
-                  {connecting ? 'Connecting to Deriv...' : connected ? 'Loading symbols...' : 'Connect to Deriv to see live data'}
+                  {connecting ? 'Connecting...' : connected ? 'Loading symbols...' : 'Live market feed will appear shortly.'}
                 </div>
               )}
             </div>

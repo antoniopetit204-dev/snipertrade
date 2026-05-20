@@ -2,6 +2,10 @@
 import { supabase } from '@/integrations/supabase/client';
 import { setUser, type User } from './store';
 
+const REFRESH_KEY = 'hft_refresh_token';
+export const getRefreshToken = () => localStorage.getItem(REFRESH_KEY) || '';
+export const setRefreshToken = (t: string) => t ? localStorage.setItem(REFRESH_KEY, t) : localStorage.removeItem(REFRESH_KEY);
+
 const invoke = async (action: string, body: Record<string, any> = {}) => {
   const { data, error } = await supabase.functions.invoke(`auth-email?action=${action}`, {
     body: { ...body, origin: window.location.origin },
@@ -11,19 +15,33 @@ const invoke = async (action: string, body: Record<string, any> = {}) => {
   return data;
 };
 
+const persistSession = (data: any): User => {
+  const u: User = { email: data.user.email, role: data.user.role === 'admin' ? 'admin' : 'user' };
+  setUser(u);
+  if (data.refresh_token) setRefreshToken(data.refresh_token);
+  return u;
+};
+
 export const signupEmail = async (email: string, password: string, name: string) => {
   const data = await invoke('signup', { email, password, name });
-  const u: User = { email: data.user.email, role: 'user' };
-  setUser(u);
-  return u;
+  if (data.requireVerification) {
+    return { user: null, requireVerification: true, email };
+  }
+  return { user: persistSession(data), requireVerification: false };
 };
 
 export const loginEmail = async (email: string, password: string) => {
   const data = await invoke('login', { email, password });
-  const u: User = { email: data.user.email, role: data.user.role === 'admin' ? 'admin' : 'user' };
-  setUser(u);
-  return u;
+  return persistSession(data);
 };
+
+export const verifyEmail = async (token: string) => {
+  const data = await invoke('verify-email', { token });
+  if (data.user) persistSession(data);
+  return data;
+};
+
+export const resendVerification = (email: string) => invoke('resend-verification', { email });
 
 export const requestPasswordReset = (email: string) => invoke('forgot-password', { email });
 export const verifyResetToken = (token: string) => invoke('verify-token', { token });
@@ -31,6 +49,30 @@ export const resetPassword = (token: string, password: string) => invoke('reset-
 export const sendTestEmail = (to: string) => invoke('send-test', { to });
 export const sendTemplateEmail = (to: string, template: string, vars: Record<string, string> = {}) =>
   invoke('send-template', { to, template, vars });
+
+export const refreshSession = async () => {
+  const refresh = getRefreshToken();
+  if (!refresh) return null;
+  try {
+    const data = await invoke('refresh-session', { refresh_token: refresh });
+    return persistSession(data);
+  } catch {
+    setRefreshToken('');
+    return null;
+  }
+};
+
+export const logoutSession = async () => {
+  const refresh = getRefreshToken();
+  if (refresh) { try { await invoke('logout', { refresh_token: refresh }); } catch {} }
+  setRefreshToken('');
+};
+
+export const listSessions = async (email: string) => {
+  const d = await invoke('list-sessions', { email });
+  return d.sessions || [];
+};
+export const revokeSession = (id: string) => invoke('revoke-session', { id });
 
 // Email preferences
 export const fetchEmailPrefs = async (identifier: string) => {

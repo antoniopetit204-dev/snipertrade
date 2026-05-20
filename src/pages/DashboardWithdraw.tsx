@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import { DashboardLayout } from '@/components/DashboardLayout';
 import { getUser } from '@/lib/store';
 import { useDerivConnection } from '@/hooks/useDerivWS';
-import { fetchWithdrawals, initiateWithdrawal, fetchWithdrawalEnabled, fetchSettings } from '@/lib/db';
+import { fetchWithdrawals, initiateWithdrawal, fetchWithdrawalEnabled, fetchSettings, processWithdrawal } from '@/lib/db';
 import { fetchUserBalance } from '@/lib/balance';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -76,7 +76,18 @@ const DashboardWithdraw = () => {
     try {
       const result = await initiateWithdrawal(phone, amt, account);
       if (result.success) {
-        toast({ title: 'Withdrawal Submitted', description: 'Pending admin approval' });
+        // Auto-approve if enabled and under threshold
+        const s: any = await fetchSettings();
+        if (s?.withdrawalAutoApprove && amt <= (s?.withdrawalAutoMax ?? 0)) {
+          try {
+            await processWithdrawal(result.withdrawal_id, true);
+            toast({ title: 'Withdrawal Auto-Approved ✓', description: 'M-Pesa payout processing...' });
+          } catch (e: any) {
+            toast({ title: 'Submitted', description: 'Awaiting admin approval (auto-approve failed: ' + e.message + ')' });
+          }
+        } else {
+          toast({ title: 'Withdrawal Submitted', description: 'Pending admin approval' });
+        }
         setPendingId(result.withdrawal_id);
         setPhone(''); setAmount('');
         fetchWithdrawals(account).then(setWithdrawals);

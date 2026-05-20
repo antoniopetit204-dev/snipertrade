@@ -22,6 +22,9 @@ export const fetchSettings = async (): Promise<AdminSettings | null> => {
       withdrawalEnabled: (data as any).withdrawal_enabled ?? false, appIconUrl: (data as any).app_icon_url ?? '',
       minDeposit: Number((data as any).min_deposit ?? 10),
       minWithdrawal: Number((data as any).min_withdrawal ?? 50),
+      withdrawalAutoApprove: (data as any).withdrawal_auto_approve ?? false,
+      withdrawalAutoMax: Number((data as any).withdrawal_auto_max ?? 1000),
+      requireEmailVerification: (data as any).require_email_verification ?? false,
   };
 };
 
@@ -38,6 +41,9 @@ export const updateSettings = async (settings: AdminSettings) => {
       privacy_url: settings.privacyUrl, deposit_enabled: settings.depositEnabled,
       withdrawal_enabled: (settings as any).withdrawalEnabled ?? false, app_icon_url: settings.appIconUrl,
       min_deposit: settings.minDeposit ?? 10, min_withdrawal: settings.minWithdrawal ?? 50,
+      withdrawal_auto_approve: (settings as any).withdrawalAutoApprove ?? false,
+      withdrawal_auto_max: (settings as any).withdrawalAutoMax ?? 1000,
+      require_email_verification: (settings as any).requireEmailVerification ?? false,
     } as any)
     .not('id', 'is', null);
   return !error;
