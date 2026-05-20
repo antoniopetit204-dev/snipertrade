@@ -84,12 +84,11 @@ async function sendMail(to: string, subject: string, html: string, text: string,
     connection: {
       hostname: smtp.host,
       port,
-      tls: tlsImplicit, // implicit TLS (465). For 587, denomailer does STARTTLS unless allowUnsecure.
+      tls: tlsImplicit,
       auth: smtp.username ? { username: smtp.username, password: smtp.password } : undefined,
     },
-    debug: { allowUnsecure: true, noStartTLS: false },
-    pool: false,
-    client: { warning: 'log', preprocessors: [] },
+    debug: { allowUnsecure: true, log: false, noStartTLS: !tlsImplicit && port !== 587 },
+    client: { warning: 'log' },
   });
 
   try {
