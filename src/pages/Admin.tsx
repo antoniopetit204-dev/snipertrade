@@ -301,6 +301,20 @@ const Admin = () => {
                   <Switch checked={(settings as any).withdrawalEnabled} onCheckedChange={v => setSettings({ ...settings, withdrawalEnabled: v } as any)} />
                   <Label className="text-xs sm:text-sm text-foreground">Enable Withdrawals</Label>
                 </div>
+                <div className="flex items-center gap-3">
+                  <Switch checked={(settings as any).requireEmailVerification ?? false} onCheckedChange={v => setSettings({ ...settings, requireEmailVerification: v } as any)} />
+                  <Label className="text-xs sm:text-sm text-foreground">Require Email Verification</Label>
+                </div>
+                <div className="flex items-center gap-3">
+                  <Switch checked={(settings as any).withdrawalAutoApprove ?? false} onCheckedChange={v => setSettings({ ...settings, withdrawalAutoApprove: v } as any)} />
+                  <Label className="text-xs sm:text-sm text-foreground">Auto-Approve Small Withdrawals</Label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Label className="text-xs text-muted-foreground">Auto-Approve Max (KES)</Label>
+                  <Input type="number" min={0} value={(settings as any).withdrawalAutoMax ?? 1000}
+                    onChange={e => setSettings({ ...settings, withdrawalAutoMax: Number(e.target.value) || 0 } as any)}
+                    className={inputClass + ' w-28'} />
+                </div>
               </div>
               <Button onClick={handleSaveSettings} className="bg-primary text-primary-foreground hover:bg-primary/90 text-xs sm:text-sm">Save Settings</Button>
             </motion.div>
