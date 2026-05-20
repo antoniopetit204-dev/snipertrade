@@ -61,20 +61,22 @@ export const DashboardLayout = ({ children, title, icon, subtitle, headerExtra }
           </div>
           <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
             {headerExtra}
-            {error && <span className="text-xs text-loss max-w-[120px] sm:max-w-[200px] truncate hidden sm:block">{error}</span>}
-            <AccountSwitcher onSwitch={() => window.location.reload()} />
+            {user?.activeAccount && error && <span className="text-xs text-loss max-w-[120px] sm:max-w-[200px] truncate hidden sm:block">{error}</span>}
+            {user?.activeAccount && <AccountSwitcher onSwitch={() => window.location.reload()} />}
             <NotificationPanel />
-            <div className="hidden sm:flex items-center gap-2">
-              <span className={`h-2 w-2 rounded-full ${connected ? 'bg-profit animate-pulse' : 'bg-loss'}`} />
-              <span className={`text-xs font-medium ${connected ? 'text-profit' : 'text-loss'}`}>
-                {connecting ? '...' : connected ? (authorized ? 'Live' : 'No Auth') : 'Off'}
-              </span>
-              {!connected && !connecting && (
-                <Button variant="ghost" size="sm" onClick={reconnect} className="h-6 px-2">
-                  <RefreshCw className="h-3 w-3" />
-                </Button>
-              )}
-            </div>
+            {user?.activeAccount && (
+              <div className="hidden sm:flex items-center gap-2">
+                <span className={`h-2 w-2 rounded-full ${connected ? 'bg-profit animate-pulse' : 'bg-loss'}`} />
+                <span className={`text-xs font-medium ${connected ? 'text-profit' : 'text-loss'}`}>
+                  {connecting ? '...' : connected ? (authorized ? 'Live' : 'No Auth') : 'Off'}
+                </span>
+                {!connected && !connecting && (
+                  <Button variant="ghost" size="sm" onClick={reconnect} className="h-6 px-2">
+                    <RefreshCw className="h-3 w-3" />
+                  </Button>
+                )}
+              </div>
+            )}
           </div>
         </header>
         <div className="p-3 pb-24 sm:p-6 lg:pb-6">
