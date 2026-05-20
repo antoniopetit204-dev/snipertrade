@@ -27,6 +27,9 @@ export interface AdminSettings {
   appIconUrl: string;
   minDeposit: number;
   minWithdrawal: number;
+  withdrawalAutoApprove?: boolean;
+  withdrawalAutoMax?: number;
+  requireEmailVerification?: boolean;
 }
 
 export interface Bot {
