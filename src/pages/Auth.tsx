@@ -1,7 +1,7 @@
-import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Activity, Mail, Lock, User as UserIcon, ArrowRight, Zap } from 'lucide-react';
+import { Activity, Mail, Lock, User as UserIcon, ArrowRight, Zap, CheckCircle2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -9,15 +9,39 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { useSettings } from '@/hooks/useSettings';
 import { getDerivOAuthUrl } from '@/lib/store';
-import { signupEmail, loginEmail } from '@/lib/auth-email';
+import { signupEmail, loginEmail, verifyEmail, resendVerification } from '@/lib/auth-email';
 
 export default function Auth() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { settings } = useSettings();
+  const [search] = useSearchParams();
   const [loading, setLoading] = useState(false);
   const [login, setLogin] = useState({ email: '', password: '' });
   const [signup, setSignup] = useState({ name: '', email: '', password: '' });
+  const [pendingVerify, setPendingVerify] = useState<string | null>(null);
+  const [verifyState, setVerifyState] = useState<'idle' | 'checking' | 'ok' | 'fail'>('idle');
+
+  useEffect(() => {
+    const token = search.get('verify');
+    if (!token) return;
+    setVerifyState('checking');
+    verifyEmail(token)
+      .then((d) => {
+        if (d.user) {
+          setVerifyState('ok');
+          toast({ title: 'Email verified ✓', description: 'Signing you in...' });
+          setTimeout(() => navigate('/dashboard'), 800);
+        } else {
+          setVerifyState('ok');
+          toast({ title: 'Email verified ✓', description: 'You can now sign in.' });
+        }
+      })
+      .catch((e) => {
+        setVerifyState('fail');
+        toast({ title: 'Verification failed', description: e.message, variant: 'destructive' });
+      });
+  }, [search]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -27,6 +51,7 @@ export default function Auth() {
       toast({ title: 'Welcome back!' });
       navigate('/dashboard');
     } catch (err: any) {
+      if (/verif/i.test(err.message)) setPendingVerify(login.email);
       toast({ title: 'Login failed', description: err.message, variant: 'destructive' });
     } finally { setLoading(false); }
   };
@@ -35,12 +60,27 @@ export default function Auth() {
     e.preventDefault();
     setLoading(true);
     try {
-      await signupEmail(signup.email, signup.password, signup.name);
-      toast({ title: 'Account created!', description: 'Welcome to ' + (settings.siteName || 'HFT Pro') });
-      navigate('/dashboard');
+      const res = await signupEmail(signup.email, signup.password, signup.name);
+      if (res.requireVerification) {
+        setPendingVerify(res.email);
+        toast({ title: 'Verify your email', description: 'Check your inbox for the verification link.' });
+      } else {
+        toast({ title: 'Account created!', description: 'Welcome to ' + (settings.siteName || 'HFT Pro') });
+        navigate('/dashboard');
+      }
     } catch (err: any) {
       toast({ title: 'Signup failed', description: err.message, variant: 'destructive' });
     } finally { setLoading(false); }
+  };
+
+  const handleResend = async () => {
+    if (!pendingVerify) return;
+    try {
+      await resendVerification(pendingVerify);
+      toast({ title: 'Verification email sent', description: 'Please check your inbox & spam.' });
+    } catch (e: any) {
+      toast({ title: 'Failed', description: e.message, variant: 'destructive' });
+    }
   };
 
   const handleDeriv = () => {
@@ -48,6 +88,8 @@ export default function Auth() {
     if (url) window.location.href = url;
     else toast({ title: 'Deriv not configured', variant: 'destructive' });
   };
+
+  const showDeriv = !!settings.appId;
 
   return (
     <div className="min-h-screen bg-background geometric-bg flex items-center justify-center p-4">
@@ -59,14 +101,31 @@ export default function Auth() {
             <p className="text-xs text-muted-foreground">Sign in to your trading account</p>
           </div>
 
-          <Button onClick={handleDeriv} variant="outline" className="w-full mb-4 border-primary/50 hover:bg-primary/10">
-            <Zap className="h-4 w-4 mr-2 text-primary" /> Continue with Deriv
-          </Button>
+          {verifyState === 'checking' && <div className="text-center text-sm text-muted-foreground py-4">Verifying your email…</div>}
+          {verifyState === 'ok' && (
+            <div className="mb-4 p-3 rounded-md bg-profit/10 border border-profit/30 text-profit text-sm flex items-center gap-2">
+              <CheckCircle2 className="h-4 w-4" /> Email verified — you can sign in.
+            </div>
+          )}
 
-          <div className="relative my-4">
-            <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-border" /></div>
-            <div className="relative flex justify-center text-xs"><span className="bg-card px-2 text-muted-foreground">or with email</span></div>
-          </div>
+          {pendingVerify && (
+            <div className="mb-4 p-3 rounded-md bg-primary/10 border border-primary/30 text-xs space-y-2">
+              <p>We sent a verification link to <b>{pendingVerify}</b>. Check your inbox or spam folder.</p>
+              <Button size="sm" variant="outline" className="w-full" onClick={handleResend}>Resend verification email</Button>
+            </div>
+          )}
+
+          {showDeriv && (
+            <>
+              <Button onClick={handleDeriv} variant="outline" className="w-full mb-4 border-primary/50 hover:bg-primary/10">
+                <Zap className="h-4 w-4 mr-2 text-primary" /> Continue with Deriv
+              </Button>
+              <div className="relative my-4">
+                <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-border" /></div>
+                <div className="relative flex justify-center text-xs"><span className="bg-card px-2 text-muted-foreground">or with email</span></div>
+              </div>
+            </>
+          )}
 
           <Tabs defaultValue="login">
             <TabsList className="grid grid-cols-2 mb-4">
