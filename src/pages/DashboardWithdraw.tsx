@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import { DashboardLayout } from '@/components/DashboardLayout';
 import { getUser } from '@/lib/store';
 import { useDerivConnection } from '@/hooks/useDerivWS';
-import { fetchWithdrawals, initiateWithdrawal, fetchWithdrawalEnabled, fetchSettings } from '@/lib/db';
+import { fetchWithdrawals, initiateWithdrawal, fetchWithdrawalEnabled, fetchSettings, processWithdrawal } from '@/lib/db';
 import { fetchUserBalance } from '@/lib/balance';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
