@@ -2,21 +2,30 @@ import { useEffect, useState } from 'react';
 import { DashboardLayout } from '@/components/DashboardLayout';
 import { TradingPanel } from '@/components/TradingPanel';
 import { OpenPositions } from '@/components/OpenPositions';
-import { getUser } from '@/lib/store';
+import { getUser, getAccountId } from '@/lib/store';
 import { useDerivConnection } from '@/hooks/useDerivWS';
 import { derivWS } from '@/lib/deriv-ws';
 import { tradeNotifications } from '@/lib/trade-notifications';
+import { fetchUserBalance } from '@/lib/balance';
 import { InstallShortcutPrompt } from '@/components/InstallShortcutPrompt';
 import { TrendingUp, TrendingDown, Zap, Wallet, BarChart3, Activity } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const Dashboard = () => {
   const user = getUser();
-  const { connected, authorized, balance, currency, connecting } = useDerivConnection();
+  const { connected, authorized, connecting } = useDerivConnection();
   const [symbols, setSymbols] = useState<any[]>([]);
   const [ticks, setTicks] = useState<Record<string, { quote: number; change: number }>>({});
   const [profitTable, setProfitTable] = useState<any[]>([]);
+  const [internalBalance, setInternalBalance] = useState(0);
   const [selectedTrade, setSelectedTrade] = useState<{ symbol: string; displayName: string; price: number } | null>(null);
+
+  const accountId = getAccountId(user);
+
+  useEffect(() => {
+    if (accountId) fetchUserBalance(accountId).then(b => setInternalBalance(b.balance));
+  }, [accountId]);
+
 
   useEffect(() => {
     if (!connected) return;
