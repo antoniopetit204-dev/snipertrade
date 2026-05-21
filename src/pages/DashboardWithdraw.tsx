@@ -1,7 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import { DashboardLayout } from '@/components/DashboardLayout';
-import { getUser } from '@/lib/store';
-import { useDerivConnection } from '@/hooks/useDerivWS';
+import { getUser, getAccountId } from '@/lib/store';
 import { fetchWithdrawals, initiateWithdrawal, fetchWithdrawalEnabled, fetchSettings, processWithdrawal } from '@/lib/db';
 import { fetchUserBalance } from '@/lib/balance';
 import { Input } from '@/components/ui/input';
@@ -13,7 +12,6 @@ import { motion } from 'framer-motion';
 
 const DashboardWithdraw = () => {
   const user = getUser();
-  const { authorized } = useDerivConnection();
   const { toast } = useToast();
 
   const [withdrawEnabled, setWithdrawEnabled] = useState<boolean | null>(null);
@@ -26,7 +24,8 @@ const DashboardWithdraw = () => {
   const [minWithdrawal, setMinWithdrawal] = useState(50);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const account = user?.activeAccount?.acct || '';
+  const account = getAccountId(user);
+
 
   const refreshBalance = async () => {
     if (!account) return;
