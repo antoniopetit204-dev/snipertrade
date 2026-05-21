@@ -24,15 +24,19 @@ const persistSession = (data: any): User => {
 
 export const signupEmail = async (email: string, password: string, name: string) => {
   const data = await invoke('signup', { email, password, name });
-  if (data.requireVerification) {
-    return { user: null, requireVerification: true, email };
-  }
-  return { user: persistSession(data), requireVerification: false };
+  // Signup always requires OTP verification now
+  return { user: null, requireVerification: true, email: data.email || email, emailSent: data.emailSent !== false, sendError: data.sendError };
 };
 
 export const loginEmail = async (email: string, password: string) => {
   const data = await invoke('login', { email, password });
   return persistSession(data);
+};
+
+export const verifyOtp = async (email: string, code: string) => {
+  const data = await invoke('verify-otp', { email, code });
+  if (data.user) persistSession(data);
+  return data;
 };
 
 export const verifyEmail = async (token: string) => {
