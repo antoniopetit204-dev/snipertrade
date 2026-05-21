@@ -26,6 +26,13 @@ const tokenHex = (bytes = 32) => {
   return Array.from(arr).map(b => b.toString(16).padStart(2, '0')).join('');
 };
 
+const otp6 = () => {
+  const arr = new Uint32Array(1);
+  crypto.getRandomValues(arr);
+  return String(arr[0] % 1_000_000).padStart(6, '0');
+};
+
+
 const render = (tpl: string, vars: Record<string, string>) =>
   (tpl || '').replace(/\{\{(\w+)\}\}/g, (_, k) => (vars[k] ?? ''));
 
