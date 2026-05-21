@@ -77,16 +77,8 @@ const Landing = () => {
     }
   }, [loading, processing, user, navigate]);
 
-  const handleDerivLogin = () => {
-    const url = getDerivOAuthUrl(settings.appId);
-    if (url) {
-      window.location.href = url;
-    } else {
-      navigate('/auth');
-    }
-  };
-
   const handleLogin = () => navigate('/auth');
+
 
   if (processing) {
     return (
