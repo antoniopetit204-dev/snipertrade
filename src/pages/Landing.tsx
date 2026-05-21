@@ -161,9 +161,6 @@ const Landing = () => {
                   <Button size="lg" onClick={handleLogin} className="bg-primary text-primary-foreground hover:bg-primary/90 font-bold text-sm sm:text-base px-6 sm:px-8">
                     <Zap className="h-4 w-4 sm:h-5 sm:w-5 mr-2" /> Sign In / Sign Up
                   </Button>
-                  <Button size="lg" variant="outline" onClick={handleDerivLogin} className="font-semibold text-sm sm:text-base px-6 sm:px-8">
-                    Continue with Deriv
-                  </Button>
                 </div>
               </motion.div>
             </div>
