@@ -277,10 +277,7 @@ Deno.serve(async (req) => {
         return json({ error: 'Email not verified. We sent you a new code.', requireVerification: true, email }, 403);
       }
 
-      if (!user) { await recordAttempt(email, 'login', false, ip); return json({ error: 'Invalid credentials' }, 401); }
-      const ok = await bcrypt.compare(password, user.password_hash);
-      if (!ok) { await recordAttempt(email, 'login', false, ip); return json({ error: 'Invalid credentials' }, 401); }
-      if (!user.verified) { await recordAttempt(email, 'login', false, ip); return json({ error: 'Email not verified. Check your inbox.', requireVerification: true }, 403); }
+
 
       await recordAttempt(email, 'login', true, ip);
       if (await shouldNotify(email, 'notify_login')) {
