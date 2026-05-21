@@ -107,7 +107,7 @@ const Dashboard = () => {
         {/* Stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-4">
           {[
-            { label: 'Balance', value: balance !== null ? `${balance.toFixed(2)} ${currency}` : '—', icon: Wallet, positive: true },
+            { label: 'Balance', value: `KES ${internalBalance.toFixed(2)}`, icon: Wallet, positive: true },
             { label: 'Active Symbols', value: symbols.length.toString(), icon: BarChart3, positive: true },
             { label: 'Connection', value: connecting ? 'Connecting' : connected ? (authorized ? 'Live & Auth' : 'Live') : 'Offline', icon: Activity, positive: connected },
             { label: 'Status', value: authorized ? 'Ready to Trade' : 'View Only', icon: Zap, positive: authorized },
