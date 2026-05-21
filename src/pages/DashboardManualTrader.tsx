@@ -33,7 +33,7 @@ const DashboardManualTrader = () => {
   const [liveTrade, setLiveTrade] = useState<{ status: 'pending' | 'win' | 'loss'; profit: number } | null>(null);
   const stopRef = useRef(false);
 
-  const account = user?.activeAccount?.acct || '';
+  const account = getAccountId(user);
 
   const refresh = async () => {
     if (!account) return;
