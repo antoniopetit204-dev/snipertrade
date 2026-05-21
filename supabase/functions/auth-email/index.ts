@@ -207,35 +207,55 @@ Deno.serve(async (req) => {
       const name = String(body.name || '').trim();
       const origin = body.origin || req.headers.get('origin') || '';
       if (!email || !password || password.length < 6) return json({ error: 'Invalid input' }, 400);
-      const { data: existing } = await supabase.from('app_users').select('id').eq('email', email).maybeSingle();
-      if (existing) return json({ error: 'Account already exists' }, 409);
+      const { data: existing } = await supabase.from('app_users').select('id, verified').eq('email', email).maybeSingle();
+      if (existing && existing.verified) return json({ error: 'Account already exists. Please sign in.' }, 409);
+
       const hash = await bcrypt.hash(password, 10);
-      const settings = await adminSettings();
-      const requireVerify = !!settings.require_email_verification;
-      const { data: created, error } = await supabase.from('app_users')
-        .insert({ email, password_hash: hash, name, verified: !requireVerify })
-        .select().single();
-      if (error) return json({ error: error.message }, 500);
+      // OTP verification is always required on signup
+      let userId = existing?.id;
+      if (existing) {
+        await supabase.from('app_users').update({ password_hash: hash, name, verified: false, updated_at: new Date().toISOString() }).eq('id', existing.id);
+      } else {
+        const { data: created, error } = await supabase.from('app_users')
+          .insert({ email, password_hash: hash, name, verified: false })
+          .select().single();
+        if (error) return json({ error: error.message }, 500);
+        userId = created.id;
+      }
       await supabase.from('user_email_preferences').upsert({ identifier: email, email }, { onConflict: 'identifier' });
 
-      if (requireVerify) {
-        const token = tokenHex(32);
-        const expires = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
-        await supabase.from('email_verifications').insert({ user_id: created.id, email, token, expires_at: expires });
-        const verifyUrl = `${origin}/auth?verify=${token}`;
-        await sendTemplated(email, 'email_verification', { name: name || email, verify_url: verifyUrl, site_url: origin });
-        return json({ requireVerification: true, user: { id: created.id, email: created.email, name: created.name, role: created.role } });
-      }
-      sendTemplated(email, 'welcome', { name: name || email, site_url: origin }).catch(() => {});
-      const session = await createSession(created.id, email, ua, ip);
-      return json({ user: { id: created.id, email: created.email, name: created.name, role: created.role }, ...session });
+      const otp = otp6();
+      const token = tokenHex(32);
+      const expires = new Date(Date.now() + 15 * 60 * 1000).toISOString();
+      await supabase.from('email_verifications').insert({ user_id: userId, email, token, otp_code: otp, expires_at: expires });
+      const verifyUrl = `${origin}/auth?verify=${token}`;
+      const sendRes = await sendTemplated(email, 'email_verification', { name: name || email, verify_url: verifyUrl, otp_code: otp, site_url: origin });
+      return json({ requireVerification: true, email, emailSent: sendRes.ok, sendError: sendRes.ok ? undefined : sendRes.error });
     }
 
-    if (action === 'login') {
+    if (action === 'verify-otp') {
       const email = String(body.email || '').toLowerCase().trim();
-      const password = String(body.password || '');
-      const rl = await checkRateLimit(email, 'login', 5, 15);
-      if (!rl.allowed) return json({ error: `Too many attempts. Try again in ${Math.ceil(rl.retryAfter / 60)} min.`, retryAfter: rl.retryAfter }, 429);
+      const code = String(body.code || '').trim();
+      if (!email || !/^\d{6}$/.test(code)) return json({ error: 'Enter the 6-digit code' }, 400);
+      const rl = await checkRateLimit(email, 'verify-otp', 10, 15);
+      if (!rl.allowed) return json({ error: 'Too many attempts. Try again later.' }, 429);
+      const { data: row } = await supabase.from('email_verifications')
+        .select('*').eq('email', email).eq('otp_code', code).eq('used', false)
+        .order('created_at', { ascending: false }).limit(1).maybeSingle();
+      if (!row || new Date(row.expires_at) < new Date()) {
+        await recordAttempt(email, 'verify-otp', false, ip);
+        return json({ error: 'Invalid or expired code' }, 400);
+      }
+      await supabase.from('app_users').update({ verified: true, updated_at: new Date().toISOString() }).eq('id', row.user_id);
+      await supabase.from('email_verifications').update({ used: true }).eq('id', row.id);
+      await recordAttempt(email, 'verify-otp', true, ip);
+      const { data: user } = await supabase.from('app_users').select('*').eq('id', row.user_id).maybeSingle();
+      const session = user ? await createSession(user.id, user.email, ua, ip) : null;
+      sendTemplated(email, 'welcome', { name: user?.name || email, site_url: body.origin || '' }).catch(() => {});
+      return json({ ok: true, user: user ? { id: user.id, email: user.email, name: user.name, role: user.role } : null, ...(session || {}) });
+    }
+
+
 
       const { data: user } = await supabase.from('app_users').select('*').eq('email', email).maybeSingle();
       if (!user) { await recordAttempt(email, 'login', false, ip); return json({ error: 'Invalid credentials' }, 401); }
