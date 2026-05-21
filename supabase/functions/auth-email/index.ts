@@ -255,9 +255,28 @@ Deno.serve(async (req) => {
       return json({ ok: true, user: user ? { id: user.id, email: user.email, name: user.name, role: user.role } : null, ...(session || {}) });
     }
 
-
+    if (action === 'login') {
+      const email = String(body.email || '').toLowerCase().trim();
+      const password = String(body.password || '');
+      const origin = body.origin || req.headers.get('origin') || '';
+      const rl = await checkRateLimit(email, 'login', 5, 15);
+      if (!rl.allowed) return json({ error: `Too many attempts. Try again in ${Math.ceil(rl.retryAfter / 60)} min.`, retryAfter: rl.retryAfter }, 429);
 
       const { data: user } = await supabase.from('app_users').select('*').eq('email', email).maybeSingle();
+      if (!user) { await recordAttempt(email, 'login', false, ip); return json({ error: 'Invalid credentials' }, 401); }
+      const ok = await bcrypt.compare(password, user.password_hash);
+      if (!ok) { await recordAttempt(email, 'login', false, ip); return json({ error: 'Invalid credentials' }, 401); }
+      if (!user.verified) {
+        // Auto-send a fresh OTP so user can verify and continue
+        const otp = otp6();
+        const token = tokenHex(32);
+        const expires = new Date(Date.now() + 15 * 60 * 1000).toISOString();
+        await supabase.from('email_verifications').insert({ user_id: user.id, email, token, otp_code: otp, expires_at: expires });
+        sendTemplated(email, 'email_verification', { name: user.name || email, verify_url: `${origin}/auth?verify=${token}`, otp_code: otp, site_url: origin }).catch(() => {});
+        await recordAttempt(email, 'login', false, ip);
+        return json({ error: 'Email not verified. We sent you a new code.', requireVerification: true, email }, 403);
+      }
+
       if (!user) { await recordAttempt(email, 'login', false, ip); return json({ error: 'Invalid credentials' }, 401); }
       const ok = await bcrypt.compare(password, user.password_hash);
       if (!ok) { await recordAttempt(email, 'login', false, ip); return json({ error: 'Invalid credentials' }, 401); }
