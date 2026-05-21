@@ -160,11 +160,8 @@ const DashboardDeposit = () => {
             className="w-full bg-primary text-primary-foreground hover:bg-primary/90 font-semibold text-sm">
             {loading ? 'Sending STK Push...' : pendingCheckout ? 'Waiting for payment...' : 'Deposit via M-Pesa'}
           </Button>
-
-          {!authorized && (
-            <p className="text-xs text-loss text-center">Please connect your Deriv account first</p>
-          )}
         </motion.div>
+
 
         {/* Pending indicator */}
         {pendingCheckout && (
