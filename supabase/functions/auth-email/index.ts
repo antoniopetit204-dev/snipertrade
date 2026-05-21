@@ -132,10 +132,11 @@ const FALLBACK_TPL: Record<string, { subject: string; html: string; text: string
     text: 'Welcome to {{site_name}}, {{name}}! Visit {{site_url}}/dashboard',
   },
   email_verification: {
-    subject: 'Verify your {{site_name}} email',
-    html: `<div style="font-family:Arial,sans-serif;max-width:560px;margin:auto;padding:24px"><h2>Verify your email</h2><p>Hi {{name}}, please confirm your email to activate your account.</p><p><a href="{{verify_url}}" style="background:#E5B84B;color:#000;padding:10px 18px;text-decoration:none;border-radius:6px;font-weight:bold">Verify Email</a></p><p style="font-size:12px;color:#666">If the button doesn't work, paste this link: {{verify_url}}</p></div>`,
-    text: 'Verify your email: {{verify_url}}',
+    subject: 'Your {{site_name}} verification code: {{otp_code}}',
+    html: `<div style="font-family:Arial,sans-serif;max-width:560px;margin:auto;padding:24px;background:#fff;color:#111"><h2 style="margin:0 0 8px">Verify your email</h2><p>Hi {{name}}, use the 6-digit code below to activate your {{site_name}} account.</p><div style="margin:24px 0;padding:18px;background:#f4f4f4;border-radius:8px;text-align:center"><div style="font-size:36px;letter-spacing:8px;font-weight:bold;font-family:'Courier New',monospace;color:#111">{{otp_code}}</div><div style="font-size:11px;color:#666;margin-top:6px">Expires in 15 minutes</div></div><p style="font-size:13px;color:#555">Or click this link: <a href="{{verify_url}}">{{verify_url}}</a></p><p style="font-size:11px;color:#888">If you didn't sign up, ignore this email.</p></div>`,
+    text: 'Your {{site_name}} verification code: {{otp_code}} (expires in 15 min). Or open: {{verify_url}}',
   },
+
   password_reset: {
     subject: 'Reset your {{site_name}} password',
     html: `<div style="font-family:Arial,sans-serif;max-width:560px;margin:auto;padding:24px"><h2>Password reset</h2><p>Hi {{name}}, click below to reset your password (valid for 1 hour).</p><p><a href="{{reset_url}}" style="background:#E5B84B;color:#000;padding:10px 18px;text-decoration:none;border-radius:6px;font-weight:bold">Reset Password</a></p><p style="font-size:12px;color:#666">If you didn't request this, ignore this email.</p></div>`,
