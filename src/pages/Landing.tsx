@@ -24,10 +24,10 @@ const HFTLoader = () => (
 );
 
 const features = [
-  { icon: Zap, title: 'High Frequency Trading', desc: 'Execute thousands of trades per second with our advanced algorithms' },
-  { icon: Bot, title: 'Automated Bots', desc: 'Deploy pre-built or custom trading bots on Deriv markets' },
-  { icon: BarChart3, title: 'Advanced Analysis', desc: 'Real-time technical indicators and AI-powered signals' },
-  { icon: Shield, title: 'Risk Management', desc: 'Protect your capital with advanced risk controls' },
+  { icon: Zap, title: 'High Frequency Trading', desc: 'Run high-speed bot strategies against your internal balance with instant execution' },
+  { icon: Bot, title: 'Automated Bots', desc: 'Deploy free or premium trading bots and let them trade your balance for you' },
+  { icon: BarChart3, title: 'Advanced Analysis', desc: 'Real-time technical indicators and AI-powered signals from live market feeds' },
+  { icon: Shield, title: 'Risk Management', desc: 'Set stake limits, run caps, and stop conditions to protect your capital' },
   { icon: TrendingUp, title: 'Installable Mobile App', desc: 'Add the platform to your Android or iPhone home screen for fast app-style access' },
   { icon: Activity, title: 'Live Charts', desc: 'TradingView-style candlestick charts with drawing tools' },
 ];
@@ -77,16 +77,8 @@ const Landing = () => {
     }
   }, [loading, processing, user, navigate]);
 
-  const handleDerivLogin = () => {
-    const url = getDerivOAuthUrl(settings.appId);
-    if (url) {
-      window.location.href = url;
-    } else {
-      navigate('/auth');
-    }
-  };
-
   const handleLogin = () => navigate('/auth');
+
 
   if (processing) {
     return (
@@ -160,9 +152,6 @@ const Landing = () => {
                 <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 justify-center">
                   <Button size="lg" onClick={handleLogin} className="bg-primary text-primary-foreground hover:bg-primary/90 font-bold text-sm sm:text-base px-6 sm:px-8">
                     <Zap className="h-4 w-4 sm:h-5 sm:w-5 mr-2" /> Sign In / Sign Up
-                  </Button>
-                  <Button size="lg" variant="outline" onClick={handleDerivLogin} className="font-semibold text-sm sm:text-base px-6 sm:px-8">
-                    Continue with Deriv
                   </Button>
                 </div>
               </motion.div>

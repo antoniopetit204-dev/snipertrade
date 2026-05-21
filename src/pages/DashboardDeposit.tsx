@@ -1,7 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import { DashboardLayout } from '@/components/DashboardLayout';
-import { getUser } from '@/lib/store';
-import { useDerivConnection } from '@/hooks/useDerivWS';
+import { getUser, getAccountId } from '@/lib/store';
 import { initiateDeposit, fetchDeposits, fetchDepositEnabled, queryStkStatus, fetchSettings } from '@/lib/db';
 import { fetchUserBalance } from '@/lib/balance';
 import { Input } from '@/components/ui/input';
@@ -13,7 +12,6 @@ import { motion } from 'framer-motion';
 
 const DashboardDeposit = () => {
   const user = getUser();
-  const { authorized } = useDerivConnection();
   const { toast } = useToast();
 
   const [depositEnabled, setDepositEnabled] = useState<boolean | null>(null);
@@ -26,7 +24,8 @@ const DashboardDeposit = () => {
   const [minDeposit, setMinDeposit] = useState(10);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const account = user?.activeAccount?.acct || '';
+  const account = getAccountId(user);
+
 
   const refreshBalance = async () => {
     if (!account) return;
@@ -161,11 +160,8 @@ const DashboardDeposit = () => {
             className="w-full bg-primary text-primary-foreground hover:bg-primary/90 font-semibold text-sm">
             {loading ? 'Sending STK Push...' : pendingCheckout ? 'Waiting for payment...' : 'Deposit via M-Pesa'}
           </Button>
-
-          {!authorized && (
-            <p className="text-xs text-loss text-center">Please connect your Deriv account first</p>
-          )}
         </motion.div>
+
 
         {/* Pending indicator */}
         {pendingCheckout && (

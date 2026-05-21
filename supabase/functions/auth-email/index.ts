@@ -26,6 +26,13 @@ const tokenHex = (bytes = 32) => {
   return Array.from(arr).map(b => b.toString(16).padStart(2, '0')).join('');
 };
 
+const otp6 = () => {
+  const arr = new Uint32Array(1);
+  crypto.getRandomValues(arr);
+  return String(arr[0] % 1_000_000).padStart(6, '0');
+};
+
+
 const render = (tpl: string, vars: Record<string, string>) =>
   (tpl || '').replace(/\{\{(\w+)\}\}/g, (_, k) => (vars[k] ?? ''));
 
@@ -125,10 +132,11 @@ const FALLBACK_TPL: Record<string, { subject: string; html: string; text: string
     text: 'Welcome to {{site_name}}, {{name}}! Visit {{site_url}}/dashboard',
   },
   email_verification: {
-    subject: 'Verify your {{site_name}} email',
-    html: `<div style="font-family:Arial,sans-serif;max-width:560px;margin:auto;padding:24px"><h2>Verify your email</h2><p>Hi {{name}}, please confirm your email to activate your account.</p><p><a href="{{verify_url}}" style="background:#E5B84B;color:#000;padding:10px 18px;text-decoration:none;border-radius:6px;font-weight:bold">Verify Email</a></p><p style="font-size:12px;color:#666">If the button doesn't work, paste this link: {{verify_url}}</p></div>`,
-    text: 'Verify your email: {{verify_url}}',
+    subject: 'Your {{site_name}} verification code: {{otp_code}}',
+    html: `<div style="font-family:Arial,sans-serif;max-width:560px;margin:auto;padding:24px;background:#fff;color:#111"><h2 style="margin:0 0 8px">Verify your email</h2><p>Hi {{name}}, use the 6-digit code below to activate your {{site_name}} account.</p><div style="margin:24px 0;padding:18px;background:#f4f4f4;border-radius:8px;text-align:center"><div style="font-size:36px;letter-spacing:8px;font-weight:bold;font-family:'Courier New',monospace;color:#111">{{otp_code}}</div><div style="font-size:11px;color:#666;margin-top:6px">Expires in 15 minutes</div></div><p style="font-size:13px;color:#555">Or click this link: <a href="{{verify_url}}">{{verify_url}}</a></p><p style="font-size:11px;color:#888">If you didn't sign up, ignore this email.</p></div>`,
+    text: 'Your {{site_name}} verification code: {{otp_code}} (expires in 15 min). Or open: {{verify_url}}',
   },
+
   password_reset: {
     subject: 'Reset your {{site_name}} password',
     html: `<div style="font-family:Arial,sans-serif;max-width:560px;margin:auto;padding:24px"><h2>Password reset</h2><p>Hi {{name}}, click below to reset your password (valid for 1 hour).</p><p><a href="{{reset_url}}" style="background:#E5B84B;color:#000;padding:10px 18px;text-decoration:none;border-radius:6px;font-weight:bold">Reset Password</a></p><p style="font-size:12px;color:#666">If you didn't request this, ignore this email.</p></div>`,
@@ -199,33 +207,58 @@ Deno.serve(async (req) => {
       const name = String(body.name || '').trim();
       const origin = body.origin || req.headers.get('origin') || '';
       if (!email || !password || password.length < 6) return json({ error: 'Invalid input' }, 400);
-      const { data: existing } = await supabase.from('app_users').select('id').eq('email', email).maybeSingle();
-      if (existing) return json({ error: 'Account already exists' }, 409);
+      const { data: existing } = await supabase.from('app_users').select('id, verified').eq('email', email).maybeSingle();
+      if (existing && existing.verified) return json({ error: 'Account already exists. Please sign in.' }, 409);
+
       const hash = await bcrypt.hash(password, 10);
-      const settings = await adminSettings();
-      const requireVerify = !!settings.require_email_verification;
-      const { data: created, error } = await supabase.from('app_users')
-        .insert({ email, password_hash: hash, name, verified: !requireVerify })
-        .select().single();
-      if (error) return json({ error: error.message }, 500);
+      // OTP verification is always required on signup
+      let userId = existing?.id;
+      if (existing) {
+        await supabase.from('app_users').update({ password_hash: hash, name, verified: false, updated_at: new Date().toISOString() }).eq('id', existing.id);
+      } else {
+        const { data: created, error } = await supabase.from('app_users')
+          .insert({ email, password_hash: hash, name, verified: false })
+          .select().single();
+        if (error) return json({ error: error.message }, 500);
+        userId = created.id;
+      }
       await supabase.from('user_email_preferences').upsert({ identifier: email, email }, { onConflict: 'identifier' });
 
-      if (requireVerify) {
-        const token = tokenHex(32);
-        const expires = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
-        await supabase.from('email_verifications').insert({ user_id: created.id, email, token, expires_at: expires });
-        const verifyUrl = `${origin}/auth?verify=${token}`;
-        await sendTemplated(email, 'email_verification', { name: name || email, verify_url: verifyUrl, site_url: origin });
-        return json({ requireVerification: true, user: { id: created.id, email: created.email, name: created.name, role: created.role } });
+      const otp = otp6();
+      const token = tokenHex(32);
+      const expires = new Date(Date.now() + 15 * 60 * 1000).toISOString();
+      await supabase.from('email_verifications').insert({ user_id: userId, email, token, otp_code: otp, expires_at: expires });
+      const verifyUrl = `${origin}/auth?verify=${token}`;
+      const sendRes = await sendTemplated(email, 'email_verification', { name: name || email, verify_url: verifyUrl, otp_code: otp, site_url: origin });
+      return json({ requireVerification: true, email, emailSent: sendRes.ok, sendError: sendRes.ok ? undefined : sendRes.error });
+    }
+
+    if (action === 'verify-otp') {
+      const email = String(body.email || '').toLowerCase().trim();
+      const code = String(body.code || '').trim();
+      if (!email || !/^\d{6}$/.test(code)) return json({ error: 'Enter the 6-digit code' }, 400);
+      const rl = await checkRateLimit(email, 'verify-otp', 10, 15);
+      if (!rl.allowed) return json({ error: 'Too many attempts. Try again later.' }, 429);
+      const { data: row } = await supabase.from('email_verifications')
+        .select('*').eq('email', email).eq('otp_code', code).eq('used', false)
+        .order('created_at', { ascending: false }).limit(1).maybeSingle();
+      if (!row || new Date(row.expires_at) < new Date()) {
+        await recordAttempt(email, 'verify-otp', false, ip);
+        return json({ error: 'Invalid or expired code' }, 400);
       }
-      sendTemplated(email, 'welcome', { name: name || email, site_url: origin }).catch(() => {});
-      const session = await createSession(created.id, email, ua, ip);
-      return json({ user: { id: created.id, email: created.email, name: created.name, role: created.role }, ...session });
+      await supabase.from('app_users').update({ verified: true, updated_at: new Date().toISOString() }).eq('id', row.user_id);
+      await supabase.from('email_verifications').update({ used: true }).eq('id', row.id);
+      await recordAttempt(email, 'verify-otp', true, ip);
+      const { data: user } = await supabase.from('app_users').select('*').eq('id', row.user_id).maybeSingle();
+      const session = user ? await createSession(user.id, user.email, ua, ip) : null;
+      sendTemplated(email, 'welcome', { name: user?.name || email, site_url: body.origin || '' }).catch(() => {});
+      return json({ ok: true, user: user ? { id: user.id, email: user.email, name: user.name, role: user.role } : null, ...(session || {}) });
     }
 
     if (action === 'login') {
       const email = String(body.email || '').toLowerCase().trim();
       const password = String(body.password || '');
+      const origin = body.origin || req.headers.get('origin') || '';
       const rl = await checkRateLimit(email, 'login', 5, 15);
       if (!rl.allowed) return json({ error: `Too many attempts. Try again in ${Math.ceil(rl.retryAfter / 60)} min.`, retryAfter: rl.retryAfter }, 429);
 
@@ -233,7 +266,18 @@ Deno.serve(async (req) => {
       if (!user) { await recordAttempt(email, 'login', false, ip); return json({ error: 'Invalid credentials' }, 401); }
       const ok = await bcrypt.compare(password, user.password_hash);
       if (!ok) { await recordAttempt(email, 'login', false, ip); return json({ error: 'Invalid credentials' }, 401); }
-      if (!user.verified) { await recordAttempt(email, 'login', false, ip); return json({ error: 'Email not verified. Check your inbox.', requireVerification: true }, 403); }
+      if (!user.verified) {
+        // Auto-send a fresh OTP so user can verify and continue
+        const otp = otp6();
+        const token = tokenHex(32);
+        const expires = new Date(Date.now() + 15 * 60 * 1000).toISOString();
+        await supabase.from('email_verifications').insert({ user_id: user.id, email, token, otp_code: otp, expires_at: expires });
+        sendTemplated(email, 'email_verification', { name: user.name || email, verify_url: `${origin}/auth?verify=${token}`, otp_code: otp, site_url: origin }).catch(() => {});
+        await recordAttempt(email, 'login', false, ip);
+        return json({ error: 'Email not verified. We sent you a new code.', requireVerification: true, email }, 403);
+      }
+
+
 
       await recordAttempt(email, 'login', true, ip);
       if (await shouldNotify(email, 'notify_login')) {

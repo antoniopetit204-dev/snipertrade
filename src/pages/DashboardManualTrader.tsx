@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { DashboardLayout } from '@/components/DashboardLayout';
-import { getUser } from '@/lib/store';
+import { getUser, getAccountId } from '@/lib/store';
 import { fetchBots } from '@/lib/db';
 import { fetchUserBalance, updateUserBalance, insertManualTrade, fetchManualTrades, type ManualTrade } from '@/lib/balance';
 import { Button } from '@/components/ui/button';
@@ -33,7 +33,7 @@ const DashboardManualTrader = () => {
   const [liveTrade, setLiveTrade] = useState<{ status: 'pending' | 'win' | 'loss'; profit: number } | null>(null);
   const stopRef = useRef(false);
 
-  const account = user?.activeAccount?.acct || '';
+  const account = getAccountId(user);
 
   const refresh = async () => {
     if (!account) return;

@@ -54,8 +54,10 @@ const DashboardBots = () => {
   };
 
   const deployBot = (bot: Bot) => {
-    navigate(`/dashboard/bot-builder?${buildBotDeploymentSearch(bot)}`);
+    // Deployed bots now trade the user's internal balance via the Manual Trader engine
+    navigate(`/dashboard/manual-trader?bot=${bot.id}`);
   };
+
 
   // Poll for STK status
   useEffect(() => {

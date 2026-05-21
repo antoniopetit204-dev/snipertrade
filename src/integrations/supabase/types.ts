@@ -388,6 +388,7 @@ export type Database = {
           email: string
           expires_at: string
           id: string
+          otp_code: string | null
           token: string
           used: boolean
           user_id: string
@@ -397,6 +398,7 @@ export type Database = {
           email: string
           expires_at: string
           id?: string
+          otp_code?: string | null
           token: string
           used?: boolean
           user_id: string
@@ -406,6 +408,7 @@ export type Database = {
           email?: string
           expires_at?: string
           id?: string
+          otp_code?: string | null
           token?: string
           used?: boolean
           user_id?: string
