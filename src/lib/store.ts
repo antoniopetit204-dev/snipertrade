@@ -150,3 +150,11 @@ export const hasDerivCallbackParams = (search: string): boolean => {
   const params = new URLSearchParams(search);
   return params.has('acct1') && params.has('token1');
 };
+
+// Returns the canonical account identifier — Deriv acct if linked, else the email.
+// Used for balances, deposits, withdrawals, manual trades.
+export const getAccountId = (user: User | null = getUser()): string => {
+  if (!user) return '';
+  return user.activeAccount?.acct || user.email || '';
+};
+
