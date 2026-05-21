@@ -182,11 +182,8 @@ const DashboardWithdraw = () => {
             className="w-full bg-primary text-primary-foreground hover:bg-primary/90 font-semibold text-sm">
             {loading ? 'Processing...' : pendingId ? 'Withdrawal in progress...' : 'Withdraw to M-Pesa'}
           </Button>
-
-          {!authorized && (
-            <p className="text-xs text-loss text-center">Please connect your Deriv account first</p>
-          )}
         </motion.div>
+
 
         {/* Pending indicator */}
         {pendingId && (
