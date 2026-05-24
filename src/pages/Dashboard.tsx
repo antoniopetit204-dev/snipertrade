@@ -165,42 +165,39 @@ const Dashboard = () => {
           <OpenPositions />
         </div>
 
-        {/* Recent Trades */}
-        {profitTable.length > 0 && (
-          <div className="bg-card border border-border rounded-lg">
-            <div className="px-3 sm:px-4 py-2 sm:py-3 border-b border-border">
-              <h2 className="text-xs sm:text-sm font-semibold text-foreground">Recent Trades</h2>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs sm:text-sm">
-                <thead>
-                  <tr className="border-b border-border text-[10px] sm:text-xs text-muted-foreground uppercase tracking-wider">
-                    <th className="text-left px-3 sm:px-4 py-2 sm:py-3">Time</th>
-                    <th className="text-left px-3 sm:px-4 py-2 sm:py-3 hidden sm:table-cell">Contract</th>
-                    <th className="text-right px-3 sm:px-4 py-2 sm:py-3">Buy</th>
-                    <th className="text-right px-3 sm:px-4 py-2 sm:py-3">Sell</th>
-                    <th className="text-right px-3 sm:px-4 py-2 sm:py-3">P&L</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {profitTable.map((t: any, i: number) => (
-                    <tr key={i} className="hover:bg-accent/30 transition-colors">
-                      <td className="px-3 sm:px-4 py-2 sm:py-3 font-mono text-muted-foreground text-[10px] sm:text-xs whitespace-nowrap">
-                        {new Date(t.purchase_time * 1000).toLocaleDateString()}
-                      </td>
-                      <td className="px-3 sm:px-4 py-2 sm:py-3 font-medium text-foreground hidden sm:table-cell truncate max-w-[150px]">{t.shortcode || t.contract_id}</td>
-                      <td className="px-3 sm:px-4 py-2 sm:py-3 font-mono text-right text-foreground">{t.buy_price}</td>
-                      <td className="px-3 sm:px-4 py-2 sm:py-3 font-mono text-right text-foreground">{t.sell_price}</td>
-                      <td className={`px-3 sm:px-4 py-2 sm:py-3 font-mono text-right font-medium ${parseFloat(t.profit) >= 0 ? 'text-profit' : 'text-loss'}`}>
-                        {parseFloat(t.profit) >= 0 ? '+' : ''}{t.profit}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+        {/* My Trades (internal balance) */}
+        <div className="bg-card border border-border rounded-lg">
+          <div className="px-3 sm:px-4 py-2 sm:py-3 border-b border-border flex items-center justify-between">
+            <h2 className="text-xs sm:text-sm font-semibold text-foreground">My Trades (Internal Balance)</h2>
+            <span className={`text-xs font-mono ${totalPnL >= 0 ? 'text-profit' : 'text-loss'}`}>
+              Total P/L: {totalPnL >= 0 ? '+' : ''}{totalPnL.toFixed(2)} KES
+            </span>
           </div>
-        )}
+          {myTrades.length === 0 ? (
+            <p className="px-4 py-8 text-center text-muted-foreground text-xs">No trades yet — open Manual Trader to start.</p>
+          ) : (
+            <div className="divide-y divide-border max-h-[300px] overflow-y-auto">
+              {myTrades.map((t, i) => (
+                <div key={t.id || i} className="px-3 sm:px-4 py-2 flex items-center justify-between text-xs">
+                  <div className="flex items-center gap-2 min-w-0">
+                    {t.result === 'win'
+                      ? <TrendingUp className="h-3.5 w-3.5 text-profit shrink-0" />
+                      : <TrendingDown className="h-3.5 w-3.5 text-loss shrink-0" />}
+                    <div className="min-w-0">
+                      <p className="text-foreground truncate">{t.bot_name}</p>
+                      <p className="text-[10px] text-muted-foreground">
+                        Stake {t.stake} • Bal {Number(t.balance_after).toFixed(2)}
+                      </p>
+                    </div>
+                  </div>
+                  <span className={`font-mono font-medium ${Number(t.profit) >= 0 ? 'text-profit' : 'text-loss'}`}>
+                    {Number(t.profit) >= 0 ? '+' : ''}{Number(t.profit).toFixed(2)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       <AnimatePresence>
