@@ -10,7 +10,9 @@ import { useToast } from '@/hooks/use-toast';
 import { Bot as BotIcon, Play, Square, Zap, TrendingUp, TrendingDown, Wallet, Activity, ChevronRight, Trophy, Flame } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { Bot } from '@/lib/store';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+
+const LAST_BOT_KEY = 'hft_last_manual_bot';
 
 const WIN_RATE = 0.5;     // 50%
 const PAYOUT_MULTIPLIER = 1.85; // typical binary payout on win
@@ -18,9 +20,10 @@ const PAYOUT_MULTIPLIER = 1.85; // typical binary payout on win
 const DashboardManualTrader = () => {
   const user = getUser();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { toast } = useToast();
   const [bots, setBots] = useState<Bot[]>([]);
-  const [selectedBot, setSelectedBot] = useState<Bot | null>(null);
+  const [selectedBot, setSelectedBotState] = useState<Bot | null>(null);
   const [balance, setBalance] = useState(0);
   const [stake, setStake] = useState(10);
   const [runs, setRuns] = useState(10);
@@ -35,6 +38,17 @@ const DashboardManualTrader = () => {
 
   const account = getAccountId(user);
 
+  // Persist + sync URL when a bot is selected
+  const setSelectedBot = (b: Bot | null) => {
+    setSelectedBotState(b);
+    if (b) {
+      localStorage.setItem(LAST_BOT_KEY, b.id);
+      if (searchParams.get('bot') !== b.id) {
+        setSearchParams({ bot: b.id }, { replace: true });
+      }
+    }
+  };
+
   const refresh = async () => {
     if (!account) return;
     const [b, h] = await Promise.all([fetchUserBalance(account), fetchManualTrades(account, 50)]);
@@ -43,7 +57,15 @@ const DashboardManualTrader = () => {
   };
 
   useEffect(() => {
-    fetchBots().then(setBots);
+    fetchBots().then((all) => {
+      setBots(all);
+      // Auto-select: URL > localStorage > none
+      const urlId = searchParams.get('bot');
+      const lastId = localStorage.getItem(LAST_BOT_KEY);
+      const pick = (id: string | null) => id ? all.find(x => x.id === id) : null;
+      const chosen = pick(urlId) || pick(lastId) || null;
+      if (chosen) setSelectedBot(chosen);
+    });
     refresh();
   }, [account]);
 

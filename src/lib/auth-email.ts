@@ -16,15 +16,22 @@ const invoke = async (action: string, body: Record<string, any> = {}) => {
 };
 
 const persistSession = (data: any): User => {
-  const u: User = { email: data.user.email, role: data.user.role === 'admin' ? 'admin' : 'user' };
+  const u: User = {
+    email: data.user.email,
+    role: data.user.role === 'admin' ? 'admin' : 'user',
+    verified: data.user.verified !== false,
+    name: data.user.name,
+  };
   setUser(u);
   if (data.refresh_token) setRefreshToken(data.refresh_token);
   return u;
 };
 
-export const signupEmail = async (email: string, password: string, name: string) => {
-  const data = await invoke('signup', { email, password, name });
-  // Signup always requires OTP verification now
+export const signupEmail = async (
+  email: string, password: string, name: string,
+  extras: { phone?: string; id_number?: string; country?: string } = {}
+) => {
+  const data = await invoke('signup', { email, password, name, ...extras });
   return { user: null, requireVerification: true, email: data.email || email, emailSent: data.emailSent !== false, sendError: data.sendError };
 };
 
@@ -46,6 +53,12 @@ export const verifyEmail = async (token: string) => {
 };
 
 export const resendVerification = (email: string) => invoke('resend-verification', { email });
+
+export const getProfile = (email: string) => invoke('get-profile', { email });
+export const updateProfile = (
+  email: string,
+  patch: { name?: string; phone?: string; id_number?: string; country?: string; avatar_url?: string }
+) => invoke('update-profile', { email, ...patch });
 
 export const requestPasswordReset = (email: string) => invoke('forgot-password', { email });
 export const verifyResetToken = (token: string) => invoke('verify-token', { token });

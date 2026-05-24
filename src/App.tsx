@@ -24,6 +24,7 @@ import ResetPassword from "./pages/ResetPassword";
 import DashboardSettings from "./pages/DashboardSettings";
 import NotFound from "./pages/NotFound";
 import { WebAppMeta } from "./components/WebAppMeta";
+import { AuthGuard } from "./components/AuthGuard";
 
 const queryClient = new QueryClient();
 
@@ -46,20 +47,20 @@ const App = () => (
           <Route path="/auth" element={<Auth />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password" element={<ResetPassword />} />
-          <Route path="/dashboard/settings" element={<DashboardSettings />} />
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/dashboard/trader" element={<DashboardTrader />} />
-          <Route path="/dashboard/manual-trader" element={<DashboardManualTrader />} />
-          <Route path="/dashboard/bots" element={<DashboardBots />} />
-          <Route path="/dashboard/bot-builder" element={<DashboardBotBuilder />} />
-          <Route path="/dashboard/analysis" element={<DashboardAnalysis />} />
-          <Route path="/dashboard/strategy" element={<DashboardStrategy />} />
-          <Route path="/dashboard/portfolio" element={<DashboardPortfolio />} />
-          <Route path="/dashboard/charts" element={<DashboardCharts />} />
-          <Route path="/dashboard/tutorial" element={<DashboardTutorial />} />
-          <Route path="/dashboard/risk" element={<DashboardRisk />} />
-          <Route path="/dashboard/deposit" element={<DashboardDeposit />} />
-          <Route path="/dashboard/withdraw" element={<DashboardWithdraw />} />
+          <Route path="/dashboard/settings" element={<AuthGuard><DashboardSettings /></AuthGuard>} />
+          <Route path="/dashboard" element={<AuthGuard><Dashboard /></AuthGuard>} />
+          <Route path="/dashboard/trader" element={<AuthGuard><DashboardTrader /></AuthGuard>} />
+          <Route path="/dashboard/manual-trader" element={<AuthGuard><DashboardManualTrader /></AuthGuard>} />
+          <Route path="/dashboard/bots" element={<AuthGuard><DashboardBots /></AuthGuard>} />
+          <Route path="/dashboard/bot-builder" element={<AuthGuard><DashboardBotBuilder /></AuthGuard>} />
+          <Route path="/dashboard/analysis" element={<AuthGuard><DashboardAnalysis /></AuthGuard>} />
+          <Route path="/dashboard/strategy" element={<AuthGuard><DashboardStrategy /></AuthGuard>} />
+          <Route path="/dashboard/portfolio" element={<AuthGuard><DashboardPortfolio /></AuthGuard>} />
+          <Route path="/dashboard/charts" element={<AuthGuard><DashboardCharts /></AuthGuard>} />
+          <Route path="/dashboard/tutorial" element={<AuthGuard><DashboardTutorial /></AuthGuard>} />
+          <Route path="/dashboard/risk" element={<AuthGuard><DashboardRisk /></AuthGuard>} />
+          <Route path="/dashboard/deposit" element={<AuthGuard><DashboardDeposit /></AuthGuard>} />
+          <Route path="/dashboard/withdraw" element={<AuthGuard><DashboardWithdraw /></AuthGuard>} />
           <Route path="/adminking" element={<Admin />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
