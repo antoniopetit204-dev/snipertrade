@@ -45,13 +45,8 @@ const Dashboard = () => {
         }
       } catch {}
 
-      if (authorized) {
-        try {
-          const profits = await derivWS.getProfitTable(10);
-          if (profits.profit_table?.transactions) setProfitTable(profits.profit_table.transactions);
-        } catch {}
-      }
     };
+    fetchData = fetchData;
     fetchData();
 
     const unsub = derivWS.subscribe('tick', (data) => {
