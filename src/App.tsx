@@ -24,6 +24,7 @@ import ResetPassword from "./pages/ResetPassword";
 import DashboardSettings from "./pages/DashboardSettings";
 import NotFound from "./pages/NotFound";
 import { WebAppMeta } from "./components/WebAppMeta";
+import { AuthGuard } from "./components/AuthGuard";
 
 const queryClient = new QueryClient();
 
