@@ -54,6 +54,12 @@ export const verifyEmail = async (token: string) => {
 
 export const resendVerification = (email: string) => invoke('resend-verification', { email });
 
+export const getProfile = (email: string) => invoke('get-profile', { email });
+export const updateProfile = (
+  email: string,
+  patch: { name?: string; phone?: string; id_number?: string; country?: string; avatar_url?: string }
+) => invoke('update-profile', { email, ...patch });
+
 export const requestPasswordReset = (email: string) => invoke('forgot-password', { email });
 export const verifyResetToken = (token: string) => invoke('verify-token', { token });
 export const resetPassword = (token: string, password: string) => invoke('reset-password', { token, password });
