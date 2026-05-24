@@ -46,7 +46,6 @@ const Dashboard = () => {
       } catch {}
 
     };
-    fetchData = fetchData;
     fetchData();
 
     const unsub = derivWS.subscribe('tick', (data) => {
