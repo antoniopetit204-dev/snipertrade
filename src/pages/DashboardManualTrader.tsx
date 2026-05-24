@@ -10,7 +10,9 @@ import { useToast } from '@/hooks/use-toast';
 import { Bot as BotIcon, Play, Square, Zap, TrendingUp, TrendingDown, Wallet, Activity, ChevronRight, Trophy, Flame } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { Bot } from '@/lib/store';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+
+const LAST_BOT_KEY = 'hft_last_manual_bot';
 
 const WIN_RATE = 0.5;     // 50%
 const PAYOUT_MULTIPLIER = 1.85; // typical binary payout on win
