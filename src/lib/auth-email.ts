@@ -16,15 +16,22 @@ const invoke = async (action: string, body: Record<string, any> = {}) => {
 };
 
 const persistSession = (data: any): User => {
-  const u: User = { email: data.user.email, role: data.user.role === 'admin' ? 'admin' : 'user' };
+  const u: User = {
+    email: data.user.email,
+    role: data.user.role === 'admin' ? 'admin' : 'user',
+    verified: data.user.verified !== false,
+    name: data.user.name,
+  };
   setUser(u);
   if (data.refresh_token) setRefreshToken(data.refresh_token);
   return u;
 };
 
-export const signupEmail = async (email: string, password: string, name: string) => {
-  const data = await invoke('signup', { email, password, name });
-  // Signup always requires OTP verification now
+export const signupEmail = async (
+  email: string, password: string, name: string,
+  extras: { phone?: string; id_number?: string; country?: string } = {}
+) => {
+  const data = await invoke('signup', { email, password, name, ...extras });
   return { user: null, requireVerification: true, email: data.email || email, emailSent: data.emailSent !== false, sendError: data.sendError };
 };
 
