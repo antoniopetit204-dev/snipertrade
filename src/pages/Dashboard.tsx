@@ -7,6 +7,7 @@ import { useDerivConnection } from '@/hooks/useDerivWS';
 import { derivWS } from '@/lib/deriv-ws';
 import { tradeNotifications } from '@/lib/trade-notifications';
 import { fetchUserBalance } from '@/lib/balance';
+import { fetchManualTrades, type ManualTrade } from '@/lib/balance';
 import { InstallShortcutPrompt } from '@/components/InstallShortcutPrompt';
 import { TrendingUp, TrendingDown, Zap, Wallet, BarChart3, Activity } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
