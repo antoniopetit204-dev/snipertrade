@@ -159,31 +159,43 @@ export type Database = {
       }
       app_users: {
         Row: {
+          avatar_url: string | null
+          country: string | null
           created_at: string
           email: string
           id: string
+          id_number: string | null
           name: string
           password_hash: string
+          phone: string | null
           role: string
           updated_at: string
           verified: boolean
         }
         Insert: {
+          avatar_url?: string | null
+          country?: string | null
           created_at?: string
           email: string
           id?: string
+          id_number?: string | null
           name?: string
           password_hash: string
+          phone?: string | null
           role?: string
           updated_at?: string
           verified?: boolean
         }
         Update: {
+          avatar_url?: string | null
+          country?: string | null
           created_at?: string
           email?: string
           id?: string
+          id_number?: string | null
           name?: string
           password_hash?: string
+          phone?: string | null
           role?: string
           updated_at?: string
           verified?: boolean
