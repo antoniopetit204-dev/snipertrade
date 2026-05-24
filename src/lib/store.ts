@@ -55,6 +55,8 @@ export interface DerivAccount {
 export interface User {
   email: string;
   role: 'admin' | 'user';
+  verified?: boolean;
+  name?: string;
   derivAccounts?: DerivAccount[];
   activeAccount?: DerivAccount;
 }
