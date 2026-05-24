@@ -205,19 +205,32 @@ Deno.serve(async (req) => {
       const email = String(body.email || '').toLowerCase().trim();
       const password = String(body.password || '');
       const name = String(body.name || '').trim();
+      const phone = String(body.phone || '').trim().replace(/\s|-/g, '');
+      const id_number = String(body.id_number || '').trim();
+      const country = String(body.country || '').trim();
       const origin = body.origin || req.headers.get('origin') || '';
       if (!email || !password || password.length < 6) return json({ error: 'Invalid input' }, 400);
       const { data: existing } = await supabase.from('app_users').select('id, verified').eq('email', email).maybeSingle();
       if (existing && existing.verified) return json({ error: 'Account already exists. Please sign in.' }, 409);
 
+      if (phone) {
+        const { data: phoneTaken } = await supabase.from('app_users').select('id, verified').eq('phone', phone).maybeSingle();
+        if (phoneTaken && phoneTaken.verified && phoneTaken.id !== existing?.id) {
+          return json({ error: 'Phone already in use' }, 409);
+        }
+      }
+
       const hash = await bcrypt.hash(password, 10);
-      // OTP verification is always required on signup
       let userId = existing?.id;
+      const patch: any = { password_hash: hash, name, verified: false, updated_at: new Date().toISOString() };
+      if (phone) patch.phone = phone;
+      if (id_number) patch.id_number = id_number;
+      if (country) patch.country = country;
       if (existing) {
-        await supabase.from('app_users').update({ password_hash: hash, name, verified: false, updated_at: new Date().toISOString() }).eq('id', existing.id);
+        await supabase.from('app_users').update(patch).eq('id', existing.id);
       } else {
         const { data: created, error } = await supabase.from('app_users')
-          .insert({ email, password_hash: hash, name, verified: false })
+          .insert({ email, password_hash: hash, name, verified: false, phone, id_number, country })
           .select().single();
         if (error) return json({ error: error.message }, 500);
         userId = created.id;
@@ -252,39 +265,71 @@ Deno.serve(async (req) => {
       const { data: user } = await supabase.from('app_users').select('*').eq('id', row.user_id).maybeSingle();
       const session = user ? await createSession(user.id, user.email, ua, ip) : null;
       sendTemplated(email, 'welcome', { name: user?.name || email, site_url: body.origin || '' }).catch(() => {});
-      return json({ ok: true, user: user ? { id: user.id, email: user.email, name: user.name, role: user.role } : null, ...(session || {}) });
+      return json({ ok: true, user: user ? { id: user.id, email: user.email, name: user.name, role: user.role, verified: true } : null, ...(session || {}) });
     }
 
     if (action === 'login') {
-      const email = String(body.email || '').toLowerCase().trim();
+      const idRaw = String(body.email || '').trim();
+      const identifier = idRaw.toLowerCase();
       const password = String(body.password || '');
       const origin = body.origin || req.headers.get('origin') || '';
-      const rl = await checkRateLimit(email, 'login', 5, 15);
+      const rl = await checkRateLimit(identifier, 'login', 5, 15);
       if (!rl.allowed) return json({ error: `Too many attempts. Try again in ${Math.ceil(rl.retryAfter / 60)} min.`, retryAfter: rl.retryAfter }, 429);
 
-      const { data: user } = await supabase.from('app_users').select('*').eq('email', email).maybeSingle();
-      if (!user) { await recordAttempt(email, 'login', false, ip); return json({ error: 'Invalid credentials' }, 401); }
+      // Allow login by email OR phone in the same field
+      const isPhone = /^[+0-9][0-9\s\-]{6,}$/.test(idRaw);
+      let user: any = null;
+      if (isPhone) {
+        const phoneClean = idRaw.replace(/\s|-/g, '');
+        const { data } = await supabase.from('app_users').select('*').eq('phone', phoneClean).maybeSingle();
+        user = data;
+      }
+      if (!user) {
+        const { data } = await supabase.from('app_users').select('*').eq('email', identifier).maybeSingle();
+        user = data;
+      }
+      if (!user) {
+        await recordAttempt(identifier, 'login', false, ip);
+        return json({ error: 'No account found. Please sign up first.', code: 'NOT_REGISTERED' }, 404);
+      }
       const ok = await bcrypt.compare(password, user.password_hash);
-      if (!ok) { await recordAttempt(email, 'login', false, ip); return json({ error: 'Invalid credentials' }, 401); }
+      if (!ok) { await recordAttempt(identifier, 'login', false, ip); return json({ error: 'Incorrect password' }, 401); }
       if (!user.verified) {
-        // Auto-send a fresh OTP so user can verify and continue
         const otp = otp6();
         const token = tokenHex(32);
         const expires = new Date(Date.now() + 15 * 60 * 1000).toISOString();
-        await supabase.from('email_verifications').insert({ user_id: user.id, email, token, otp_code: otp, expires_at: expires });
-        sendTemplated(email, 'email_verification', { name: user.name || email, verify_url: `${origin}/auth?verify=${token}`, otp_code: otp, site_url: origin }).catch(() => {});
-        await recordAttempt(email, 'login', false, ip);
-        return json({ error: 'Email not verified. We sent you a new code.', requireVerification: true, email }, 403);
+        await supabase.from('email_verifications').insert({ user_id: user.id, email: user.email, token, otp_code: otp, expires_at: expires });
+        sendTemplated(user.email, 'email_verification', { name: user.name || user.email, verify_url: `${origin}/auth?verify=${token}`, otp_code: otp, site_url: origin }).catch(() => {});
+        await recordAttempt(identifier, 'login', false, ip);
+        return json({ error: 'Email not verified. We sent you a fresh code.', requireVerification: true, email: user.email }, 403);
       }
 
-
-
-      await recordAttempt(email, 'login', true, ip);
-      if (await shouldNotify(email, 'notify_login')) {
-        sendTemplated(email, 'login_alert', { name: user.name || email, time: new Date().toUTCString() }).catch(() => {});
+      await recordAttempt(identifier, 'login', true, ip);
+      if (await shouldNotify(user.email, 'notify_login')) {
+        sendTemplated(user.email, 'login_alert', { name: user.name || user.email, time: new Date().toUTCString() }).catch(() => {});
       }
-      const session = await createSession(user.id, email, ua, ip);
-      return json({ user: { id: user.id, email: user.email, name: user.name, role: user.role }, ...session });
+      const session = await createSession(user.id, user.email, ua, ip);
+      return json({ user: { id: user.id, email: user.email, name: user.name, role: user.role, verified: true }, ...session });
+    }
+
+    if (action === 'get-profile') {
+      const email = String(body.email || '').toLowerCase().trim();
+      const { data: user } = await supabase.from('app_users')
+        .select('id, email, name, phone, id_number, country, avatar_url, role, verified').eq('email', email).maybeSingle();
+      return json({ user });
+    }
+
+    if (action === 'update-profile') {
+      const email = String(body.email || '').toLowerCase().trim();
+      if (!email) return json({ error: 'Missing email' }, 400);
+      const patch: any = { updated_at: new Date().toISOString() };
+      ['name', 'phone', 'id_number', 'country', 'avatar_url'].forEach(k => {
+        if (body[k] !== undefined) patch[k] = String(body[k] || '').trim();
+      });
+      if (patch.phone) patch.phone = patch.phone.replace(/\s|-/g, '');
+      const { error } = await supabase.from('app_users').update(patch).eq('email', email);
+      if (error) return json({ error: error.message }, 500);
+      return json({ ok: true });
     }
 
     if (action === 'verify-email') {
