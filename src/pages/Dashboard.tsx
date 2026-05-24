@@ -17,14 +17,17 @@ const Dashboard = () => {
   const { connected, authorized, connecting } = useDerivConnection();
   const [symbols, setSymbols] = useState<any[]>([]);
   const [ticks, setTicks] = useState<Record<string, { quote: number; change: number }>>({});
-  const [profitTable, setProfitTable] = useState<any[]>([]);
   const [internalBalance, setInternalBalance] = useState(0);
+  const [myTrades, setMyTrades] = useState<ManualTrade[]>([]);
   const [selectedTrade, setSelectedTrade] = useState<{ symbol: string; displayName: string; price: number } | null>(null);
 
   const accountId = getAccountId(user);
+  const totalPnL = myTrades.reduce((sum, t) => sum + Number(t.profit || 0), 0);
 
   useEffect(() => {
-    if (accountId) fetchUserBalance(accountId).then(b => setInternalBalance(b.balance));
+    if (!accountId) return;
+    fetchUserBalance(accountId).then(b => setInternalBalance(b.balance));
+    fetchManualTrades(accountId, 20).then(setMyTrades);
   }, [accountId]);
 
 
