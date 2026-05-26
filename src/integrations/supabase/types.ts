@@ -498,32 +498,50 @@ export type Database = {
       }
       mpesa_config: {
         Row: {
+          b2c_enabled: boolean
+          b2c_shortcode: string
           consumer_key: string
           consumer_secret: string
           created_at: string
           environment: string
           id: string
+          initiator_name: string
           passkey: string
+          queue_timeout_url: string
+          result_url: string
+          security_credential: string
           shortcode: string
           updated_at: string
         }
         Insert: {
+          b2c_enabled?: boolean
+          b2c_shortcode?: string
           consumer_key?: string
           consumer_secret?: string
           created_at?: string
           environment?: string
           id?: string
+          initiator_name?: string
           passkey?: string
+          queue_timeout_url?: string
+          result_url?: string
+          security_credential?: string
           shortcode?: string
           updated_at?: string
         }
         Update: {
+          b2c_enabled?: boolean
+          b2c_shortcode?: string
           consumer_key?: string
           consumer_secret?: string
           created_at?: string
           environment?: string
           id?: string
+          initiator_name?: string
           passkey?: string
+          queue_timeout_url?: string
+          result_url?: string
+          security_credential?: string
           shortcode?: string
           updated_at?: string
         }
