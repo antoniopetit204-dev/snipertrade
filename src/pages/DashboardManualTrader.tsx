@@ -241,6 +241,28 @@ const DashboardManualTrader = () => {
                 )}
               </div>
 
+              {/* Contract type selector */}
+              <div className="space-y-1.5">
+                <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">Contract Type</Label>
+                <div className="grid grid-cols-3 gap-1.5">
+                  {CONTRACTS.map(c => (
+                    <button key={c.id} disabled={running} onClick={() => setContractType(c.id)}
+                      className={`px-2 py-2 rounded-md border text-[11px] font-semibold transition-all ${
+                        contractType === c.id
+                          ? 'bg-primary text-primary-foreground border-primary shadow'
+                          : 'bg-secondary border-border text-foreground hover:border-primary/40'
+                      } disabled:opacity-50`}>
+                      {c.label}
+                    </button>
+                  ))}
+                </div>
+                <div className="flex items-center justify-between text-[10px] text-muted-foreground">
+                  <span>{contract.description}</span>
+                  <span className="font-mono text-primary">×{contract.payout.toFixed(2)} payout</span>
+                </div>
+              </div>
+
+
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">Stake / trade (KES)</Label>
