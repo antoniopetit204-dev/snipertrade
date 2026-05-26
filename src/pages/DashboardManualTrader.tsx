@@ -13,9 +13,25 @@ import type { Bot } from '@/lib/store';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 
 const LAST_BOT_KEY = 'hft_last_manual_bot';
+const LAST_CONTRACT_KEY = 'hft_last_contract_type';
 
-const WIN_RATE = 0.5;     // 50%
-const PAYOUT_MULTIPLIER = 1.85; // typical binary payout on win
+// Contract types — each defines its own win probability + payout
+type ContractType = 'RiseFall' | 'OverUnder' | 'EvenOdd';
+
+interface ContractDef {
+  id: ContractType;
+  label: string;
+  description: string;
+  winRate: number;     // baseline 50% — house pulse keeps it fair
+  payout: number;      // multiplier on win (stake * payout returned)
+  sides: [string, string];
+}
+
+const CONTRACTS: ContractDef[] = [
+  { id: 'RiseFall',  label: 'Rise / Fall',  description: 'Predict if the next tick rises or falls', winRate: 0.50, payout: 1.92, sides: ['Rise', 'Fall'] },
+  { id: 'OverUnder', label: 'Over / Under', description: 'Last digit over or under 5',              winRate: 0.50, payout: 1.85, sides: ['Over', 'Under'] },
+  { id: 'EvenOdd',   label: 'Even / Odd',   description: 'Last digit of next tick is even or odd',  winRate: 0.50, payout: 1.95, sides: ['Even', 'Odd'] },
+];
 
 const DashboardManualTrader = () => {
   const user = getUser();
