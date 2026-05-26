@@ -253,7 +253,7 @@ Deno.serve(async (req) => {
       return json({ success: true, withdrawal_id: withdrawal.id, message: 'Withdrawal pending admin approval' });
     }
 
-    // ─── PROCESS WITHDRAWAL (admin approve / reject) ───
+    // ─── PROCESS WITHDRAWAL (admin approve / reject, or auto) ───
     if (action === 'process_withdrawal') {
       const body = await req.json();
       const { withdrawal_id, approve } = body;
@@ -266,13 +266,58 @@ Deno.serve(async (req) => {
         return json({ error: `Cannot process — already ${w.status}` }, 400);
 
       if (!approve) {
-        // refund balance
         await refundBalance(supabase, w.deriv_account, Number(w.amount));
         await supabase.from('withdrawals').update({ status: 'cancelled' }).eq('id', withdrawal_id);
         return json({ success: true, message: 'Withdrawal cancelled & balance refunded' });
       }
 
-      // Admin approved → mark completed (admin sends via M-Pesa portal manually or via B2C if configured)
+      // ── Try real Daraja B2C if enabled & configured ──
+      if (config?.b2c_enabled && config?.initiator_name && config?.security_credential && config?.b2c_shortcode) {
+        try {
+          const b2cBase = config.environment === 'production'
+            ? 'https://api.safaricom.co.ke' : 'https://sandbox.safaricom.co.ke';
+          const authStr = btoa(`${config.consumer_key}:${config.consumer_secret}`);
+          const tokResp = await fetch(`${b2cBase}/oauth/v1/generate?grant_type=client_credentials`, {
+            headers: { Authorization: `Basic ${authStr}` },
+          });
+          const tokJson = await tokResp.json();
+          if (!tokJson.access_token) throw new Error('B2C token failed');
+
+          const payload = {
+            InitiatorName: config.initiator_name,
+            SecurityCredential: config.security_credential,
+            CommandID: 'BusinessPayment',
+            Amount: Math.floor(Number(w.amount)),
+            PartyA: config.b2c_shortcode,
+            PartyB: w.phone_number,
+            Remarks: 'Withdrawal payout',
+            QueueTimeOutURL: config.queue_timeout_url || 'https://example.com/timeout',
+            ResultURL: config.result_url || 'https://example.com/result',
+            Occasion: 'Withdrawal',
+          };
+          const b2cResp = await fetch(`${b2cBase}/mpesa/b2c/v3/paymentrequest`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${tokJson.access_token}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          });
+          const b2cData = await b2cResp.json();
+          if (b2cData.ResponseCode === '0' || b2cData.ConversationID) {
+            await supabase.from('withdrawals').update({
+              status: 'completed',
+              mpesa_transaction_id: b2cData.ConversationID || b2cData.OriginatorConversationID || null,
+            }).eq('id', withdrawal_id);
+            return json({ success: true, message: 'B2C payout dispatched', b2c: b2cData });
+          }
+          // B2C failed — mark approved (manual fallback) but log error
+          await supabase.from('withdrawals').update({ status: 'approved' }).eq('id', withdrawal_id);
+          return json({ success: false, error: b2cData.errorMessage || 'B2C dispatch failed', b2c: b2cData }, 502);
+        } catch (e) {
+          await supabase.from('withdrawals').update({ status: 'approved' }).eq('id', withdrawal_id);
+          return json({ success: false, error: 'B2C error: ' + (e as Error).message }, 502);
+        }
+      }
+
+      // Fallback: mark completed (admin pays manually)
       await supabase.from('withdrawals').update({ status: 'completed' }).eq('id', withdrawal_id);
       return json({ success: true, message: 'Withdrawal approved & marked completed' });
     }
