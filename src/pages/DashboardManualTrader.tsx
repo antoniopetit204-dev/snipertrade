@@ -312,7 +312,7 @@ const DashboardManualTrader = () => {
                     className="flex flex-col items-center gap-2">
                     <motion.div animate={{ rotate: 360 }} transition={{ duration: 0.8, repeat: Infinity, ease: 'linear' }}
                       className="h-10 w-10 rounded-full border-2 border-primary/30 border-t-primary" />
-                    <p className="text-xs text-muted-foreground">Executing trade…</p>
+                    <p className="text-xs text-muted-foreground">Executing {contract.label}{liveTrade.side ? ` · ${liveTrade.side}` : ''}…</p>
                   </motion.div>
                 )}
                 {liveTrade?.status === 'win' && (
@@ -320,7 +320,7 @@ const DashboardManualTrader = () => {
                     className="flex flex-col items-center gap-1">
                     <TrendingUp className="h-10 w-10 text-profit" />
                     <p className="text-xl font-bold text-profit font-mono">+{liveTrade.profit.toFixed(2)} KES</p>
-                    <p className="text-[10px] text-muted-foreground uppercase">WIN</p>
+                    <p className="text-[10px] text-muted-foreground uppercase">WIN · {liveTrade.side}</p>
                   </motion.div>
                 )}
                 {liveTrade?.status === 'loss' && (
@@ -328,7 +328,7 @@ const DashboardManualTrader = () => {
                     className="flex flex-col items-center gap-1">
                     <TrendingDown className="h-10 w-10 text-loss" />
                     <p className="text-xl font-bold text-loss font-mono">{liveTrade.profit.toFixed(2)} KES</p>
-                    <p className="text-[10px] text-muted-foreground uppercase">LOSS</p>
+                    <p className="text-[10px] text-muted-foreground uppercase">LOSS · {liveTrade.side}</p>
                   </motion.div>
                 )}
                 {!liveTrade && (
