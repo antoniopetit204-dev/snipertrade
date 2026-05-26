@@ -40,6 +40,10 @@ const DashboardManualTrader = () => {
   const { toast } = useToast();
   const [bots, setBots] = useState<Bot[]>([]);
   const [selectedBot, setSelectedBotState] = useState<Bot | null>(null);
+  const [contractType, setContractTypeState] = useState<ContractType>(
+    (localStorage.getItem(LAST_CONTRACT_KEY) as ContractType) || 'RiseFall'
+  );
+  const contract = CONTRACTS.find(c => c.id === contractType)!;
   const [balance, setBalance] = useState(0);
   const [stake, setStake] = useState(10);
   const [runs, setRuns] = useState(10);
@@ -49,8 +53,13 @@ const DashboardManualTrader = () => {
   const [wins, setWins] = useState(0);
   const [losses, setLosses] = useState(0);
   const [history, setHistory] = useState<ManualTrade[]>([]);
-  const [liveTrade, setLiveTrade] = useState<{ status: 'pending' | 'win' | 'loss'; profit: number } | null>(null);
+  const [liveTrade, setLiveTrade] = useState<{ status: 'pending' | 'win' | 'loss'; profit: number; side?: string } | null>(null);
   const stopRef = useRef(false);
+
+  const setContractType = (t: ContractType) => {
+    setContractTypeState(t);
+    localStorage.setItem(LAST_CONTRACT_KEY, t);
+  };
 
   const account = getAccountId(user);
 
@@ -88,15 +97,15 @@ const DashboardManualTrader = () => {
   const accessibleBots = useMemo(() => bots.filter(b => b.enabled !== false), [bots]);
 
   const runOne = async (runId: string, currentBalance: number): Promise<number> => {
-    setLiveTrade({ status: 'pending', profit: 0 });
-    // simulate tick movement / fancy spinner pause
+    const side = contract.sides[Math.floor(Math.random() * 2)];
+    setLiveTrade({ status: 'pending', profit: 0, side });
     await new Promise(r => setTimeout(r, 700 + Math.random() * 600));
 
-    const won = Math.random() < WIN_RATE;
-    const profit = won ? +(stake * (PAYOUT_MULTIPLIER - 1)).toFixed(2) : -stake;
+    const won = Math.random() < contract.winRate;
+    const profit = won ? +(stake * (contract.payout - 1)).toFixed(2) : -stake;
     const newBalance = +(currentBalance + profit).toFixed(2);
 
-    setLiveTrade({ status: won ? 'win' : 'loss', profit });
+    setLiveTrade({ status: won ? 'win' : 'loss', profit, side });
     setSessionPnL(p => +(p + profit).toFixed(2));
     if (won) setWins(w => w + 1); else setLosses(l => l + 1);
     setBalance(newBalance);
@@ -105,8 +114,8 @@ const DashboardManualTrader = () => {
     await insertManualTrade({
       deriv_account: account,
       bot_id: selectedBot?.id || null,
-      bot_name: selectedBot?.name || 'Manual',
-      stake, payout: won ? +(stake * PAYOUT_MULTIPLIER).toFixed(2) : 0,
+      bot_name: `${selectedBot?.name || 'Manual'} · ${contract.label} (${side})`,
+      stake, payout: won ? +(stake * contract.payout).toFixed(2) : 0,
       profit, result: won ? 'win' : 'loss',
       balance_after: newBalance, run_id: runId,
     });
