@@ -23,7 +23,7 @@ const Admin = () => {
   const [bots, setBots] = useState<Bot[]>([]);
   const [newBot, setNewBot] = useState({ name: '', description: '', strategy: '', category: 'free' as 'free' | 'premium', price: 0 });
   const [loading, setLoading] = useState(true);
-  const [mpesaConfig, setMpesaConfig] = useState<Omit<MpesaConfig, 'id'>>({ consumerKey: '', consumerSecret: '', shortcode: '', passkey: '', environment: 'sandbox' });
+  const [mpesaConfig, setMpesaConfig] = useState<Omit<MpesaConfig, 'id'>>({ consumerKey: '', consumerSecret: '', shortcode: '', passkey: '', environment: 'sandbox', b2cEnabled: false, initiatorName: '', securityCredential: '', b2cShortcode: '', resultUrl: '', queueTimeoutUrl: '' });
   const [accessRequests, setAccessRequests] = useState<any[]>([]);
   const [purchases, setPurchases] = useState<any[]>([]);
   const [withdrawals, setWithdrawals] = useState<any[]>([]);
@@ -43,7 +43,7 @@ const Admin = () => {
       ]);
       if (dbSettings) setSettings(dbSettings);
       setBots(dbBots);
-      if (dbMpesa) setMpesaConfig({ consumerKey: dbMpesa.consumerKey, consumerSecret: dbMpesa.consumerSecret, shortcode: dbMpesa.shortcode, passkey: dbMpesa.passkey, environment: dbMpesa.environment });
+      if (dbMpesa) setMpesaConfig({ consumerKey: dbMpesa.consumerKey, consumerSecret: dbMpesa.consumerSecret, shortcode: dbMpesa.shortcode, passkey: dbMpesa.passkey, environment: dbMpesa.environment, b2cEnabled: dbMpesa.b2cEnabled, initiatorName: dbMpesa.initiatorName, securityCredential: dbMpesa.securityCredential, b2cShortcode: dbMpesa.b2cShortcode, resultUrl: dbMpesa.resultUrl, queueTimeoutUrl: dbMpesa.queueTimeoutUrl });
       setAccessRequests(dbRequests);
       setPurchases(dbPurchases);
       setWithdrawals(dbWithdrawals);
@@ -437,6 +437,38 @@ const Admin = () => {
                   </select>
                 </div>
               </div>
+
+              {/* B2C Withdrawal Config */}
+              <div className="pt-4 border-t border-border space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xs sm:text-sm font-semibold text-foreground">M-Pesa B2C (Auto Withdrawals)</h3>
+                  <Switch checked={mpesaConfig.b2cEnabled ?? false} onCheckedChange={v => setMpesaConfig({ ...mpesaConfig, b2cEnabled: v })} />
+                </div>
+                <p className="text-[10px] text-muted-foreground">When enabled, approved withdrawals (and auto-approved ones under the threshold) are sent directly to the customer's M-Pesa via Daraja B2C PaymentRequest.</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label className={labelClass}>Initiator Name</Label>
+                    <Input value={mpesaConfig.initiatorName ?? ''} onChange={e => setMpesaConfig({ ...mpesaConfig, initiatorName: e.target.value })} placeholder="API Initiator username" className={`${inputClass} font-mono`} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className={labelClass}>Security Credential</Label>
+                    <Input value={mpesaConfig.securityCredential ?? ''} onChange={e => setMpesaConfig({ ...mpesaConfig, securityCredential: e.target.value })} type="password" placeholder="Encrypted initiator password" className={`${inputClass} font-mono`} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className={labelClass}>B2C Shortcode</Label>
+                    <Input value={mpesaConfig.b2cShortcode ?? ''} onChange={e => setMpesaConfig({ ...mpesaConfig, b2cShortcode: e.target.value })} placeholder="B2C Paybill / Till" className={`${inputClass} font-mono`} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className={labelClass}>Result URL</Label>
+                    <Input value={mpesaConfig.resultUrl ?? ''} onChange={e => setMpesaConfig({ ...mpesaConfig, resultUrl: e.target.value })} placeholder="https://your-domain/result" className={`${inputClass} font-mono`} />
+                  </div>
+                  <div className="space-y-2 sm:col-span-2">
+                    <Label className={labelClass}>Queue Timeout URL</Label>
+                    <Input value={mpesaConfig.queueTimeoutUrl ?? ''} onChange={e => setMpesaConfig({ ...mpesaConfig, queueTimeoutUrl: e.target.value })} placeholder="https://your-domain/timeout" className={`${inputClass} font-mono`} />
+                  </div>
+                </div>
+              </div>
+
               <Button onClick={handleSaveMpesa} className="bg-primary text-primary-foreground hover:bg-primary/90 text-xs sm:text-sm">Save M-Pesa Config</Button>
 
               {purchases.length > 0 && (

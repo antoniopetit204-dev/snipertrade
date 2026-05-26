@@ -13,9 +13,25 @@ import type { Bot } from '@/lib/store';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 
 const LAST_BOT_KEY = 'hft_last_manual_bot';
+const LAST_CONTRACT_KEY = 'hft_last_contract_type';
 
-const WIN_RATE = 0.5;     // 50%
-const PAYOUT_MULTIPLIER = 1.85; // typical binary payout on win
+// Contract types — each defines its own win probability + payout
+type ContractType = 'RiseFall' | 'OverUnder' | 'EvenOdd';
+
+interface ContractDef {
+  id: ContractType;
+  label: string;
+  description: string;
+  winRate: number;     // baseline 50% — house pulse keeps it fair
+  payout: number;      // multiplier on win (stake * payout returned)
+  sides: [string, string];
+}
+
+const CONTRACTS: ContractDef[] = [
+  { id: 'RiseFall',  label: 'Rise / Fall',  description: 'Predict if the next tick rises or falls', winRate: 0.50, payout: 1.92, sides: ['Rise', 'Fall'] },
+  { id: 'OverUnder', label: 'Over / Under', description: 'Last digit over or under 5',              winRate: 0.50, payout: 1.85, sides: ['Over', 'Under'] },
+  { id: 'EvenOdd',   label: 'Even / Odd',   description: 'Last digit of next tick is even or odd',  winRate: 0.50, payout: 1.95, sides: ['Even', 'Odd'] },
+];
 
 const DashboardManualTrader = () => {
   const user = getUser();
@@ -24,6 +40,10 @@ const DashboardManualTrader = () => {
   const { toast } = useToast();
   const [bots, setBots] = useState<Bot[]>([]);
   const [selectedBot, setSelectedBotState] = useState<Bot | null>(null);
+  const [contractType, setContractTypeState] = useState<ContractType>(
+    (localStorage.getItem(LAST_CONTRACT_KEY) as ContractType) || 'RiseFall'
+  );
+  const contract = CONTRACTS.find(c => c.id === contractType)!;
   const [balance, setBalance] = useState(0);
   const [stake, setStake] = useState(10);
   const [runs, setRuns] = useState(10);
@@ -33,8 +53,13 @@ const DashboardManualTrader = () => {
   const [wins, setWins] = useState(0);
   const [losses, setLosses] = useState(0);
   const [history, setHistory] = useState<ManualTrade[]>([]);
-  const [liveTrade, setLiveTrade] = useState<{ status: 'pending' | 'win' | 'loss'; profit: number } | null>(null);
+  const [liveTrade, setLiveTrade] = useState<{ status: 'pending' | 'win' | 'loss'; profit: number; side?: string } | null>(null);
   const stopRef = useRef(false);
+
+  const setContractType = (t: ContractType) => {
+    setContractTypeState(t);
+    localStorage.setItem(LAST_CONTRACT_KEY, t);
+  };
 
   const account = getAccountId(user);
 
@@ -72,15 +97,15 @@ const DashboardManualTrader = () => {
   const accessibleBots = useMemo(() => bots.filter(b => b.enabled !== false), [bots]);
 
   const runOne = async (runId: string, currentBalance: number): Promise<number> => {
-    setLiveTrade({ status: 'pending', profit: 0 });
-    // simulate tick movement / fancy spinner pause
+    const side = contract.sides[Math.floor(Math.random() * 2)];
+    setLiveTrade({ status: 'pending', profit: 0, side });
     await new Promise(r => setTimeout(r, 700 + Math.random() * 600));
 
-    const won = Math.random() < WIN_RATE;
-    const profit = won ? +(stake * (PAYOUT_MULTIPLIER - 1)).toFixed(2) : -stake;
+    const won = Math.random() < contract.winRate;
+    const profit = won ? +(stake * (contract.payout - 1)).toFixed(2) : -stake;
     const newBalance = +(currentBalance + profit).toFixed(2);
 
-    setLiveTrade({ status: won ? 'win' : 'loss', profit });
+    setLiveTrade({ status: won ? 'win' : 'loss', profit, side });
     setSessionPnL(p => +(p + profit).toFixed(2));
     if (won) setWins(w => w + 1); else setLosses(l => l + 1);
     setBalance(newBalance);
@@ -89,8 +114,8 @@ const DashboardManualTrader = () => {
     await insertManualTrade({
       deriv_account: account,
       bot_id: selectedBot?.id || null,
-      bot_name: selectedBot?.name || 'Manual',
-      stake, payout: won ? +(stake * PAYOUT_MULTIPLIER).toFixed(2) : 0,
+      bot_name: `${selectedBot?.name || 'Manual'} · ${contract.label} (${side})`,
+      stake, payout: won ? +(stake * contract.payout).toFixed(2) : 0,
       profit, result: won ? 'win' : 'loss',
       balance_after: newBalance, run_id: runId,
     });
@@ -216,6 +241,28 @@ const DashboardManualTrader = () => {
                 )}
               </div>
 
+              {/* Contract type selector */}
+              <div className="space-y-1.5">
+                <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">Contract Type</Label>
+                <div className="grid grid-cols-3 gap-1.5">
+                  {CONTRACTS.map(c => (
+                    <button key={c.id} disabled={running} onClick={() => setContractType(c.id)}
+                      className={`px-2 py-2 rounded-md border text-[11px] font-semibold transition-all ${
+                        contractType === c.id
+                          ? 'bg-primary text-primary-foreground border-primary shadow'
+                          : 'bg-secondary border-border text-foreground hover:border-primary/40'
+                      } disabled:opacity-50`}>
+                      {c.label}
+                    </button>
+                  ))}
+                </div>
+                <div className="flex items-center justify-between text-[10px] text-muted-foreground">
+                  <span>{contract.description}</span>
+                  <span className="font-mono text-primary">×{contract.payout.toFixed(2)} payout</span>
+                </div>
+              </div>
+
+
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">Stake / trade (KES)</Label>
@@ -265,7 +312,7 @@ const DashboardManualTrader = () => {
                     className="flex flex-col items-center gap-2">
                     <motion.div animate={{ rotate: 360 }} transition={{ duration: 0.8, repeat: Infinity, ease: 'linear' }}
                       className="h-10 w-10 rounded-full border-2 border-primary/30 border-t-primary" />
-                    <p className="text-xs text-muted-foreground">Executing trade…</p>
+                    <p className="text-xs text-muted-foreground">Executing {contract.label}{liveTrade.side ? ` · ${liveTrade.side}` : ''}…</p>
                   </motion.div>
                 )}
                 {liveTrade?.status === 'win' && (
@@ -273,7 +320,7 @@ const DashboardManualTrader = () => {
                     className="flex flex-col items-center gap-1">
                     <TrendingUp className="h-10 w-10 text-profit" />
                     <p className="text-xl font-bold text-profit font-mono">+{liveTrade.profit.toFixed(2)} KES</p>
-                    <p className="text-[10px] text-muted-foreground uppercase">WIN</p>
+                    <p className="text-[10px] text-muted-foreground uppercase">WIN · {liveTrade.side}</p>
                   </motion.div>
                 )}
                 {liveTrade?.status === 'loss' && (
@@ -281,7 +328,7 @@ const DashboardManualTrader = () => {
                     className="flex flex-col items-center gap-1">
                     <TrendingDown className="h-10 w-10 text-loss" />
                     <p className="text-xl font-bold text-loss font-mono">{liveTrade.profit.toFixed(2)} KES</p>
-                    <p className="text-[10px] text-muted-foreground uppercase">LOSS</p>
+                    <p className="text-[10px] text-muted-foreground uppercase">LOSS · {liveTrade.side}</p>
                   </motion.div>
                 )}
                 {!liveTrade && (

@@ -132,6 +132,12 @@ export interface MpesaConfig {
   shortcode: string;
   passkey: string;
   environment: 'sandbox' | 'production';
+  b2cEnabled?: boolean;
+  initiatorName?: string;
+  securityCredential?: string;
+  b2cShortcode?: string;
+  resultUrl?: string;
+  queueTimeoutUrl?: string;
 }
 
 export const fetchMpesaConfig = async (): Promise<MpesaConfig | null> => {
@@ -141,19 +147,33 @@ export const fetchMpesaConfig = async (): Promise<MpesaConfig | null> => {
     .limit(1)
     .single();
   if (error || !data) return null;
+  const d: any = data;
   return {
-    id: data.id, consumerKey: data.consumer_key, consumerSecret: data.consumer_secret,
-    shortcode: data.shortcode, passkey: data.passkey, environment: data.environment as 'sandbox' | 'production',
+    id: d.id, consumerKey: d.consumer_key, consumerSecret: d.consumer_secret,
+    shortcode: d.shortcode, passkey: d.passkey, environment: d.environment as 'sandbox' | 'production',
+    b2cEnabled: d.b2c_enabled ?? false,
+    initiatorName: d.initiator_name ?? '',
+    securityCredential: d.security_credential ?? '',
+    b2cShortcode: d.b2c_shortcode ?? '',
+    resultUrl: d.result_url ?? '',
+    queueTimeoutUrl: d.queue_timeout_url ?? '',
   };
 };
 
 export const updateMpesaConfig = async (config: Omit<MpesaConfig, 'id'>) => {
-  const { error } = await supabase
+  const payload: any = {
+    consumer_key: config.consumerKey, consumer_secret: config.consumerSecret,
+    shortcode: config.shortcode, passkey: config.passkey, environment: config.environment,
+    b2c_enabled: config.b2cEnabled ?? false,
+    initiator_name: config.initiatorName ?? '',
+    security_credential: config.securityCredential ?? '',
+    b2c_shortcode: config.b2cShortcode ?? '',
+    result_url: config.resultUrl ?? '',
+    queue_timeout_url: config.queueTimeoutUrl ?? '',
+  };
+  const { error } = await (supabase as any)
     .from('mpesa_config')
-    .update({
-      consumer_key: config.consumerKey, consumer_secret: config.consumerSecret,
-      shortcode: config.shortcode, passkey: config.passkey, environment: config.environment,
-    })
+    .update(payload)
     .not('id', 'is', null);
   return !error;
 };
