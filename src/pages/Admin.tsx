@@ -538,8 +538,11 @@ const Admin = () => {
                           </>
                         ) : (
                           <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${
-                            w.status === 'completed' ? 'bg-profit/20 text-profit' : w.status === 'cancelled' ? 'bg-loss/20 text-loss' : 'bg-primary/20 text-primary'
-                          }`}>{w.status}</span>
+                            w.status === 'completed' ? 'bg-profit/20 text-profit'
+                            : w.status === 'cancelled' || w.status === 'failed' ? 'bg-loss/20 text-loss'
+                            : w.status === 'processing' ? 'bg-primary/20 text-primary animate-pulse'
+                            : 'bg-primary/20 text-primary'
+                          }`}>{w.status}{w.mpesa_receipt ? ` · ${w.mpesa_receipt}` : ''}</span>
                         )}
                       </div>
                     </div>
@@ -548,6 +551,7 @@ const Admin = () => {
               )}
             </motion.div>
           </TabsContent>
+
 
           {/* Access Requests */}
           <TabsContent value="requests">
