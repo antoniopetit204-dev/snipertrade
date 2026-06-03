@@ -262,6 +262,18 @@ const DashboardManualTrader = () => {
                 )}
               </div>
 
+              {/* Symbol selector */}
+              <div className="space-y-1.5">
+                <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">Symbol</Label>
+                <select value={symbol} onChange={e => setSymbol(e.target.value)} disabled={running}
+                  className="w-full bg-secondary border border-border text-foreground rounded-md px-3 py-2 text-xs disabled:opacity-50">
+                  {symbols.length === 0 && <option value="">Loading symbols…</option>}
+                  {symbols.map((s: any) => (
+                    <option key={s.symbol} value={s.symbol}>{s.display_name} ({s.market_display_name})</option>
+                  ))}
+                </select>
+              </div>
+
               {/* Contract type selector */}
               <div className="space-y-1.5">
                 <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">Contract Type</Label>
