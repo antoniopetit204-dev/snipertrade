@@ -41,11 +41,13 @@ const DashboardManualTrader = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { toast } = useToast();
+  const { symbols } = useActiveSymbols();
   const [bots, setBots] = useState<Bot[]>([]);
   const [selectedBot, setSelectedBotState] = useState<Bot | null>(null);
   const [contractType, setContractTypeState] = useState<ContractType>(
     (localStorage.getItem(LAST_CONTRACT_KEY) as ContractType) || 'RiseFall'
   );
+  const [symbol, setSymbolState] = useState<string>(localStorage.getItem(LAST_SYMBOL_KEY) || '');
   const contract = CONTRACTS.find(c => c.id === contractType)!;
   const [balance, setBalance] = useState(0);
   const [stake, setStake] = useState(10);
@@ -64,7 +66,21 @@ const DashboardManualTrader = () => {
     localStorage.setItem(LAST_CONTRACT_KEY, t);
   };
 
+  const setSymbol = (s: string) => {
+    setSymbolState(s);
+    if (s) localStorage.setItem(LAST_SYMBOL_KEY, s);
+  };
+
+  // Default symbol once loaded
+  useEffect(() => {
+    if (!symbol && symbols.length > 0) {
+      const vol = symbols.find((s: any) => s.symbol?.startsWith('R_')) || symbols[0];
+      setSymbol(vol.symbol);
+    }
+  }, [symbols, symbol]);
+
   const account = getAccountId(user);
+
 
   // Persist + sync URL when a bot is selected
   const setSelectedBot = (b: Bot | null) => {
