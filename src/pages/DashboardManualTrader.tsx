@@ -11,9 +11,12 @@ import { Bot as BotIcon, Play, Square, Zap, TrendingUp, TrendingDown, Wallet, Ac
 import { motion, AnimatePresence } from 'framer-motion';
 import type { Bot } from '@/lib/store';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useActiveSymbols } from '@/hooks/useDerivWS';
 
 const LAST_BOT_KEY = 'hft_last_manual_bot';
 const LAST_CONTRACT_KEY = 'hft_last_contract_type';
+const LAST_SYMBOL_KEY = 'hft_last_manual_symbol';
+
 
 // Contract types — each defines its own win probability + payout
 type ContractType = 'RiseFall' | 'OverUnder' | 'EvenOdd';
