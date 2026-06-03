@@ -120,16 +120,6 @@ const DashboardWithdraw = () => {
   return (
     <DashboardLayout title="Withdraw Funds" icon={<ArrowUpFromLine className="h-5 w-5 text-primary" />}>
       <div className="space-y-4 sm:space-y-6 max-w-2xl mx-auto">
-        {/* Disclaimer */}
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-          className="bg-primary/5 border border-primary/20 rounded-lg p-4 flex gap-3">
-          <Info className="h-5 w-5 text-primary shrink-0 mt-0.5" />
-          <div className="text-xs sm:text-sm text-muted-foreground space-y-1">
-            <p className="font-semibold text-foreground">Third-Party Withdrawal Service</p>
-            <p>Withdrawals are processed via M-Pesa B2C (Business to Customer). Funds are deducted from your trading account and sent to your M-Pesa number. Processing may take 1-5 minutes.</p>
-            <p className="text-[10px] text-muted-foreground">Standard M-Pesa transaction charges may apply.</p>
-          </div>
-        </motion.div>
 
         {/* Balance Card */}
         <div className="bg-gradient-to-br from-primary/15 to-primary/5 border border-primary/30 rounded-lg p-4 sm:p-6 text-center">
