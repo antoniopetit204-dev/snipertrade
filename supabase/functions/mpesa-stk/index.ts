@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import forge from "npm:node-forge@1.3.1";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -8,7 +9,92 @@ const corsHeaders = {
 const json = (data: unknown, status = 200) =>
   new Response(JSON.stringify(data), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
-// Atomic-ish balance helpers (read-modify-write; sufficient for low-concurrency)
+// ── Safaricom public certificates (used to RSA-encrypt initiator passwords) ──
+const SANDBOX_CERT = `-----BEGIN CERTIFICATE-----
+MIIGgDCCBWigAwIBAgIKMvrulAAAAARG5DANBgkqhkiG9w0BAQsFADBbMRMwEQYK
+CZImiZPyLGQBGRYDbmV0MRkwFwYKCZImiZPyLGQBGRYJc2FmYXJpY29tMSkwJwYD
+VQQDEyBTYWZhcmljb20gSW50ZXJuYWwgSXNzdWluZyBDQSAwMjAeFw0xNzA0MjUx
+NjA3MjRaFw0xODAzMzAwNzAwMjNaMIGNMQswCQYDVQQGEwJLRTEQMA4GA1UECBMH
+TmFpcm9iaTEQMA4GA1UEBxMHTmFpcm9iaTEaMBgGA1UEChMRU2FmYXJpY29tIExp
+bWl0ZWQxEzARBgNVBAsTClRlY2hub2xvZ3kxKTAnBgNVBAMTIGFwaWdlZS5hcGlj
+YWxsZXIuc2FmYXJpY29tLmNvLmtlMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIB
+CgKCAQEAoknIb5Tm1hxOVdFsOejAs6veAai32Zv442BLuOGkFKUeCUM2s0K8XEsU
+t6BP25rQGNlTCTEqfdtRrym6bt5k0fTDscf0yMCoYzaxTh1mejg8rPO6bD8MJB0c
+FWRUeLEyWjMeEPsYVSJFv7T58IdAn7/RhkrpBl1cT/Lpu8t+eRgZxXAv1ngfPmCV
+tCJ1u1lxLN0WkdQQ9toF286KGzGAIyP5IUjW0CmtMNuRcwYHEml9V2bDhCqIxsko
+quHcGfeqe8YeGuS9NbWAVE0QlqdM1eL4Z/f8YJBNFXIXjbiXusezgFmFOdSrFGOf
+ZBgvVfaRyhmIs8bYNU9eEgMwBlG6YwIDAQABo4IDLTCCAykwHQYDVR0OBBYEFG2w
+ycrgEBPFzPUZVjh8KoJ3EpuyMB8GA1UdIwQYMBaAFOsy1E9+YJo6mCBjug1evuh5
+TtUkMIIBSwYDVR0fBIIBQjCCAT4wggE6oIIBNqCCATKGgdZsZGFwOi8vL0NOPVNh
+ZmFyaWNvbSUyMEludGVybmFsJTIwSXNzdWluZyUyMENBJTIwMDIsQ049U1ZEVDNJ
+U1NDQTAxLENOPUNEUCxDTj1QdWJsaWMlMjBLZXklMjBTZXJ2aWNlcyxDTj1TZXJ2
+aWNlcyxDTj1Db25maWd1cmF0aW9uLERDPXNhZmFyaWNvbSxEQz1uZXQ/Y2VydGlm
+aWNhdGVSZXZvY2F0aW9uTGlzdD9iYXNlP29iamVjdENsYXNzPWNSTERpc3RyaWJ1
+dGlvblBvaW50hldodHRwOi8vY3JsLnNhZmFyaWNvbS5jby5rZS9TYWZhcmljb20l
+MjBJbnRlcm5hbCUyMElzc3VpbmclMjBDQSUyMDAyKDEpLmNybDCCAQkGCCsGAQUF
+BwEBBIH8MIH5MIHJBggrBgEFBQcwAoaBvGxkYXA6Ly8vQ049U2FmYXJpY29tJTIw
+SW50ZXJuYWwlMjBJc3N1aW5nJTIwQ0ElMjAwMixDTj1BSUEsQ049UHVibGljJTIw
+S2V5JTIwU2VydmljZXMsQ049U2VydmljZXMsQ049Q29uZmlndXJhdGlvbixEQz1z
+YWZhcmljb20sREM9bmV0P2NBQ2VydGlmaWNhdGU/YmFzZT9vYmplY3RDbGFzcz1j
+ZXJ0aWZpY2F0aW9uQXV0aG9yaXR5MCsGCCsGAQUFBzABhh9odHRwOi8vY3JsLnNh
+ZmFyaWNvbS5jby5rZS9vY3NwMAsGA1UdDwQEAwIFoDA9BgkrBgEEAYI3FQcEMDAu
+BiYrBgEEAYI3FQiHz4xWhMLEA4XphTaE3tENhqCICGeG9JgcgT/zAgFkAgEKMBMG
+A1UdJQQMMAoGCCsGAQUFBwMBMBsGCSsGAQQBgjcVCgQOMAwwCgYIKwYBBQUHAwEw
+DQYJKoZIhvcNAQELBQADggEBADQh3SrSldL3qLgEZ7uS7VStdLmizUbtPHbo7CYK
+DDH+iCVdy6yzhfeJDmFmgUzL61OEM2vEnFTcaO9MlGv7BNJEuJaTJOGiH/khe6tx
+T1WaXa9hT3+8/lOTNz4xPjr4HhMc5/yokYLnu5cWS+8h6kQjxn+rdgXjJTjp/HLO
+HEukR0msZGZj+kKtY4QPLEGr2tgmGS+jpRTREv7yJpJSyM8ZS56i2tWcj5dDywuB
+qb2L3IUYqZSjlVJzS0v2ZBlYg7sokj/D5jWqOTOiKsRsX1lZ2gxA1MGr3kFm5VEx
+M6rT44PaLs9ymA4SX/Q88OYa5/dHmEs59SihrFulIN2NwI8=
+-----END CERTIFICATE-----`;
+
+const PROD_CERT = `-----BEGIN CERTIFICATE-----
+MIIGkzCCBXugAwIBAgIKXfBp5gAAAAQAUjANBgkqhkiG9w0BAQsFADBbMRMwEQYK
+CZImiZPyLGQBGRYDbmV0MRkwFwYKCZImiZPyLGQBGRYJc2FmYXJpY29tMSkwJwYD
+VQQDEyBTYWZhcmljb20gSW50ZXJuYWwgSXNzdWluZyBDQSAwMjAeFw0yMTA1MTAx
+MzE5MjVaFw0yMjA1MTAxMzE5MjVaMHsxCzAJBgNVBAYTAktFMRAwDgYDVQQIEwdO
+YWlyb2JpMRAwDgYDVQQHEwdOYWlyb2JpMRYwFAYDVQQKEw1TYWZhcmljb20gUExD
+MRMwEQYDVQQLEwpEaWdpdGFsIElUMRswGQYDVQQDExJhcGkuc2FmYXJpY29tLmNv
+LmtlMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAk1ldOXrV04PJ7QQp
+oVeOcg3jX/eK1eAYqV0YvtCfb0WgRfwUVqOFt3O3HzrFTLI8FzEnYa9wB3UVEFpZ
+fjAhEbpFxFy7s4DyMaPNyhz/Yc7VPgYXVjQrI5dWoMl4OWxAxiL6FNJB+ofRWlIa
+BBKKzVcm+1RNdcyx5y/EXmpsNm5VOBL/iCXIVmZAOK6lQjgEjFCDQ7XNPxYIYGdM
+HQE0CdAo0YqyKjQXKZSdAEZxKqQJD2QUu5IxKVfd4LqYqfH8a9XV2vQbWxOFEjbT
+mQpFtCq2EXBRsW3FQUlqGzWfWmiBnLOe4d8h+AhmybhPwR93JeJyJBJgUNVbBPyD
+QwIDAQABo4IDJzCCAyMwHQYDVR0OBBYEFEUFXyKLkBQ/F7E0bdt4HxLslmkqMB8G
+A1UdIwQYMBaAFOsy1E9+YJo6mCBjug1evuh5TtUkMIIBSwYDVR0fBIIBQjCCAT4w
+ggE6oIIBNqCCATKGgdZsZGFwOi8vL0NOPVNhZmFyaWNvbSUyMEludGVybmFsJTIw
+SXNzdWluZyUyMENBJTIwMDIsQ049U1ZEVDNJU1NDQTAxLENOPUNEUCxDTj1QdWJs
+aWMlMjBLZXklMjBTZXJ2aWNlcyxDTj1TZXJ2aWNlcyxDTj1Db25maWd1cmF0aW9u
+LERDPXNhZmFyaWNvbSxEQz1uZXQ/Y2VydGlmaWNhdGVSZXZvY2F0aW9uTGlzdD9i
+YXNlP29iamVjdENsYXNzPWNSTERpc3RyaWJ1dGlvblBvaW50hldodHRwOi8vY3Js
+LnNhZmFyaWNvbS5jby5rZS9TYWZhcmljb20lMjBJbnRlcm5hbCUyMElzc3Vpbmcl
+MjBDQSUyMDAyKDEpLmNybDCCAQkGCCsGAQUFBwEBBIH8MIH5MIHJBggrBgEFBQcw
+AoaBvGxkYXA6Ly8vQ049U2FmYXJpY29tJTIwSW50ZXJuYWwlMjBJc3N1aW5nJTIw
+Q0ElMjAwMixDTj1BSUEsQ049UHVibGljJTIwS2V5JTIwU2VydmljZXMsQ049U2Vy
+dmljZXMsQ049Q29uZmlndXJhdGlvbixEQz1zYWZhcmljb20sREM9bmV0P2NBQ2Vy
+dGlmaWNhdGU/YmFzZT9vYmplY3RDbGFzcz1jZXJ0aWZpY2F0aW9uQXV0aG9yaXR5
+MCsGCCsGAQUFBzABhh9odHRwOi8vY3JsLnNhZmFyaWNvbS5jby5rZS9vY3NwMAsG
+A1UdDwQEAwIFoDA9BgkrBgEEAYI3FQcEMDAuBiYrBgEEAYI3FQiHz4xWhMLEA4Xp
+hTaE3tENhqCICGeG9JgcgT/zAgFkAgEKMBMGA1UdJQQMMAoGCCsGAQUFBwMBMBsG
+CSsGAQQBgjcVCgQOMAwwCgYIKwYBBQUHAwEwDQYJKoZIhvcNAQELBQADggEBABAE
+fUaktKVUe3SrgXC3F2pK7lBxEcgxfp/jPkUbjmuJUjMyJOLhsRJZ6QrjzghpDpFi
+3X0fSGM4tH3sEm5GFkxbZeBN9R5+s0e/dQXmpiZX2nb3qV1xv1OPYz9XU9N5p6tT
+PqUmGgQp+J0JtKjjB7+0qkH9DwLfJrG2g3R1Dh4VZQwM6lJ2P1uV0lFq9bD3i8KZ
+xMxnq+RaGcZJgM6XKLm1g9rxC3xQ8eu0L2c1c5+a8XO0w6/HnLZ7Z9DZqkFwQGgL
+EnNRXh3wd8oP0xVL0X1fhYwSqRm+VqzHsxr4U2vXcF3HJB1Rj4LXVZ5NqMmHvK0c
+Vzhxa9b8sk0gZQqXkw==
+-----END CERTIFICATE-----`;
+
+const generateSecurityCredential = (initiatorPassword: string, env: string): string => {
+  const certPem = env === 'production' ? PROD_CERT : SANDBOX_CERT;
+  const cert = forge.pki.certificateFromPem(certPem);
+  const publicKey = cert.publicKey as forge.pki.rsa.PublicKey;
+  const encrypted = publicKey.encrypt(initiatorPassword, 'RSAES-PKCS1-V1_5');
+  return forge.util.encode64(encrypted);
+};
+
+// Atomic-ish balance helpers
 async function creditBalance(supabase: any, account: string, amount: number) {
   const { data: existing } = await supabase
     .from('user_balances').select('*').eq('deriv_account', account).maybeSingle();
@@ -57,12 +143,71 @@ Deno.serve(async (req) => {
     const url = new URL(req.url);
     const action = url.searchParams.get('action') || 'stk_push';
 
+    // ─── GENERATE SECURITY CREDENTIAL (no M-Pesa call) ───
+    if (action === 'b2c_generate_credential') {
+      const body = await req.json();
+      const { initiator_password, environment } = body;
+      if (!initiator_password) return json({ error: 'initiator_password required' }, 400);
+      try {
+        const credential = generateSecurityCredential(initiator_password, environment || 'sandbox');
+        return json({ success: true, security_credential: credential });
+      } catch (e) {
+        return json({ error: 'Encryption failed: ' + (e as Error).message }, 500);
+      }
+    }
+
+    // ─── B2C RESULT CALLBACK (from Safaricom) ───
+    if (action === 'b2c_result') {
+      const body = await req.json().catch(() => ({}));
+      const result = body?.Result;
+      if (result) {
+        const convId = result.ConversationID || result.OriginatorConversationID;
+        const code = Number(result.ResultCode);
+        const desc = result.ResultDesc || '';
+        const receiptItem = result.ResultParameters?.ResultParameter?.find(
+          (p: any) => p.Key === 'TransactionReceipt'
+        );
+        const receipt = receiptItem?.Value || null;
+
+        const { data: w } = await supabase.from('withdrawals')
+          .select('*').eq('mpesa_transaction_id', convId).maybeSingle();
+        if (w) {
+          if (code === 0) {
+            await supabase.from('withdrawals').update({
+              status: 'completed', mpesa_receipt: receipt,
+            }).eq('id', w.id);
+          } else {
+            // Failure → refund
+            await refundBalance(supabase, w.deriv_account, Number(w.amount));
+            await supabase.from('withdrawals').update({
+              status: 'failed', mpesa_receipt: `FAIL: ${desc}`,
+            }).eq('id', w.id);
+          }
+        }
+      }
+      return json({ ResultCode: 0, ResultDesc: 'Accepted' });
+    }
+
+    // ─── B2C QUEUE TIMEOUT CALLBACK ───
+    if (action === 'b2c_timeout') {
+      const body = await req.json().catch(() => ({}));
+      const convId = body?.ConversationID || body?.OriginatorConversationID;
+      if (convId) {
+        const { data: w } = await supabase.from('withdrawals')
+          .select('*').eq('mpesa_transaction_id', convId).maybeSingle();
+        if (w && w.status !== 'completed') {
+          await refundBalance(supabase, w.deriv_account, Number(w.amount));
+          await supabase.from('withdrawals').update({ status: 'failed' }).eq('id', w.id);
+        }
+      }
+      return json({ ResultCode: 0, ResultDesc: 'Accepted' });
+    }
+
     const { data: config } = await supabase.from('mpesa_config').select('*').limit(1).single();
     const { data: settings } = await supabase.from('admin_settings').select('*').limit(1).single();
     const minDeposit = Number((settings as any)?.min_deposit ?? 10);
     const minWithdrawal = Number((settings as any)?.min_withdrawal ?? 50);
 
-    // M-Pesa related actions need config
     const needsMpesa = ['stk_push', 'callback', 'query'].includes(action);
     if (needsMpesa && (!config || !config.consumer_key || !config.shortcode)) {
       return json({ error: 'M-Pesa not configured' }, 400);
@@ -151,7 +296,6 @@ Deno.serve(async (req) => {
             .update({ status: 'completed', mpesa_receipt: receipt })
             .eq('mpesa_checkout_request_id', checkoutId);
 
-          // Credit balance if it's a deposit that hasn't been credited yet
           const { data: dep } = await supabase.from('deposits')
             .select('*').eq('mpesa_checkout_request_id', checkoutId).maybeSingle();
           if (dep && !dep.credited) {
@@ -170,7 +314,7 @@ Deno.serve(async (req) => {
       return json({ ResultCode: 0, ResultDesc: 'Accepted' });
     }
 
-    // ─── QUERY STK STATUS (also credits if confirmed via polling) ───
+    // ─── QUERY STK STATUS ───
     if (action === 'query') {
       const body = await req.json();
       const { checkout_request_id } = body;
@@ -189,7 +333,6 @@ Deno.serve(async (req) => {
       });
       const queryData = await queryResp.json();
 
-      // If Safaricom says success and we have a pending deposit not credited → credit it now
       if (queryData.ResultCode === '0' || queryData.ResultCode === 0) {
         const { data: dep } = await supabase.from('deposits')
           .select('*').eq('mpesa_checkout_request_id', checkout_request_id).maybeSingle();
@@ -221,7 +364,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    // ─── WITHDRAW (debits balance immediately; waits for admin approval) ───
+    // ─── WITHDRAW ───
     if (action === 'withdraw') {
       const body = await req.json();
       const { phone_number, amount, deriv_account } = body;
@@ -233,7 +376,6 @@ Deno.serve(async (req) => {
       if (!(settings as any)?.withdrawal_enabled)
         return json({ error: 'Withdrawals are currently disabled' }, 403);
 
-      // Debit internal balance (reserve funds)
       const ok = await debitBalance(supabase, deriv_account, Number(amount));
       if (!ok) return json({ error: 'Insufficient balance' }, 400);
 
@@ -245,12 +387,11 @@ Deno.serve(async (req) => {
       }).select().single();
 
       if (insertErr) {
-        // refund
         await refundBalance(supabase, deriv_account, Number(amount));
         return json({ error: 'Failed to create withdrawal record' }, 500);
       }
 
-      return json({ success: true, withdrawal_id: withdrawal.id, message: 'Withdrawal pending admin approval' });
+      return json({ success: true, withdrawal_id: withdrawal.id, message: 'Withdrawal submitted' });
     }
 
     // ─── PROCESS WITHDRAWAL (admin approve / reject, or auto) ───
@@ -271,7 +412,7 @@ Deno.serve(async (req) => {
         return json({ success: true, message: 'Withdrawal cancelled & balance refunded' });
       }
 
-      // ── Try real Daraja B2C if enabled & configured ──
+      // Try real Daraja B2C if enabled & configured
       if (config?.b2c_enabled && config?.initiator_name && config?.security_credential && config?.b2c_shortcode) {
         try {
           const b2cBase = config.environment === 'production'
@@ -283,6 +424,10 @@ Deno.serve(async (req) => {
           const tokJson = await tokResp.json();
           if (!tokJson.access_token) throw new Error('B2C token failed');
 
+          // Auto-build callback URLs pointing back to this edge function
+          const resultUrl = config.result_url || `${supabaseUrl}/functions/v1/mpesa-stk?action=b2c_result`;
+          const timeoutUrl = config.queue_timeout_url || `${supabaseUrl}/functions/v1/mpesa-stk?action=b2c_timeout`;
+
           const payload = {
             InitiatorName: config.initiator_name,
             SecurityCredential: config.security_credential,
@@ -291,8 +436,8 @@ Deno.serve(async (req) => {
             PartyA: config.b2c_shortcode,
             PartyB: w.phone_number,
             Remarks: 'Withdrawal payout',
-            QueueTimeOutURL: config.queue_timeout_url || 'https://example.com/timeout',
-            ResultURL: config.result_url || 'https://example.com/result',
+            QueueTimeOutURL: timeoutUrl,
+            ResultURL: resultUrl,
             Occasion: 'Withdrawal',
           };
           const b2cResp = await fetch(`${b2cBase}/mpesa/b2c/v3/paymentrequest`, {
@@ -302,13 +447,13 @@ Deno.serve(async (req) => {
           });
           const b2cData = await b2cResp.json();
           if (b2cData.ResponseCode === '0' || b2cData.ConversationID) {
+            // Mark as processing — callback will finalize to completed/failed
             await supabase.from('withdrawals').update({
-              status: 'completed',
+              status: 'processing',
               mpesa_transaction_id: b2cData.ConversationID || b2cData.OriginatorConversationID || null,
             }).eq('id', withdrawal_id);
             return json({ success: true, message: 'B2C payout dispatched', b2c: b2cData });
           }
-          // B2C failed — mark approved (manual fallback) but log error
           await supabase.from('withdrawals').update({ status: 'approved' }).eq('id', withdrawal_id);
           return json({ success: false, error: b2cData.errorMessage || 'B2C dispatch failed', b2c: b2cData }, 502);
         } catch (e) {

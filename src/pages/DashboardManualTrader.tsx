@@ -11,9 +11,12 @@ import { Bot as BotIcon, Play, Square, Zap, TrendingUp, TrendingDown, Wallet, Ac
 import { motion, AnimatePresence } from 'framer-motion';
 import type { Bot } from '@/lib/store';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useActiveSymbols } from '@/hooks/useDerivWS';
 
 const LAST_BOT_KEY = 'hft_last_manual_bot';
 const LAST_CONTRACT_KEY = 'hft_last_contract_type';
+const LAST_SYMBOL_KEY = 'hft_last_manual_symbol';
+
 
 // Contract types — each defines its own win probability + payout
 type ContractType = 'RiseFall' | 'OverUnder' | 'EvenOdd';
@@ -38,11 +41,13 @@ const DashboardManualTrader = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { toast } = useToast();
+  const { symbols } = useActiveSymbols();
   const [bots, setBots] = useState<Bot[]>([]);
   const [selectedBot, setSelectedBotState] = useState<Bot | null>(null);
   const [contractType, setContractTypeState] = useState<ContractType>(
     (localStorage.getItem(LAST_CONTRACT_KEY) as ContractType) || 'RiseFall'
   );
+  const [symbol, setSymbolState] = useState<string>(localStorage.getItem(LAST_SYMBOL_KEY) || '');
   const contract = CONTRACTS.find(c => c.id === contractType)!;
   const [balance, setBalance] = useState(0);
   const [stake, setStake] = useState(10);
@@ -61,7 +66,21 @@ const DashboardManualTrader = () => {
     localStorage.setItem(LAST_CONTRACT_KEY, t);
   };
 
+  const setSymbol = (s: string) => {
+    setSymbolState(s);
+    if (s) localStorage.setItem(LAST_SYMBOL_KEY, s);
+  };
+
+  // Default symbol once loaded
+  useEffect(() => {
+    if (!symbol && symbols.length > 0) {
+      const vol = symbols.find((s: any) => s.symbol?.startsWith('R_')) || symbols[0];
+      setSymbol(vol.symbol);
+    }
+  }, [symbols, symbol]);
+
   const account = getAccountId(user);
+
 
   // Persist + sync URL when a bot is selected
   const setSelectedBot = (b: Bot | null) => {
@@ -111,14 +130,16 @@ const DashboardManualTrader = () => {
     setBalance(newBalance);
 
     await updateUserBalance(account, newBalance);
+    const symLabel = symbols.find((s: any) => s.symbol === symbol)?.display_name || symbol || 'Synthetic';
     await insertManualTrade({
       deriv_account: account,
       bot_id: selectedBot?.id || null,
-      bot_name: `${selectedBot?.name || 'Manual'} · ${contract.label} (${side})`,
+      bot_name: `${selectedBot?.name || 'Manual'} · ${symLabel} · ${contract.label} (${side})`,
       stake, payout: won ? +(stake * contract.payout).toFixed(2) : 0,
       profit, result: won ? 'win' : 'loss',
       balance_after: newBalance, run_id: runId,
     });
+
 
     await new Promise(r => setTimeout(r, 450));
     setLiveTrade(null);
@@ -239,6 +260,18 @@ const DashboardManualTrader = () => {
                 {selectedBot && (
                   <span className="text-[10px] px-2 py-1 rounded bg-primary/10 text-primary">{selectedBot.strategy}</span>
                 )}
+              </div>
+
+              {/* Symbol selector */}
+              <div className="space-y-1.5">
+                <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">Symbol</Label>
+                <select value={symbol} onChange={e => setSymbol(e.target.value)} disabled={running}
+                  className="w-full bg-secondary border border-border text-foreground rounded-md px-3 py-2 text-xs disabled:opacity-50">
+                  {symbols.length === 0 && <option value="">Loading symbols…</option>}
+                  {symbols.map((s: any) => (
+                    <option key={s.symbol} value={s.symbol}>{s.display_name} ({s.market_display_name})</option>
+                  ))}
+                </select>
               </div>
 
               {/* Contract type selector */}

@@ -444,7 +444,7 @@ const Admin = () => {
                   <h3 className="text-xs sm:text-sm font-semibold text-foreground">M-Pesa B2C (Auto Withdrawals)</h3>
                   <Switch checked={mpesaConfig.b2cEnabled ?? false} onCheckedChange={v => setMpesaConfig({ ...mpesaConfig, b2cEnabled: v })} />
                 </div>
-                <p className="text-[10px] text-muted-foreground">When enabled, approved withdrawals (and auto-approved ones under the threshold) are sent directly to the customer's M-Pesa via Daraja B2C PaymentRequest.</p>
+                <p className="text-[10px] text-muted-foreground">When enabled, approved withdrawals are sent directly via Daraja B2C. Result/timeout URLs auto-resolve to this app's edge function — set them on the Safaricom portal too.</p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="space-y-2">
                     <Label className={labelClass}>Initiator Name</Label>
@@ -452,22 +452,35 @@ const Admin = () => {
                   </div>
                   <div className="space-y-2">
                     <Label className={labelClass}>Security Credential</Label>
-                    <Input value={mpesaConfig.securityCredential ?? ''} onChange={e => setMpesaConfig({ ...mpesaConfig, securityCredential: e.target.value })} type="password" placeholder="Encrypted initiator password" className={`${inputClass} font-mono`} />
+                    <div className="flex gap-1">
+                      <Input value={mpesaConfig.securityCredential ?? ''} onChange={e => setMpesaConfig({ ...mpesaConfig, securityCredential: e.target.value })} type="password" placeholder="Auto-generate or paste encrypted" className={`${inputClass} font-mono flex-1`} />
+                      <Button type="button" variant="outline" size="sm" className="text-[10px] h-9 shrink-0" onClick={async () => {
+                        const pwd = window.prompt('Enter Initiator Password (will be RSA-encrypted with Safaricom cert):');
+                        if (!pwd) return;
+                        try {
+                          const { data, error } = await (await import('@/integrations/supabase/client')).supabase.functions.invoke('mpesa-stk?action=b2c_generate_credential', { body: { initiator_password: pwd, environment: mpesaConfig.environment } });
+                          if (error || !data?.security_credential) throw new Error(data?.error || error?.message || 'Failed');
+                          setMpesaConfig({ ...mpesaConfig, securityCredential: data.security_credential });
+                          toast({ title: 'Security Credential generated ✓' });
+                        } catch (e: any) { toast({ title: 'Generation failed', description: e.message, variant: 'destructive' }); }
+                      }}>Generate</Button>
+                    </div>
                   </div>
                   <div className="space-y-2">
                     <Label className={labelClass}>B2C Shortcode</Label>
                     <Input value={mpesaConfig.b2cShortcode ?? ''} onChange={e => setMpesaConfig({ ...mpesaConfig, b2cShortcode: e.target.value })} placeholder="B2C Paybill / Till" className={`${inputClass} font-mono`} />
                   </div>
                   <div className="space-y-2">
-                    <Label className={labelClass}>Result URL</Label>
-                    <Input value={mpesaConfig.resultUrl ?? ''} onChange={e => setMpesaConfig({ ...mpesaConfig, resultUrl: e.target.value })} placeholder="https://your-domain/result" className={`${inputClass} font-mono`} />
+                    <Label className={labelClass}>Result URL <span className="text-[9px] text-primary">(auto)</span></Label>
+                    <Input value={mpesaConfig.resultUrl || `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/mpesa-stk?action=b2c_result`} onChange={e => setMpesaConfig({ ...mpesaConfig, resultUrl: e.target.value })} className={`${inputClass} font-mono`} />
                   </div>
                   <div className="space-y-2 sm:col-span-2">
-                    <Label className={labelClass}>Queue Timeout URL</Label>
-                    <Input value={mpesaConfig.queueTimeoutUrl ?? ''} onChange={e => setMpesaConfig({ ...mpesaConfig, queueTimeoutUrl: e.target.value })} placeholder="https://your-domain/timeout" className={`${inputClass} font-mono`} />
+                    <Label className={labelClass}>Queue Timeout URL <span className="text-[9px] text-primary">(auto)</span></Label>
+                    <Input value={mpesaConfig.queueTimeoutUrl || `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/mpesa-stk?action=b2c_timeout`} onChange={e => setMpesaConfig({ ...mpesaConfig, queueTimeoutUrl: e.target.value })} className={`${inputClass} font-mono`} />
                   </div>
                 </div>
               </div>
+
 
               <Button onClick={handleSaveMpesa} className="bg-primary text-primary-foreground hover:bg-primary/90 text-xs sm:text-sm">Save M-Pesa Config</Button>
 
@@ -525,8 +538,11 @@ const Admin = () => {
                           </>
                         ) : (
                           <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${
-                            w.status === 'completed' ? 'bg-profit/20 text-profit' : w.status === 'cancelled' ? 'bg-loss/20 text-loss' : 'bg-primary/20 text-primary'
-                          }`}>{w.status}</span>
+                            w.status === 'completed' ? 'bg-profit/20 text-profit'
+                            : w.status === 'cancelled' || w.status === 'failed' ? 'bg-loss/20 text-loss'
+                            : w.status === 'processing' ? 'bg-primary/20 text-primary animate-pulse'
+                            : 'bg-primary/20 text-primary'
+                          }`}>{w.status}{w.mpesa_receipt ? ` · ${w.mpesa_receipt}` : ''}</span>
                         )}
                       </div>
                     </div>
@@ -535,6 +551,7 @@ const Admin = () => {
               )}
             </motion.div>
           </TabsContent>
+
 
           {/* Access Requests */}
           <TabsContent value="requests">
