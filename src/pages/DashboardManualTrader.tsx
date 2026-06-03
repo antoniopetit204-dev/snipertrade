@@ -130,14 +130,16 @@ const DashboardManualTrader = () => {
     setBalance(newBalance);
 
     await updateUserBalance(account, newBalance);
+    const symLabel = symbols.find((s: any) => s.symbol === symbol)?.display_name || symbol || 'Synthetic';
     await insertManualTrade({
       deriv_account: account,
       bot_id: selectedBot?.id || null,
-      bot_name: `${selectedBot?.name || 'Manual'} · ${contract.label} (${side})`,
+      bot_name: `${selectedBot?.name || 'Manual'} · ${symLabel} · ${contract.label} (${side})`,
       stake, payout: won ? +(stake * contract.payout).toFixed(2) : 0,
       profit, result: won ? 'win' : 'loss',
       balance_after: newBalance, run_id: runId,
     });
+
 
     await new Promise(r => setTimeout(r, 450));
     setLiveTrade(null);
