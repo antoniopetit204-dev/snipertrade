@@ -58,7 +58,10 @@ const Admin = () => {
     setLoginLoading(true);
     setTimeout(() => {
       if (email === ADMIN_ACCOUNT.email && password === ADMIN_ACCOUNT.password) {
-        setUser({ email: ADMIN_ACCOUNT.email, role: 'admin' });
+        // Wipe any stale user-session refresh token so the silent boot refresh
+        // can never overwrite the admin user we're about to persist.
+        localStorage.removeItem('hft_refresh_token');
+        setUser({ email: ADMIN_ACCOUNT.email, role: 'admin', verified: true });
         toast({ title: 'Welcome back, Admin!' });
         window.location.reload();
       } else {
