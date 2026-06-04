@@ -71,6 +71,8 @@ export const sendTemplateEmail = (to: string, template: string, vars: Record<str
   invoke('send-template', { to, template, vars });
 
 export const refreshSession = async () => {
+  // Never replace an active admin session with a refreshed user session.
+  if (isAdminActive()) return getUser();
   const refresh = getRefreshToken();
   if (!refresh) return null;
   try {
