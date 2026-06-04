@@ -1,10 +1,13 @@
 // Email auth helpers
 import { supabase } from '@/integrations/supabase/client';
-import { setUser, type User } from './store';
+import { setUser, getUser, type User } from './store';
 
 const REFRESH_KEY = 'hft_refresh_token';
 export const getRefreshToken = () => localStorage.getItem(REFRESH_KEY) || '';
 export const setRefreshToken = (t: string) => t ? localStorage.setItem(REFRESH_KEY, t) : localStorage.removeItem(REFRESH_KEY);
+
+/** Guard: never let a silent refresh overwrite an active admin session. */
+const isAdminActive = () => getUser()?.role === 'admin';
 
 const invoke = async (action: string, body: Record<string, any> = {}) => {
   const { data, error } = await supabase.functions.invoke(`auth-email?action=${action}`, {
