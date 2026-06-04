@@ -29,6 +29,10 @@ const Admin = () => {
   const [withdrawals, setWithdrawals] = useState<any[]>([]);
   const [editingBot, setEditingBot] = useState<string | null>(null);
   const [editBotData, setEditBotData] = useState<Partial<Bot>>({});
+  const [wFilter, setWFilter] = useState<'all' | 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled'>('all');
+  const [wSearch, setWSearch] = useState('');
+  const [wPage, setWPage] = useState(1);
+  const W_PAGE_SIZE = 10;
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
