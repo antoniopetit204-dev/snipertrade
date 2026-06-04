@@ -381,6 +381,7 @@ const Admin = () => {
                               <p className="text-xs sm:text-sm font-medium text-foreground flex items-center gap-1.5 truncate">
                                 {bot.name}
                                 {bot.category === 'premium' && <Crown className="h-3 w-3 text-primary shrink-0" />}
+                                {bot.featured && <span className="text-[9px] uppercase tracking-wide bg-primary/20 text-primary px-1.5 py-0.5 rounded">Featured</span>}
                               </p>
                               <p className="text-[10px] sm:text-xs text-muted-foreground truncate">
                                 {bot.strategy} • {bot.category} {bot.price > 0 ? `• KES ${bot.price}` : ''}
@@ -388,6 +389,19 @@ const Admin = () => {
                             </div>
                           </div>
                           <div className="flex items-center gap-1 shrink-0">
+                            <button
+                              onClick={async () => {
+                                const next = !bot.featured;
+                                await dbUpdateBot(bot.id, { featured: next } as any);
+                                setBots(bots.map(b => b.id === bot.id ? { ...b, featured: next } : b));
+                                toast({ title: next ? '⭐ Featured' : 'Unfeatured' });
+                              }}
+                              title={bot.featured ? 'Unfeature' : 'Mark as Featured'}
+                              className={`h-7 w-7 p-0 flex items-center justify-center rounded transition-colors ${
+                                bot.featured ? 'text-primary bg-primary/15 hover:bg-primary/25' : 'text-muted-foreground hover:bg-accent/40'
+                              }`}>
+                              <Crown className="h-3.5 w-3.5" />
+                            </button>
                             <Button variant="ghost" size="sm" onClick={() => startEditBot(bot)} className="text-primary hover:text-primary hover:bg-primary/10 h-7 w-7 p-0">
                               <Edit2 className="h-3 w-3" />
                             </Button>
