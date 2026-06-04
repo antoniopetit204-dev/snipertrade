@@ -61,6 +61,7 @@ export const fetchBots = async (): Promise<Bot[]> => {
     id: b.id, name: b.name, description: b.description, strategy: b.strategy,
     enabled: b.enabled, createdAt: b.created_at, profitLoss: Number(b.profit_loss),
     trades: b.trades, winRate: Number(b.win_rate), category: b.category, price: Number(b.price || 0),
+    featured: Boolean(b.featured),
   }));
 };
 
