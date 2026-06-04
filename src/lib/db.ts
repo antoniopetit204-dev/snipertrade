@@ -61,6 +61,7 @@ export const fetchBots = async (): Promise<Bot[]> => {
     id: b.id, name: b.name, description: b.description, strategy: b.strategy,
     enabled: b.enabled, createdAt: b.created_at, profitLoss: Number(b.profit_loss),
     trades: b.trades, winRate: Number(b.win_rate), category: b.category, price: Number(b.price || 0),
+    featured: Boolean(b.featured),
   }));
 };
 
@@ -91,6 +92,7 @@ export const updateBot = async (id: string, updates: Partial<Bot>) => {
   if (updates.profitLoss !== undefined) dbUpdates.profit_loss = updates.profitLoss;
   if (updates.trades !== undefined) dbUpdates.trades = updates.trades;
   if (updates.winRate !== undefined) dbUpdates.win_rate = updates.winRate;
+  if ((updates as any).featured !== undefined) (dbUpdates as any).featured = (updates as any).featured;
   
   return supabase.from('bots').update(dbUpdates).eq('id', id);
 };

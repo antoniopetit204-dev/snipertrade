@@ -29,6 +29,10 @@ const Admin = () => {
   const [withdrawals, setWithdrawals] = useState<any[]>([]);
   const [editingBot, setEditingBot] = useState<string | null>(null);
   const [editBotData, setEditBotData] = useState<Partial<Bot>>({});
+  const [wFilter, setWFilter] = useState<'all' | 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled'>('all');
+  const [wSearch, setWSearch] = useState('');
+  const [wPage, setWPage] = useState(1);
+  const W_PAGE_SIZE = 10;
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -58,7 +62,10 @@ const Admin = () => {
     setLoginLoading(true);
     setTimeout(() => {
       if (email === ADMIN_ACCOUNT.email && password === ADMIN_ACCOUNT.password) {
-        setUser({ email: ADMIN_ACCOUNT.email, role: 'admin' });
+        // Wipe any stale user-session refresh token so the silent boot refresh
+        // can never overwrite the admin user we're about to persist.
+        localStorage.removeItem('hft_refresh_token');
+        setUser({ email: ADMIN_ACCOUNT.email, role: 'admin', verified: true });
         toast({ title: 'Welcome back, Admin!' });
         window.location.reload();
       } else {
@@ -378,6 +385,7 @@ const Admin = () => {
                               <p className="text-xs sm:text-sm font-medium text-foreground flex items-center gap-1.5 truncate">
                                 {bot.name}
                                 {bot.category === 'premium' && <Crown className="h-3 w-3 text-primary shrink-0" />}
+                                {bot.featured && <span className="text-[9px] uppercase tracking-wide bg-primary/20 text-primary px-1.5 py-0.5 rounded">Featured</span>}
                               </p>
                               <p className="text-[10px] sm:text-xs text-muted-foreground truncate">
                                 {bot.strategy} • {bot.category} {bot.price > 0 ? `• KES ${bot.price}` : ''}
@@ -385,6 +393,19 @@ const Admin = () => {
                             </div>
                           </div>
                           <div className="flex items-center gap-1 shrink-0">
+                            <button
+                              onClick={async () => {
+                                const next = !bot.featured;
+                                await dbUpdateBot(bot.id, { featured: next } as any);
+                                setBots(bots.map(b => b.id === bot.id ? { ...b, featured: next } : b));
+                                toast({ title: next ? '⭐ Featured' : 'Unfeatured' });
+                              }}
+                              title={bot.featured ? 'Unfeature' : 'Mark as Featured'}
+                              className={`h-7 w-7 p-0 flex items-center justify-center rounded transition-colors ${
+                                bot.featured ? 'text-primary bg-primary/15 hover:bg-primary/25' : 'text-muted-foreground hover:bg-accent/40'
+                              }`}>
+                              <Crown className="h-3.5 w-3.5" />
+                            </button>
                             <Button variant="ghost" size="sm" onClick={() => startEditBot(bot)} className="text-primary hover:text-primary hover:bg-primary/10 h-7 w-7 p-0">
                               <Edit2 className="h-3 w-3" />
                             </Button>
@@ -505,50 +526,125 @@ const Admin = () => {
             </motion.div>
           </TabsContent>
 
-          {/* Withdrawals Management */}
+          {/* Withdrawals Management — filters + pagination + stats */}
           <TabsContent value="withdrawals">
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="bg-card border border-border rounded-lg p-4 sm:p-6 space-y-4">
-              <h2 className="text-sm sm:text-base font-semibold text-foreground flex items-center gap-2">
-                <ArrowUpFromLine className="h-4 w-4 text-primary" /> Withdrawal Requests
-              </h2>
-              <p className="text-[10px] sm:text-xs text-muted-foreground">
-                Review and process user withdrawal requests. Approved withdrawals are sent via M-Pesa B2C.
-              </p>
-              {withdrawals.length === 0 ? (
-                <p className="text-xs text-muted-foreground text-center py-4">No withdrawal requests yet.</p>
-              ) : (
-                <div className="space-y-2 max-h-[400px] overflow-y-auto">
-                  {withdrawals.map((w: any) => (
-                    <div key={w.id} className="flex items-center justify-between bg-secondary/50 rounded-lg p-3 gap-3">
-                      <div className="min-w-0">
-                        <p className="text-xs sm:text-sm font-medium text-foreground">KES {w.amount} → {w.phone_number}</p>
-                        <p className="text-[10px] text-muted-foreground">Account: {w.deriv_account} • {new Date(w.created_at).toLocaleDateString()}</p>
-                      </div>
-                      <div className="flex items-center gap-2 shrink-0">
-                        {w.status === 'pending' ? (
-                          <>
-                            <Button size="sm" onClick={async () => { await processWithdrawal(w.id, true); setWithdrawals(withdrawals.map((x: any) => x.id === w.id ? { ...x, status: 'completed' } : x)); }}
-                              className="bg-profit/20 text-profit hover:bg-profit/30 h-7 text-xs">
-                              <CheckCircle className="h-3 w-3 mr-1" /> Approve
-                            </Button>
-                            <Button size="sm" onClick={async () => { await processWithdrawal(w.id, false); setWithdrawals(withdrawals.map((x: any) => x.id === w.id ? { ...x, status: 'cancelled' } : x)); }}
-                              className="bg-loss/20 text-loss hover:bg-loss/30 h-7 text-xs">
-                              <XCircle className="h-3 w-3 mr-1" /> Reject
-                            </Button>
-                          </>
-                        ) : (
-                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${
-                            w.status === 'completed' ? 'bg-profit/20 text-profit'
-                            : w.status === 'cancelled' || w.status === 'failed' ? 'bg-loss/20 text-loss'
-                            : w.status === 'processing' ? 'bg-primary/20 text-primary animate-pulse'
-                            : 'bg-primary/20 text-primary'
-                          }`}>{w.status}{w.mpesa_receipt ? ` · ${w.mpesa_receipt}` : ''}</span>
-                        )}
-                      </div>
-                    </div>
-                  ))}
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">
+              {/* Stats */}
+              {(() => {
+                const stats = withdrawals.reduce((acc: any, w: any) => {
+                  acc.total += Number(w.amount) || 0;
+                  acc[w.status] = (acc[w.status] || 0) + 1;
+                  if (w.status === 'completed') acc.paidOut += Number(w.amount) || 0;
+                  if (w.status === 'pending') acc.pendingAmt += Number(w.amount) || 0;
+                  return acc;
+                }, { total: 0, paidOut: 0, pendingAmt: 0 });
+                return (
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
+                    <div className="bg-card border border-border rounded-lg p-3"><p className="text-[10px] text-muted-foreground uppercase">Total Requests</p><p className="text-lg font-bold text-foreground">{withdrawals.length}</p></div>
+                    <div className="bg-card border border-primary/30 rounded-lg p-3"><p className="text-[10px] text-muted-foreground uppercase">Pending</p><p className="text-lg font-bold text-primary">{stats.pending || 0}</p><p className="text-[10px] text-muted-foreground">KES {(stats.pendingAmt||0).toFixed(0)}</p></div>
+                    <div className="bg-card border border-profit/30 rounded-lg p-3"><p className="text-[10px] text-muted-foreground uppercase">Paid Out</p><p className="text-lg font-bold text-profit">KES {stats.paidOut.toFixed(0)}</p></div>
+                    <div className="bg-card border border-loss/30 rounded-lg p-3"><p className="text-[10px] text-muted-foreground uppercase">Failed / Rejected</p><p className="text-lg font-bold text-loss">{(stats.failed || 0) + (stats.cancelled || 0)}</p></div>
+                  </div>
+                );
+              })()}
+
+              <div className="bg-card border border-border rounded-lg p-4 sm:p-6 space-y-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <h2 className="text-sm sm:text-base font-semibold text-foreground flex items-center gap-2">
+                    <ArrowUpFromLine className="h-4 w-4 text-primary" /> M-Pesa B2C Withdrawals
+                  </h2>
+                  <Button size="sm" variant="outline" className="text-xs h-7" onClick={async () => {
+                    const d = await fetchAllWithdrawals();
+                    setWithdrawals(d);
+                    toast({ title: 'Refreshed' });
+                  }}>Refresh</Button>
                 </div>
-              )}
+
+                {/* Filters */}
+                <div className="flex flex-wrap items-center gap-2">
+                  <Input value={wSearch} onChange={e => { setWSearch(e.target.value); setWPage(1); }}
+                    placeholder="Search phone, account, or receipt…"
+                    className={`${inputClass} max-w-xs`} />
+                  <div className="flex gap-1 flex-wrap">
+                    {(['all','pending','processing','completed','failed','cancelled'] as const).map(s => (
+                      <button key={s} onClick={() => { setWFilter(s); setWPage(1); }}
+                        className={`px-2.5 py-1 rounded text-[10px] font-medium uppercase transition-colors ${
+                          wFilter === s ? 'bg-primary text-primary-foreground' : 'bg-secondary text-muted-foreground hover:bg-accent/40'
+                        }`}>
+                        {s} {s !== 'all' ? `(${withdrawals.filter((w:any)=>w.status===s).length})` : `(${withdrawals.length})`}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* List */}
+                {(() => {
+                  const filtered = withdrawals.filter((w: any) => {
+                    if (wFilter !== 'all' && w.status !== wFilter) return false;
+                    if (wSearch) {
+                      const q = wSearch.toLowerCase();
+                      return (w.phone_number || '').toLowerCase().includes(q)
+                        || (w.deriv_account || '').toLowerCase().includes(q)
+                        || (w.mpesa_receipt || '').toLowerCase().includes(q);
+                    }
+                    return true;
+                  });
+                  const totalPages = Math.max(1, Math.ceil(filtered.length / W_PAGE_SIZE));
+                  const page = Math.min(wPage, totalPages);
+                  const slice = filtered.slice((page - 1) * W_PAGE_SIZE, page * W_PAGE_SIZE);
+                  if (filtered.length === 0) return <p className="text-xs text-muted-foreground text-center py-6">No withdrawals match your filters.</p>;
+                  return (
+                    <>
+                      <div className="space-y-2">
+                        {slice.map((w: any) => (
+                          <div key={w.id} className="flex items-center justify-between bg-secondary/50 rounded-lg p-3 gap-3">
+                            <div className="min-w-0 flex-1">
+                              <p className="text-xs sm:text-sm font-medium text-foreground">KES {Number(w.amount).toFixed(2)} → <span className="font-mono">{w.phone_number}</span></p>
+                              <p className="text-[10px] text-muted-foreground truncate">
+                                {w.deriv_account} • {new Date(w.created_at).toLocaleString()}
+                                {w.mpesa_receipt && <> • <span className="text-primary font-mono">{w.mpesa_receipt}</span></>}
+                                {w.mpesa_transaction_id && <> • txn {w.mpesa_transaction_id}</>}
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0">
+                              {w.status === 'pending' ? (
+                                <>
+                                  <Button size="sm" onClick={async () => {
+                                    try { await processWithdrawal(w.id, true); setWithdrawals(withdrawals.map((x: any) => x.id === w.id ? { ...x, status: 'processing' } : x)); toast({ title: 'Sending via B2C…' }); }
+                                    catch (e: any) { toast({ title: 'Approval failed', description: e.message, variant: 'destructive' }); }
+                                  }} className="bg-profit/20 text-profit hover:bg-profit/30 h-7 text-xs">
+                                    <CheckCircle className="h-3 w-3 mr-1" /> Approve
+                                  </Button>
+                                  <Button size="sm" onClick={async () => { await processWithdrawal(w.id, false); setWithdrawals(withdrawals.map((x: any) => x.id === w.id ? { ...x, status: 'cancelled' } : x)); }}
+                                    className="bg-loss/20 text-loss hover:bg-loss/30 h-7 text-xs">
+                                    <XCircle className="h-3 w-3 mr-1" /> Reject
+                                  </Button>
+                                </>
+                              ) : (
+                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${
+                                  w.status === 'completed' ? 'bg-profit/20 text-profit'
+                                  : w.status === 'cancelled' || w.status === 'failed' ? 'bg-loss/20 text-loss'
+                                  : w.status === 'processing' ? 'bg-primary/20 text-primary animate-pulse'
+                                  : 'bg-primary/20 text-primary'
+                                }`}>{w.status}</span>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      {totalPages > 1 && (
+                        <div className="flex items-center justify-between pt-2">
+                          <p className="text-[10px] text-muted-foreground">Page {page} / {totalPages} • {filtered.length} entries</p>
+                          <div className="flex gap-1">
+                            <Button size="sm" variant="outline" className="h-7 text-xs" disabled={page <= 1} onClick={() => setWPage(p => Math.max(1, p - 1))}>Prev</Button>
+                            <Button size="sm" variant="outline" className="h-7 text-xs" disabled={page >= totalPages} onClick={() => setWPage(p => Math.min(totalPages, p + 1))}>Next</Button>
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
+              </div>
             </motion.div>
           </TabsContent>
 

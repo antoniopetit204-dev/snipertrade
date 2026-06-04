@@ -44,6 +44,7 @@ export interface Bot {
   winRate: number;
   category: 'free' | 'premium';
   price: number;
+  featured?: boolean;
 }
 
 export interface DerivAccount {
