@@ -93,6 +93,7 @@ export const updateBot = async (id: string, updates: Partial<Bot>) => {
   if (updates.trades !== undefined) dbUpdates.trades = updates.trades;
   if (updates.winRate !== undefined) dbUpdates.win_rate = updates.winRate;
   if ((updates as any).featured !== undefined) (dbUpdates as any).featured = (updates as any).featured;
+  if ((updates as any).risk_tier !== undefined) (dbUpdates as any).risk_tier = (updates as any).risk_tier;
   
   return supabase.from('bots').update(dbUpdates).eq('id', id);
 };
