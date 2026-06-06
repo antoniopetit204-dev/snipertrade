@@ -553,11 +553,47 @@ const Admin = () => {
                   <h2 className="text-sm sm:text-base font-semibold text-foreground flex items-center gap-2">
                     <ArrowUpFromLine className="h-4 w-4 text-primary" /> M-Pesa B2C Withdrawals
                   </h2>
-                  <Button size="sm" variant="outline" className="text-xs h-7" onClick={async () => {
-                    const d = await fetchAllWithdrawals();
-                    setWithdrawals(d);
-                    toast({ title: 'Refreshed' });
-                  }}>Refresh</Button>
+                  <div className="flex gap-2">
+                    <Button size="sm" variant="outline" className="text-xs h-7" onClick={() => {
+                      const filtered = withdrawals.filter((w: any) => {
+                        if (wFilter !== 'all' && w.status !== wFilter) return false;
+                        if (wSearch) {
+                          const q = wSearch.toLowerCase();
+                          return (w.phone_number || '').toLowerCase().includes(q)
+                            || (w.deriv_account || '').toLowerCase().includes(q)
+                            || (w.mpesa_receipt || '').toLowerCase().includes(q);
+                        }
+                        return true;
+                      });
+                      const esc = (v: any) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+                      const rows = [
+                        ['id','created_at','deriv_account','phone_number','amount','status','mpesa_receipt','mpesa_transaction_id'],
+                        ...filtered.map((w: any) => [w.id, w.created_at, w.deriv_account, w.phone_number, w.amount, w.status, w.mpesa_receipt || '', w.mpesa_transaction_id || '']),
+                      ].map(r => r.map(esc).join(',')).join('\n');
+                      const blob = new Blob([rows], { type: 'text/csv;charset=utf-8;' });
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement('a');
+                      a.href = url;
+                      a.download = `withdrawals-${wFilter}-${new Date().toISOString().slice(0,10)}.csv`;
+                      a.click();
+                      URL.revokeObjectURL(url);
+                      toast({ title: `Exported ${filtered.length} rows` });
+                    }}>Export CSV</Button>
+                    <Button size="sm" variant="outline" className="text-xs h-7" onClick={async () => {
+                      try {
+                        const { data, error } = await (await import('@/integrations/supabase/client')).supabase.functions.invoke('mpesa-stk?action=b2c_reconcile', { body: {} });
+                        if (error) throw error;
+                        toast({ title: 'Reconciled', description: `Scanned ${data?.scanned || 0}, healed ${data?.healed || 0}` });
+                        const d = await fetchAllWithdrawals();
+                        setWithdrawals(d);
+                      } catch (e: any) { toast({ title: 'Reconcile failed', description: e.message, variant: 'destructive' }); }
+                    }}>Reconcile</Button>
+                    <Button size="sm" variant="outline" className="text-xs h-7" onClick={async () => {
+                      const d = await fetchAllWithdrawals();
+                      setWithdrawals(d);
+                      toast({ title: 'Refreshed' });
+                    }}>Refresh</Button>
+                  </div>
                 </div>
 
                 {/* Filters */}
