@@ -211,6 +211,7 @@ const Admin = () => {
                 { value: 'mpesa', icon: Smartphone, label: 'M-Pesa' },
                 { value: 'withdrawals', icon: ArrowUpFromLine, label: 'Withdrawals' },
                 { value: 'requests', icon: Users, label: 'Requests' },
+                { value: 'users', icon: Users, label: 'Users' },
                 { value: 'smtp', icon: Mail, label: 'SMTP' },
                 { value: 'emails', icon: FileText, label: 'Emails' },
                 { value: 'seo', icon: AppWindow, label: 'SEO' },
