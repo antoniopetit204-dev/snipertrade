@@ -102,9 +102,14 @@ const DashboardBotBuilder = () => {
       setResults(prev => [...prev, { round: i, profit: 0, status: 'PLACED', side: selectedContract.sides[0] }]);
       await new Promise(r => setTimeout(r, 700 + Math.random() * 500));
 
-      const won = Math.random() < 0.5;
+      // Server-side house-edge resolver
+      const { supabase } = await import('@/integrations/supabase/client');
+      const { data: res } = await supabase.functions.invoke('resolve-trade', {
+        body: { deriv_account: account, email: account, bot_id: null, stake: stakeN, payout_multiplier: selectedContract.payout },
+      });
+      const won = !!res?.won;
       const side = selectedContract.sides[won ? 0 : 1];
-      const profit = won ? +(stakeN * (selectedContract.payout - 1)).toFixed(2) : -stakeN;
+      const profit = Number(res?.profit ?? (won ? +(stakeN * (selectedContract.payout - 1)).toFixed(2) : -stakeN));
       totalProfit += profit;
       bal = +(bal + profit).toFixed(2);
       setBalance(bal);
