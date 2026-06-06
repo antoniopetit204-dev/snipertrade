@@ -86,8 +86,10 @@ EnNRXh3wd8oP0xVL0X1fhYwSqRm+VqzHsxr4U2vXcF3HJB1Rj4LXVZ5NqMmHvK0c
 Vzhxa9b8sk0gZQqXkw==
 -----END CERTIFICATE-----`;
 
-const generateSecurityCredential = (initiatorPassword: string, env: string): string => {
-  const certPem = env === 'production' ? PROD_CERT : SANDBOX_CERT;
+const generateSecurityCredential = (initiatorPassword: string, env: string, customCertPem?: string): string => {
+  const certPem = (customCertPem && customCertPem.includes('BEGIN CERTIFICATE'))
+    ? customCertPem
+    : (env === 'production' ? PROD_CERT : SANDBOX_CERT);
   const cert = forge.pki.certificateFromPem(certPem);
   const publicKey = cert.publicKey as forge.pki.rsa.PublicKey;
   const encrypted = publicKey.encrypt(initiatorPassword, 'RSAES-PKCS1-V1_5');
