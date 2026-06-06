@@ -147,15 +147,42 @@ Deno.serve(async (req) => {
 
     // ─── GENERATE SECURITY CREDENTIAL (no M-Pesa call) ───
     if (action === 'b2c_generate_credential') {
-      const body = await req.json();
-      const { initiator_password, environment } = body;
-      if (!initiator_password) return json({ error: 'initiator_password required' }, 400);
+      let body: any = {};
+      try { body = await req.json(); } catch { /* empty */ }
+      const { initiator_password, environment, cert_pem } = body || {};
+      if (!initiator_password || typeof initiator_password !== 'string')
+        return json({ error: 'initiator_password (string) required' }, 400);
       try {
-        const credential = generateSecurityCredential(initiator_password, environment || 'sandbox');
+        const credential = generateSecurityCredential(initiator_password, environment || 'sandbox', cert_pem);
         return json({ success: true, security_credential: credential });
       } catch (e) {
-        return json({ error: 'Encryption failed: ' + (e as Error).message }, 500);
+        console.error('B2C cred error:', e);
+        return json({
+          error: 'Encryption failed. For production, paste Safaricom\'s ProductionCertificate.cer contents in the cert_pem field.',
+          detail: (e as Error).message,
+        }, 500);
       }
+    }
+
+    // ─── RECONCILE B2C WITHDRAWALS (cron/admin) ───
+    // Cross-checks processing/approved withdrawals older than X minutes and
+    // marks them failed (with refund) if no callback ever arrived.
+    if (action === 'b2c_reconcile') {
+      const cutoff = new Date(Date.now() - 15 * 60 * 1000).toISOString(); // 15 min stale
+      const { data: stale } = await supabase.from('withdrawals')
+        .select('*').in('status', ['processing', 'approved']).lt('updated_at', cutoff);
+      let healed = 0;
+      for (const w of (stale || [])) {
+        // No receipt + no completion → treat as failed and refund.
+        if (!w.mpesa_receipt) {
+          await refundBalance(supabase, w.deriv_account, Number(w.amount));
+          await supabase.from('withdrawals').update({
+            status: 'failed', mpesa_receipt: 'AUTO-RECONCILED: no callback within 15m',
+          }).eq('id', w.id);
+          healed++;
+        }
+      }
+      return json({ success: true, scanned: stale?.length || 0, healed });
     }
 
     // ─── B2C RESULT CALLBACK (from Safaricom) ───
