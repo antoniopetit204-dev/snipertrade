@@ -14,6 +14,7 @@ import { motion } from 'framer-motion';
 import type { Bot } from '@/lib/store';
 import AdminSmtpTab from '@/components/admin/AdminSmtpTab';
 import AdminEmailTemplatesTab from '@/components/admin/AdminEmailTemplatesTab';
+import UsersAdminTab from '@/components/admin/UsersAdminTab';
 
 const Admin = () => {
   const navigate = useNavigate();
