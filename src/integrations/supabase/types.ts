@@ -171,6 +171,7 @@ export type Database = {
           role: string
           updated_at: string
           verified: boolean
+          win_tier: string
         }
         Insert: {
           avatar_url?: string | null
@@ -185,6 +186,7 @@ export type Database = {
           role?: string
           updated_at?: string
           verified?: boolean
+          win_tier?: string
         }
         Update: {
           avatar_url?: string | null
@@ -199,6 +201,7 @@ export type Database = {
           role?: string
           updated_at?: string
           verified?: boolean
+          win_tier?: string
         }
         Relationships: []
       }
@@ -252,6 +255,7 @@ export type Database = {
           name: string
           price: number
           profit_loss: number
+          risk_tier: string
           strategy: string
           trades: number
           updated_at: string
@@ -267,6 +271,7 @@ export type Database = {
           name: string
           price?: number
           profit_loss?: number
+          risk_tier?: string
           strategy?: string
           trades?: number
           updated_at?: string
@@ -282,6 +287,7 @@ export type Database = {
           name?: string
           price?: number
           profit_loss?: number
+          risk_tier?: string
           strategy?: string
           trades?: number
           updated_at?: string
@@ -424,6 +430,33 @@ export type Database = {
           token?: string
           used?: boolean
           user_id?: string
+        }
+        Relationships: []
+      }
+      house_ledger: {
+        Row: {
+          id: string
+          min_floor: number
+          pool: number
+          total_user_payouts: number
+          total_user_stakes: number
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          min_floor?: number
+          pool?: number
+          total_user_payouts?: number
+          total_user_stakes?: number
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          min_floor?: number
+          pool?: number
+          total_user_payouts?: number
+          total_user_stakes?: number
+          updated_at?: string
         }
         Relationships: []
       }

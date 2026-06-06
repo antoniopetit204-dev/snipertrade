@@ -120,8 +120,13 @@ const DashboardManualTrader = () => {
     setLiveTrade({ status: 'pending', profit: 0, side });
     await new Promise(r => setTimeout(r, 700 + Math.random() * 600));
 
-    const won = Math.random() < contract.winRate;
-    const profit = won ? +(stake * (contract.payout - 1)).toFixed(2) : -stake;
+    // Server-side house-edge resolver
+    const { supabase } = await import('@/integrations/supabase/client');
+    const { data: res } = await supabase.functions.invoke('resolve-trade', {
+      body: { deriv_account: account, email: account, bot_id: selectedBot?.id || null, stake, payout_multiplier: contract.payout },
+    });
+    const won = !!res?.won;
+    const profit = Number(res?.profit ?? (won ? +(stake * (contract.payout - 1)).toFixed(2) : -stake));
     const newBalance = +(currentBalance + profit).toFixed(2);
 
     setLiveTrade({ status: won ? 'win' : 'loss', profit, side });
