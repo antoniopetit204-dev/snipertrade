@@ -366,11 +366,19 @@ const Admin = () => {
                             <Input value={editBotData.price || 0} onChange={e => setEditBotData({ ...editBotData, price: Number(e.target.value) || 0 })} placeholder="Price" type="number" className={`${inputClass} text-xs`} />
                           </div>
                           <Input value={editBotData.description || ''} onChange={e => setEditBotData({ ...editBotData, description: e.target.value })} placeholder="Description" className={`${inputClass} text-xs`} />
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 flex-wrap">
                             <select value={editBotData.category || 'free'} onChange={e => setEditBotData({ ...editBotData, category: e.target.value as any })}
                               className="bg-secondary border border-border text-foreground rounded-md px-2 py-1 text-xs">
                               <option value="free">Free</option>
                               <option value="premium">Premium</option>
+                            </select>
+                            <select value={(editBotData as any).risk_tier || (bot as any).risk_tier || 'normal'}
+                              onChange={e => setEditBotData({ ...editBotData, risk_tier: e.target.value } as any)}
+                              className="bg-secondary border border-border text-foreground rounded-md px-2 py-1 text-xs"
+                              title="Bot risk / profit tier">
+                              <option value="low">Low Risk · High Win</option>
+                              <option value="normal">Normal</option>
+                              <option value="high">High Risk · High Profit</option>
                             </select>
                             <Button size="sm" onClick={() => saveEditBot(bot.id)} className="bg-profit/20 text-profit hover:bg-profit/30 h-7 text-xs">
                               <Save className="h-3 w-3 mr-1" /> Save
