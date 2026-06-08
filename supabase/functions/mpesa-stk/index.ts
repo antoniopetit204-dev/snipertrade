@@ -48,48 +48,28 @@ qb2L3IUYqZSjlVJzS0v2ZBlYg7sokj/D5jWqOTOiKsRsX1lZ2gxA1MGr3kFm5VEx
 M6rT44PaLs9ymA4SX/Q88OYa5/dHmEs59SihrFulIN2NwI8=
 -----END CERTIFICATE-----`;
 
-const PROD_CERT = `-----BEGIN CERTIFICATE-----
-MIIGkzCCBXugAwIBAgIKXfBp5gAAAAQAUjANBgkqhkiG9w0BAQsFADBbMRMwEQYK
-CZImiZPyLGQBGRYDbmV0MRkwFwYKCZImiZPyLGQBGRYJc2FmYXJpY29tMSkwJwYD
-VQQDEyBTYWZhcmljb20gSW50ZXJuYWwgSXNzdWluZyBDQSAwMjAeFw0yMTA1MTAx
-MzE5MjVaFw0yMjA1MTAxMzE5MjVaMHsxCzAJBgNVBAYTAktFMRAwDgYDVQQIEwdO
-YWlyb2JpMRAwDgYDVQQHEwdOYWlyb2JpMRYwFAYDVQQKEw1TYWZhcmljb20gUExD
-MRMwEQYDVQQLEwpEaWdpdGFsIElUMRswGQYDVQQDExJhcGkuc2FmYXJpY29tLmNv
-LmtlMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAk1ldOXrV04PJ7QQp
-oVeOcg3jX/eK1eAYqV0YvtCfb0WgRfwUVqOFt3O3HzrFTLI8FzEnYa9wB3UVEFpZ
-fjAhEbpFxFy7s4DyMaPNyhz/Yc7VPgYXVjQrI5dWoMl4OWxAxiL6FNJB+ofRWlIa
-BBKKzVcm+1RNdcyx5y/EXmpsNm5VOBL/iCXIVmZAOK6lQjgEjFCDQ7XNPxYIYGdM
-HQE0CdAo0YqyKjQXKZSdAEZxKqQJD2QUu5IxKVfd4LqYqfH8a9XV2vQbWxOFEjbT
-mQpFtCq2EXBRsW3FQUlqGzWfWmiBnLOe4d8h+AhmybhPwR93JeJyJBJgUNVbBPyD
-QwIDAQABo4IDJzCCAyMwHQYDVR0OBBYEFEUFXyKLkBQ/F7E0bdt4HxLslmkqMB8G
-A1UdIwQYMBaAFOsy1E9+YJo6mCBjug1evuh5TtUkMIIBSwYDVR0fBIIBQjCCAT4w
-ggE6oIIBNqCCATKGgdZsZGFwOi8vL0NOPVNhZmFyaWNvbSUyMEludGVybmFsJTIw
-SXNzdWluZyUyMENBJTIwMDIsQ049U1ZEVDNJU1NDQTAxLENOPUNEUCxDTj1QdWJs
-aWMlMjBLZXklMjBTZXJ2aWNlcyxDTj1TZXJ2aWNlcyxDTj1Db25maWd1cmF0aW9u
-LERDPXNhZmFyaWNvbSxEQz1uZXQ/Y2VydGlmaWNhdGVSZXZvY2F0aW9uTGlzdD9i
-YXNlP29iamVjdENsYXNzPWNSTERpc3RyaWJ1dGlvblBvaW50hldodHRwOi8vY3Js
-LnNhZmFyaWNvbS5jby5rZS9TYWZhcmljb20lMjBJbnRlcm5hbCUyMElzc3Vpbmcl
-MjBDQSUyMDAyKDEpLmNybDCCAQkGCCsGAQUFBwEBBIH8MIH5MIHJBggrBgEFBQcw
-AoaBvGxkYXA6Ly8vQ049U2FmYXJpY29tJTIwSW50ZXJuYWwlMjBJc3N1aW5nJTIw
-Q0ElMjAwMixDTj1BSUEsQ049UHVibGljJTIwS2V5JTIwU2VydmljZXMsQ049U2Vy
-dmljZXMsQ049Q29uZmlndXJhdGlvbixEQz1zYWZhcmljb20sREM9bmV0P2NBQ2Vy
-dGlmaWNhdGU/YmFzZT9vYmplY3RDbGFzcz1jZXJ0aWZpY2F0aW9uQXV0aG9yaXR5
-MCsGCCsGAQUFBzABhh9odHRwOi8vY3JsLnNhZmFyaWNvbS5jby5rZS9vY3NwMAsG
-A1UdDwQEAwIFoDA9BgkrBgEEAYI3FQcEMDAuBiYrBgEEAYI3FQiHz4xWhMLEA4Xp
-hTaE3tENhqCICGeG9JgcgT/zAgFkAgEKMBMGA1UdJQQMMAoGCCsGAQUFBwMBMBsG
-CSsGAQQBgjcVCgQOMAwwCgYIKwYBBQUHAwEwDQYJKoZIhvcNAQELBQADggEBABAE
-fUaktKVUe3SrgXC3F2pK7lBxEcgxfp/jPkUbjmuJUjMyJOLhsRJZ6QrjzghpDpFi
-3X0fSGM4tH3sEm5GFkxbZeBN9R5+s0e/dQXmpiZX2nb3qV1xv1OPYz9XU9N5p6tT
-PqUmGgQp+J0JtKjjB7+0qkH9DwLfJrG2g3R1Dh4VZQwM6lJ2P1uV0lFq9bD3i8KZ
-xMxnq+RaGcZJgM6XKLm1g9rxC3xQ8eu0L2c1c5+a8XO0w6/HnLZ7Z9DZqkFwQGgL
-EnNRXh3wd8oP0xVL0X1fhYwSqRm+VqzHsxr4U2vXcF3HJB1Rj4LXVZ5NqMmHvK0c
-Vzhxa9b8sk0gZQqXkw==
------END CERTIFICATE-----`;
+// NOTE: For production, callers MUST pass the official Safaricom
+// `ProductionCertificate.cer` contents via the cert_pem field. We deliberately
+// do NOT ship an embedded production cert — an outdated/invalid one was the
+// root cause of "Too few bytes to read ASN.1 value" failures.
 
 const generateSecurityCredential = (initiatorPassword: string, env: string, customCertPem?: string): string => {
-  const certPem = (customCertPem && customCertPem.includes('BEGIN CERTIFICATE'))
-    ? customCertPem
-    : (env === 'production' ? PROD_CERT : SANDBOX_CERT);
+  let certPem: string;
+  if (customCertPem && customCertPem.includes('BEGIN CERTIFICATE')) {
+    certPem = customCertPem.trim();
+  } else if (env === 'production') {
+    throw new Error('Production requires cert_pem: paste the contents of Safaricom\'s ProductionCertificate.cer file.');
+  } else {
+    certPem = SANDBOX_CERT;
+  }
+  // Sanity check PEM structure before forge tries to parse it.
+  const b64Body = certPem
+    .replace(/-----BEGIN CERTIFICATE-----/g, '')
+    .replace(/-----END CERTIFICATE-----/g, '')
+    .replace(/\s+/g, '');
+  if (!b64Body || b64Body.length < 200 || !/^[A-Za-z0-9+/=]+$/.test(b64Body)) {
+    throw new Error('Certificate body is empty, malformed, or contains non-base64 characters.');
+  }
   const cert = forge.pki.certificateFromPem(certPem);
   const publicKey = cert.publicKey as forge.pki.rsa.PublicKey;
   const encrypted = publicKey.encrypt(initiatorPassword, 'RSAES-PKCS1-V1_5');

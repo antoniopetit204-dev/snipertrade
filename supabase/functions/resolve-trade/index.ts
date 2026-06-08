@@ -16,6 +16,10 @@ const BASE_WIN_PROB: Record<string, number> = {
   high: 0.32,    // high-risk / high-reward → house edge larger
 };
 const HIGH_TIER_WIN_PROB = 0.90; // admin-flagged "high win" users
+// Losses always cost full stake; wins are shrunk by this factor so that the
+// magnitude of a loss exceeds the magnitude of a win even when users win often.
+// Effective profit = stake * (payout_mult - 1) * WIN_SHRINK
+const WIN_SHRINK = 0.80;
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
@@ -59,12 +63,21 @@ Deno.serve(async (req) => {
       .select('*').limit(1).maybeSingle();
     const pool = Number(ledger?.pool || 0);
     const minFloor = Number(ledger?.min_floor || 0);
-    const potentialLoss = +(stakeN * (payoutMult - 1)).toFixed(2);
+    const rawPayoutProfit = stakeN * (payoutMult - 1);
+    const winProfit = +(rawPayoutProfit * WIN_SHRINK).toFixed(2); // shrunk win
+    const potentialLoss = winProfit; // house pays this if user wins
 
     // HOUSE SAFETY: if paying out this win would push pool below floor → force loss.
-    // Exception: high-tier users still allowed to win but the loss is absorbed only
-    // when the post-payout pool stays above floor / 2 to avoid total drain.
     const safeFloor = winTier === 'high' ? minFloor / 2 : minFloor;
+    const canAfford = (pool - potentialLoss) >= safeFloor;
+    let won: boolean;
+    if (!canAfford) {
+      won = false;
+    } else {
+      won = Math.random() < p;
+    }
+
+    const profit = won ? winProfit : -stakeN;
     const canAfford = (pool - potentialLoss) >= safeFloor;
     let won: boolean;
     if (!canAfford) {
@@ -73,34 +86,41 @@ Deno.serve(async (req) => {
       won = Math.random() < p;
     }
 
-    const profit = won ? potentialLoss : -stakeN;
+    const profit = won ? winProfit : -stakeN;
     // House pool moves inversely: stake in → +stake; win paid → -profit
-    const housePoolDelta = won ? -potentialLoss : stakeN;
+    const housePoolDelta = won ? -winProfit : stakeN;
+    const effectivePayout = won ? +(stakeN + winProfit).toFixed(2) : 0;
 
     // Update ledger atomically-ish
     if (ledger?.id) {
       await supabase.from('house_ledger').update({
         pool: +(pool + housePoolDelta).toFixed(2),
         total_user_stakes: +(Number(ledger.total_user_stakes || 0) + stakeN).toFixed(2),
-        total_user_payouts: +(Number(ledger.total_user_payouts || 0) + (won ? potentialLoss + stakeN : 0)).toFixed(2),
+        total_user_payouts: +(Number(ledger.total_user_payouts || 0) + effectivePayout).toFixed(2),
         updated_at: new Date().toISOString(),
       }).eq('id', ledger.id);
     } else {
       await supabase.from('house_ledger').insert({
         pool: housePoolDelta,
         total_user_stakes: stakeN,
-        total_user_payouts: won ? potentialLoss + stakeN : 0,
+        total_user_payouts: effectivePayout,
       });
     }
+
+    // Pool warning when within 1.5× of safety floor
+    const newPool = pool + housePoolDelta;
+    const poolWarning = minFloor > 0 && newPool < minFloor * 1.5;
 
     return json({
       success: true,
       won,
       profit,
-      payout: won ? +(stakeN * payoutMult).toFixed(2) : 0,
+      payout: effectivePayout,
       win_tier: winTier,
       risk_tier: riskTier,
       house_safe: canAfford,
+      pool_warning: poolWarning,
+      pool_after: +newPool.toFixed(2),
     });
   } catch (e) {
     console.error('resolve-trade error', e);
