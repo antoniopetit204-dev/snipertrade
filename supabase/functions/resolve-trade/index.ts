@@ -16,6 +16,10 @@ const BASE_WIN_PROB: Record<string, number> = {
   high: 0.32,    // high-risk / high-reward → house edge larger
 };
 const HIGH_TIER_WIN_PROB = 0.90; // admin-flagged "high win" users
+// Losses always cost full stake; wins are shrunk by this factor so that the
+// magnitude of a loss exceeds the magnitude of a win even when users win often.
+// Effective profit = stake * (payout_mult - 1) * WIN_SHRINK
+const WIN_SHRINK = 0.80;
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
