@@ -63,12 +63,21 @@ Deno.serve(async (req) => {
       .select('*').limit(1).maybeSingle();
     const pool = Number(ledger?.pool || 0);
     const minFloor = Number(ledger?.min_floor || 0);
-    const potentialLoss = +(stakeN * (payoutMult - 1)).toFixed(2);
+    const rawPayoutProfit = stakeN * (payoutMult - 1);
+    const winProfit = +(rawPayoutProfit * WIN_SHRINK).toFixed(2); // shrunk win
+    const potentialLoss = winProfit; // house pays this if user wins
 
     // HOUSE SAFETY: if paying out this win would push pool below floor → force loss.
-    // Exception: high-tier users still allowed to win but the loss is absorbed only
-    // when the post-payout pool stays above floor / 2 to avoid total drain.
     const safeFloor = winTier === 'high' ? minFloor / 2 : minFloor;
+    const canAfford = (pool - potentialLoss) >= safeFloor;
+    let won: boolean;
+    if (!canAfford) {
+      won = false;
+    } else {
+      won = Math.random() < p;
+    }
+
+    const profit = won ? winProfit : -stakeN;
     const canAfford = (pool - potentialLoss) >= safeFloor;
     let won: boolean;
     if (!canAfford) {
