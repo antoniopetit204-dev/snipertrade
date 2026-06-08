@@ -214,6 +214,7 @@ const Admin = () => {
                 { value: 'withdrawals', icon: ArrowUpFromLine, label: 'Withdrawals' },
                 { value: 'requests', icon: Users, label: 'Requests' },
                 { value: 'users', icon: Users, label: 'Users' },
+                { value: 'ledger', icon: Wallet, label: 'Ledger' },
                 { value: 'smtp', icon: Mail, label: 'SMTP' },
                 { value: 'emails', icon: FileText, label: 'Emails' },
                 { value: 'seo', icon: AppWindow, label: 'SEO' },
