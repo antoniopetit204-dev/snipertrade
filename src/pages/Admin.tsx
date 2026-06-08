@@ -702,6 +702,10 @@ const Admin = () => {
             <UsersAdminTab />
           </TabsContent>
 
+          <TabsContent value="ledger">
+            <HouseLedgerTab />
+          </TabsContent>
+
           {/* Access Requests */}
           <TabsContent value="requests">
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="bg-card border border-border rounded-lg p-4 sm:p-6 space-y-4">
