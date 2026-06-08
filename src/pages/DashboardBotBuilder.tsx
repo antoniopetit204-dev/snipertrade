@@ -102,10 +102,11 @@ const DashboardBotBuilder = () => {
       setResults(prev => [...prev, { round: i, profit: 0, status: 'PLACED', side: selectedContract.sides[0] }]);
       await new Promise(r => setTimeout(r, 700 + Math.random() * 500));
 
-      // Server-side house-edge resolver
+      // Server-side house-edge resolver (requires authenticated session)
       const { supabase } = await import('@/integrations/supabase/client');
+      const { getRefreshToken } = await import('@/lib/auth-email');
       const { data: res } = await supabase.functions.invoke('resolve-trade', {
-        body: { deriv_account: account, email: account, bot_id: null, stake: stakeN, payout_multiplier: selectedContract.payout },
+        body: { deriv_account: account, email: account, bot_id: null, stake: stakeN, payout_multiplier: selectedContract.payout, refresh_token: getRefreshToken() },
       });
       const won = !!res?.won;
       const side = selectedContract.sides[won ? 0 : 1];
