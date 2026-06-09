@@ -76,6 +76,35 @@ const HouseLedgerTab = () => {
     return tiers;
   }, [userStats]);
 
+  // Cumulative P&L over time, grouped by tier (using chronological trades)
+  const cumulativeSeries = useMemo(() => {
+    const chrono = [...trades].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+    let cumNormal = 0, cumHigh = 0;
+    return chrono.map(t => {
+      const tier = users[t.deriv_account]?.win_tier === 'high' ? 'high' : 'normal';
+      if (tier === 'high') cumHigh += Number(t.profit); else cumNormal += Number(t.profit);
+      return {
+        time: new Date(t.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        Normal: +cumNormal.toFixed(2),
+        High: +cumHigh.toFixed(2),
+      };
+    });
+  }, [trades, users]);
+
+  const tierBars = useMemo(() => ([
+    {
+      tier: 'Normal',
+      'Win Rate %': tierStats.normal.trades ? +(tierStats.normal.wins / tierStats.normal.trades * 100).toFixed(1) : 0,
+      'ROI %': tierStats.normal.stake ? +(tierStats.normal.profit / tierStats.normal.stake * 100).toFixed(1) : 0,
+    },
+    {
+      tier: 'High Win',
+      'Win Rate %': tierStats.high.trades ? +(tierStats.high.wins / tierStats.high.trades * 100).toFixed(1) : 0,
+      'ROI %': tierStats.high.stake ? +(tierStats.high.profit / tierStats.high.stake * 100).toFixed(1) : 0,
+    },
+  ]), [tierStats]);
+
+
   return (
     <div className="space-y-4">
       {/* Alert banner */}
