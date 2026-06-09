@@ -404,25 +404,53 @@ Deno.serve(async (req) => {
     }
 
     // ─── PROCESS WITHDRAWAL (admin approve / reject, or auto) ───
+    // Idempotent and explicit status machine:
+    //   pending  →  approved  →  processing  →  completed | failed
+    //   pending  →  rejected (refund)
+    // Any other transition is rejected so retries from the UI are safe.
     if (action === 'process_withdrawal') {
-      const body = await req.json();
-      const { withdrawal_id, approve } = body;
+      const body = await req.json().catch(() => ({}));
+      const { withdrawal_id, approve } = body || {};
       if (!withdrawal_id) return json({ error: 'withdrawal_id required' }, 400);
 
       const { data: w } = await supabase.from('withdrawals')
         .select('*').eq('id', withdrawal_id).single();
       if (!w) return json({ error: 'Withdrawal not found' }, 404);
-      if (w.status !== 'pending')
-        return json({ error: `Cannot process — already ${w.status}` }, 400);
 
-      if (!approve) {
-        await refundBalance(supabase, w.deriv_account, Number(w.amount));
-        await supabase.from('withdrawals').update({ status: 'cancelled' }).eq('id', withdrawal_id);
-        return json({ success: true, message: 'Withdrawal cancelled & balance refunded' });
+      // Idempotency — return current state instead of erroring out on retry.
+      const terminal = ['completed', 'failed', 'rejected', 'cancelled'];
+      if (terminal.includes(w.status)) {
+        return json({ success: true, idempotent: true, status: w.status, message: `Already ${w.status}` });
+      }
+      if (w.status === 'processing' && approve) {
+        return json({ success: true, idempotent: true, status: 'processing', message: 'B2C already dispatched, awaiting callback' });
+      }
+      if (!['pending', 'approved'].includes(w.status)) {
+        return json({ error: `Invalid state transition from ${w.status}` }, 409);
       }
 
-      // Try real Daraja B2C if enabled & configured
-      if (config?.b2c_enabled && config?.initiator_name && config?.security_credential && config?.b2c_shortcode) {
+      // ── REJECT ──
+      if (!approve) {
+        if (w.status !== 'pending') {
+          return json({ error: `Cannot reject a ${w.status} withdrawal` }, 409);
+        }
+        await refundBalance(supabase, w.deriv_account, Number(w.amount));
+        await supabase.from('withdrawals').update({
+          status: 'rejected',
+          mpesa_receipt: 'Rejected by admin — balance refunded',
+        }).eq('id', withdrawal_id);
+        return json({ success: true, status: 'rejected', message: 'Withdrawal rejected & balance refunded' });
+      }
+
+      // ── APPROVE ── promote pending → approved first (intermediate state)
+      if (w.status === 'pending') {
+        await supabase.from('withdrawals').update({ status: 'approved' }).eq('id', withdrawal_id);
+        w.status = 'approved';
+      }
+
+      // Try real Daraja B2C if enabled & fully configured
+      const b2cReady = config?.b2c_enabled && config?.initiator_name && config?.security_credential && config?.b2c_shortcode;
+      if (b2cReady) {
         try {
           const b2cBase = config.environment === 'production'
             ? 'https://api.safaricom.co.ke' : 'https://sandbox.safaricom.co.ke';
@@ -431,12 +459,16 @@ Deno.serve(async (req) => {
             headers: { Authorization: `Basic ${authStr}` },
           });
           const tokJson = await tokResp.json();
-          if (!tokJson.access_token) throw new Error('B2C token failed');
+          if (!tokJson.access_token) {
+            return json({
+              success: false, status: 'approved',
+              error: 'B2C OAuth token failed — check consumer key/secret. Withdrawal stays Approved for manual payout.',
+              detail: tokJson,
+            }, 502);
+          }
 
-          // Auto-build callback URLs pointing back to this edge function
           const resultUrl = config.result_url || `${supabaseUrl}/functions/v1/mpesa-stk?action=b2c_result`;
           const timeoutUrl = config.queue_timeout_url || `${supabaseUrl}/functions/v1/mpesa-stk?action=b2c_timeout`;
-
           const payload = {
             InitiatorName: config.initiator_name,
             SecurityCredential: config.security_credential,
@@ -456,24 +488,31 @@ Deno.serve(async (req) => {
           });
           const b2cData = await b2cResp.json();
           if (b2cData.ResponseCode === '0' || b2cData.ConversationID) {
-            // Mark as processing — callback will finalize to completed/failed
             await supabase.from('withdrawals').update({
               status: 'processing',
               mpesa_transaction_id: b2cData.ConversationID || b2cData.OriginatorConversationID || null,
             }).eq('id', withdrawal_id);
-            return json({ success: true, message: 'B2C payout dispatched', b2c: b2cData });
+            return json({ success: true, status: 'processing', message: 'B2C payout dispatched', b2c: b2cData });
           }
-          await supabase.from('withdrawals').update({ status: 'approved' }).eq('id', withdrawal_id);
-          return json({ success: false, error: b2cData.errorMessage || 'B2C dispatch failed', b2c: b2cData }, 502);
+          return json({
+            success: false, status: 'approved',
+            error: b2cData.errorMessage || 'B2C dispatch failed — withdrawal stays Approved for manual payout.',
+            b2c: b2cData,
+          }, 502);
         } catch (e) {
-          await supabase.from('withdrawals').update({ status: 'approved' }).eq('id', withdrawal_id);
-          return json({ success: false, error: 'B2C error: ' + (e as Error).message }, 502);
+          return json({
+            success: false, status: 'approved',
+            error: 'B2C error: ' + (e as Error).message + ' — withdrawal stays Approved for manual payout.',
+          }, 502);
         }
       }
 
-      // Fallback: mark completed (admin pays manually)
-      await supabase.from('withdrawals').update({ status: 'completed' }).eq('id', withdrawal_id);
-      return json({ success: true, message: 'Withdrawal approved & marked completed' });
+      // No B2C credentials → admin-paid manual fallback
+      await supabase.from('withdrawals').update({
+        status: 'completed',
+        mpesa_receipt: 'MANUAL PAYOUT by admin (B2C not configured)',
+      }).eq('id', withdrawal_id);
+      return json({ success: true, status: 'completed', message: 'Marked completed (manual payout — configure B2C for automation)' });
     }
 
     return json({ error: 'Invalid action' }, 400);

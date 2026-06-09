@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { AlertTriangle, Wallet, TrendingUp, TrendingDown, Activity, ShieldAlert } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, BarChart, Bar, Legend, CartesianGrid } from 'recharts';
 
 interface Ledger {
   id?: string; pool: number; total_user_stakes: number;
@@ -75,6 +76,35 @@ const HouseLedgerTab = () => {
     return tiers;
   }, [userStats]);
 
+  // Cumulative P&L over time, grouped by tier (using chronological trades)
+  const cumulativeSeries = useMemo(() => {
+    const chrono = [...trades].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+    let cumNormal = 0, cumHigh = 0;
+    return chrono.map(t => {
+      const tier = users[t.deriv_account]?.win_tier === 'high' ? 'high' : 'normal';
+      if (tier === 'high') cumHigh += Number(t.profit); else cumNormal += Number(t.profit);
+      return {
+        time: new Date(t.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        Normal: +cumNormal.toFixed(2),
+        High: +cumHigh.toFixed(2),
+      };
+    });
+  }, [trades, users]);
+
+  const tierBars = useMemo(() => ([
+    {
+      tier: 'Normal',
+      'Win Rate %': tierStats.normal.trades ? +(tierStats.normal.wins / tierStats.normal.trades * 100).toFixed(1) : 0,
+      'ROI %': tierStats.normal.stake ? +(tierStats.normal.profit / tierStats.normal.stake * 100).toFixed(1) : 0,
+    },
+    {
+      tier: 'High Win',
+      'Win Rate %': tierStats.high.trades ? +(tierStats.high.wins / tierStats.high.trades * 100).toFixed(1) : 0,
+      'ROI %': tierStats.high.stake ? +(tierStats.high.profit / tierStats.high.stake * 100).toFixed(1) : 0,
+    },
+  ]), [tierStats]);
+
+
   return (
     <div className="space-y-4">
       {/* Alert banner */}
@@ -130,6 +160,43 @@ const HouseLedgerTab = () => {
           })}
         </div>
       </div>
+
+      {/* Charts: tier comparison + cumulative P&L */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+        <div className="bg-card border border-border rounded-lg p-4">
+          <h3 className="text-xs font-semibold mb-2 text-muted-foreground uppercase">Win Rate & ROI by Tier</h3>
+          <div className="h-56">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={tierBars}>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                <XAxis dataKey="tier" tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} />
+                <YAxis tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} />
+                <Tooltip contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', fontSize: 12 }} />
+                <Legend wrapperStyle={{ fontSize: 11 }} />
+                <Bar dataKey="Win Rate %" fill="hsl(var(--primary))" />
+                <Bar dataKey="ROI %" fill="hsl(var(--profit, 142 71% 45%))" />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+        <div className="bg-card border border-border rounded-lg p-4">
+          <h3 className="text-xs font-semibold mb-2 text-muted-foreground uppercase">Cumulative User P&L Over Time</h3>
+          <div className="h-56">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={cumulativeSeries}>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                <XAxis dataKey="time" tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} />
+                <YAxis tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} />
+                <Tooltip contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', fontSize: 12 }} />
+                <Legend wrapperStyle={{ fontSize: 11 }} />
+                <Line type="monotone" dataKey="Normal" stroke="hsl(var(--muted-foreground))" dot={false} strokeWidth={2} />
+                <Line type="monotone" dataKey="High" stroke="hsl(var(--primary))" dot={false} strokeWidth={2} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      </div>
+
 
       {/* Per-user table */}
       <div className="bg-card border border-border rounded-lg p-4">
