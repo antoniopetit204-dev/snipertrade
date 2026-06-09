@@ -161,6 +161,43 @@ const HouseLedgerTab = () => {
         </div>
       </div>
 
+      {/* Charts: tier comparison + cumulative P&L */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+        <div className="bg-card border border-border rounded-lg p-4">
+          <h3 className="text-xs font-semibold mb-2 text-muted-foreground uppercase">Win Rate & ROI by Tier</h3>
+          <div className="h-56">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={tierBars}>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                <XAxis dataKey="tier" tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} />
+                <YAxis tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} />
+                <Tooltip contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', fontSize: 12 }} />
+                <Legend wrapperStyle={{ fontSize: 11 }} />
+                <Bar dataKey="Win Rate %" fill="hsl(var(--primary))" />
+                <Bar dataKey="ROI %" fill="hsl(var(--profit, 142 71% 45%))" />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+        <div className="bg-card border border-border rounded-lg p-4">
+          <h3 className="text-xs font-semibold mb-2 text-muted-foreground uppercase">Cumulative User P&L Over Time</h3>
+          <div className="h-56">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={cumulativeSeries}>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                <XAxis dataKey="time" tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} />
+                <YAxis tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} />
+                <Tooltip contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', fontSize: 12 }} />
+                <Legend wrapperStyle={{ fontSize: 11 }} />
+                <Line type="monotone" dataKey="Normal" stroke="hsl(var(--muted-foreground))" dot={false} strokeWidth={2} />
+                <Line type="monotone" dataKey="High" stroke="hsl(var(--primary))" dot={false} strokeWidth={2} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      </div>
+
+
       {/* Per-user table */}
       <div className="bg-card border border-border rounded-lg p-4">
         <div className="flex items-center justify-between mb-3">
