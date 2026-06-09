@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { AlertTriangle, Wallet, TrendingUp, TrendingDown, Activity, ShieldAlert } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, BarChart, Bar, Legend, CartesianGrid } from 'recharts';
 
 interface Ledger {
   id?: string; pool: number; total_user_stakes: number;
