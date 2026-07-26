@@ -166,6 +166,57 @@ const DashboardDeposit = () => {
           <p className="text-[10px] text-muted-foreground">Min deposit: KES {minDeposit}</p>
         </div>
 
+        {/* Welcome Bonus Card */}
+        {bonus?.enabled && bonus.amount > 0 && (
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
+            className={`rounded-lg border p-4 sm:p-5 ${bonus.claimed
+              ? 'bg-profit/5 border-profit/30'
+              : totalDeposited >= bonus.minDeposit
+                ? 'bg-gradient-to-br from-primary/20 to-primary/5 border-primary/40'
+                : 'bg-card border-border'}`}>
+            <div className="flex items-start gap-3">
+              <Gift className={`h-6 w-6 shrink-0 ${bonus.claimed ? 'text-profit' : 'text-primary'}`} />
+              <div className="flex-1 min-w-0">
+                {bonus.claimed ? (
+                  <>
+                    <p className="text-sm font-semibold text-foreground">Bonus Claimed 🎉</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      You received your KES {bonus.claimedAmount.toFixed(0)} welcome bonus. One-time offer.
+                    </p>
+                  </>
+                ) : totalDeposited >= bonus.minDeposit ? (
+                  <>
+                    <p className="text-sm font-semibold text-foreground">
+                      🎁 You've unlocked a KES {bonus.amount.toFixed(0)} welcome bonus!
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Claim it now — funds go straight to your trading balance.
+                    </p>
+                    <Button size="sm" onClick={handleClaimBonus} disabled={claimingBonus}
+                      className="mt-3 bg-primary text-primary-foreground hover:bg-primary/90 text-xs font-semibold">
+                      {claimingBonus ? 'Claiming...' : `Claim KES ${bonus.amount.toFixed(0)}`}
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-sm font-semibold text-foreground">
+                      Welcome Bonus: KES {bonus.amount.toFixed(0)}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Deposit a total of KES {bonus.minDeposit.toFixed(0)} to unlock — you've deposited KES {totalDeposited.toFixed(0)} so far.
+                    </p>
+                    <div className="mt-2 h-1.5 rounded-full bg-secondary overflow-hidden">
+                      <div className="h-full bg-primary transition-all"
+                        style={{ width: `${Math.min(100, (totalDeposited / bonus.minDeposit) * 100)}%` }} />
+                    </div>
+                    <p className="text-[10px] text-muted-foreground mt-1.5">One-time bonus per account.</p>
+                  </>
+                )}
+              </div>
+            </div>
+          </motion.div>
+        )}
+
         {/* Deposit Form */}
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
           className="bg-card border border-border rounded-lg p-4 sm:p-6 space-y-4">
