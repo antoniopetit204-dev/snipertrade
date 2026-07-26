@@ -37,14 +37,49 @@ const DashboardDeposit = () => {
     setInternalBalance(b.balance);
   };
 
+  const refreshBonus = async () => {
+    if (!user?.email) return;
+    try {
+      const s = await fetchBonusStatus(user.email);
+      setBonus(s);
+    } catch {}
+  };
+
+  const refreshDeposits = async () => {
+    if (!account) return;
+    const list = await fetchDeposits(account);
+    setDeposits(list);
+    const total = (list || [])
+      .filter((d: any) => d.status === 'completed' || d.status === 'credited' || d.credited === true)
+      .reduce((s: number, d: any) => s + Number(d.amount || 0), 0);
+    setTotalDeposited(total);
+  };
+
   useEffect(() => {
     fetchDepositEnabled().then(setDepositEnabled);
     fetchSettings().then(s => s && setMinDeposit(s.minDeposit ?? 10));
     if (account) {
-      fetchDeposits(account).then(setDeposits);
+      refreshDeposits();
       refreshBalance();
+      refreshBonus();
     }
-  }, [account]);
+  }, [account, user?.email]);
+
+  const handleClaimBonus = async () => {
+    if (!account) return;
+    setClaimingBonus(true);
+    try {
+      const res = await claimBonus(account);
+      toast({ title: '🎁 Bonus Claimed!', description: `+KES ${res.bonus} added to your balance` });
+      setInternalBalance(res.new_balance);
+      await refreshBonus();
+    } catch (e: any) {
+      toast({ title: 'Could not claim bonus', description: e.message || String(e), variant: 'destructive' });
+    } finally {
+      setClaimingBonus(false);
+    }
+  };
+
 
   // Poll for pending STK
   useEffect(() => {
