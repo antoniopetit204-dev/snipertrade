@@ -59,6 +59,9 @@ export type Database = {
           api_key: string
           app_icon_url: string
           app_id: string
+          bonus_amount: number
+          bonus_enabled: boolean
+          bonus_min_deposit: number
           contact_email: string
           contact_phone: string
           created_at: string
@@ -93,6 +96,9 @@ export type Database = {
           api_key?: string
           app_icon_url?: string
           app_id?: string
+          bonus_amount?: number
+          bonus_enabled?: boolean
+          bonus_min_deposit?: number
           contact_email?: string
           contact_phone?: string
           created_at?: string
@@ -127,6 +133,9 @@ export type Database = {
           api_key?: string
           app_icon_url?: string
           app_id?: string
+          bonus_amount?: number
+          bonus_enabled?: boolean
+          bonus_min_deposit?: number
           contact_email?: string
           contact_phone?: string
           created_at?: string
@@ -160,6 +169,8 @@ export type Database = {
       app_users: {
         Row: {
           avatar_url: string | null
+          bonus_claimed_amount: number
+          bonus_claimed_at: string | null
           country: string | null
           created_at: string
           email: string
@@ -175,6 +186,8 @@ export type Database = {
         }
         Insert: {
           avatar_url?: string | null
+          bonus_claimed_amount?: number
+          bonus_claimed_at?: string | null
           country?: string | null
           created_at?: string
           email: string
@@ -190,6 +203,8 @@ export type Database = {
         }
         Update: {
           avatar_url?: string | null
+          bonus_claimed_amount?: number
+          bonus_claimed_at?: string | null
           country?: string | null
           created_at?: string
           email?: string
