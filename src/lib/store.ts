@@ -30,6 +30,9 @@ export interface AdminSettings {
   withdrawalAutoApprove?: boolean;
   withdrawalAutoMax?: number;
   requireEmailVerification?: boolean;
+  bonusEnabled?: boolean;
+  bonusAmount?: number;
+  bonusMinDeposit?: number;
 }
 
 export interface Bot {
