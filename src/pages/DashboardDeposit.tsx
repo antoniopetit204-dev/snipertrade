@@ -3,11 +3,12 @@ import { DashboardLayout } from '@/components/DashboardLayout';
 import { getUser, getAccountId } from '@/lib/store';
 import { initiateDeposit, fetchDeposits, fetchDepositEnabled, queryStkStatus, fetchSettings } from '@/lib/db';
 import { fetchUserBalance } from '@/lib/balance';
+import { claimBonus, fetchBonusStatus } from '@/lib/auth-email';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Wallet, Smartphone, AlertTriangle, CheckCircle, Clock, XCircle, ArrowDownToLine, Info } from 'lucide-react';
+import { Wallet, Smartphone, AlertTriangle, CheckCircle, Clock, XCircle, ArrowDownToLine, Info, Gift } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 const DashboardDeposit = () => {
@@ -22,6 +23,9 @@ const DashboardDeposit = () => {
   const [pendingCheckout, setPendingCheckout] = useState<string | null>(null);
   const [internalBalance, setInternalBalance] = useState(0);
   const [minDeposit, setMinDeposit] = useState(10);
+  const [bonus, setBonus] = useState<{ claimed: boolean; claimedAmount: number; enabled: boolean; amount: number; minDeposit: number } | null>(null);
+  const [totalDeposited, setTotalDeposited] = useState(0);
+  const [claimingBonus, setClaimingBonus] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const account = getAccountId(user);
