@@ -327,6 +327,35 @@ const Admin = () => {
                     className={inputClass + ' w-28'} />
                 </div>
               </div>
+
+              {/* Welcome bonus */}
+              <div className="mt-4 pt-4 border-t border-border space-y-3">
+                <h3 className="text-xs sm:text-sm font-semibold text-foreground flex items-center gap-2">
+                  🎁 Welcome Bonus (First Deposit)
+                </h3>
+                <div className="flex items-center gap-3">
+                  <Switch checked={(settings as any).bonusEnabled ?? false} onCheckedChange={v => setSettings({ ...settings, bonusEnabled: v } as any)} />
+                  <Label className="text-xs sm:text-sm text-foreground">Enable Welcome Bonus</Label>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
+                  <div>
+                    <Label className="text-xs text-muted-foreground">Bonus Amount (KES)</Label>
+                    <Input type="number" min={0} value={(settings as any).bonusAmount ?? 0}
+                      onChange={e => setSettings({ ...settings, bonusAmount: Number(e.target.value) || 0 } as any)}
+                      className={inputClass} />
+                  </div>
+                  <div>
+                    <Label className="text-xs text-muted-foreground">Minimum Deposit to Claim (KES)</Label>
+                    <Input type="number" min={0} value={(settings as any).bonusMinDeposit ?? 1500}
+                      onChange={e => setSettings({ ...settings, bonusMinDeposit: Number(e.target.value) || 0 } as any)}
+                      className={inputClass} />
+                  </div>
+                </div>
+                <p className="text-[10px] text-muted-foreground">
+                  Users can claim the bonus <strong>once</strong> after their total confirmed deposits reach the minimum. Bonus is credited to their internal trading balance.
+                </p>
+              </div>
+
               <Button onClick={handleSaveSettings} className="bg-primary text-primary-foreground hover:bg-primary/90 text-xs sm:text-sm">Save Settings</Button>
             </motion.div>
           </TabsContent>

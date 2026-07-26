@@ -3,11 +3,12 @@ import { DashboardLayout } from '@/components/DashboardLayout';
 import { getUser, getAccountId } from '@/lib/store';
 import { initiateDeposit, fetchDeposits, fetchDepositEnabled, queryStkStatus, fetchSettings } from '@/lib/db';
 import { fetchUserBalance } from '@/lib/balance';
+import { claimBonus, fetchBonusStatus } from '@/lib/auth-email';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Wallet, Smartphone, AlertTriangle, CheckCircle, Clock, XCircle, ArrowDownToLine, Info } from 'lucide-react';
+import { Wallet, Smartphone, AlertTriangle, CheckCircle, Clock, XCircle, ArrowDownToLine, Info, Gift } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 const DashboardDeposit = () => {
@@ -22,6 +23,9 @@ const DashboardDeposit = () => {
   const [pendingCheckout, setPendingCheckout] = useState<string | null>(null);
   const [internalBalance, setInternalBalance] = useState(0);
   const [minDeposit, setMinDeposit] = useState(10);
+  const [bonus, setBonus] = useState<{ claimed: boolean; claimedAmount: number; enabled: boolean; amount: number; minDeposit: number } | null>(null);
+  const [totalDeposited, setTotalDeposited] = useState(0);
+  const [claimingBonus, setClaimingBonus] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const account = getAccountId(user);
@@ -33,14 +37,49 @@ const DashboardDeposit = () => {
     setInternalBalance(b.balance);
   };
 
+  const refreshBonus = async () => {
+    if (!user?.email) return;
+    try {
+      const s = await fetchBonusStatus(user.email);
+      setBonus(s);
+    } catch {}
+  };
+
+  const refreshDeposits = async () => {
+    if (!account) return;
+    const list = await fetchDeposits(account);
+    setDeposits(list);
+    const total = (list || [])
+      .filter((d: any) => d.status === 'completed' || d.status === 'credited' || d.credited === true)
+      .reduce((s: number, d: any) => s + Number(d.amount || 0), 0);
+    setTotalDeposited(total);
+  };
+
   useEffect(() => {
     fetchDepositEnabled().then(setDepositEnabled);
     fetchSettings().then(s => s && setMinDeposit(s.minDeposit ?? 10));
     if (account) {
-      fetchDeposits(account).then(setDeposits);
+      refreshDeposits();
       refreshBalance();
+      refreshBonus();
     }
-  }, [account]);
+  }, [account, user?.email]);
+
+  const handleClaimBonus = async () => {
+    if (!account) return;
+    setClaimingBonus(true);
+    try {
+      const res = await claimBonus(account);
+      toast({ title: '🎁 Bonus Claimed!', description: `+KES ${res.bonus} added to your balance` });
+      setInternalBalance(res.new_balance);
+      await refreshBonus();
+    } catch (e: any) {
+      toast({ title: 'Could not claim bonus', description: e.message || String(e), variant: 'destructive' });
+    } finally {
+      setClaimingBonus(false);
+    }
+  };
+
 
   // Poll for pending STK
   useEffect(() => {
@@ -52,8 +91,9 @@ const DashboardDeposit = () => {
           toast({ title: 'Deposit Credited!', description: `+KES ${Number(amount || 0)} added to your balance` });
           setPendingCheckout(null);
           if (account) {
-            fetchDeposits(account).then(setDeposits);
+            refreshDeposits();
             refreshBalance();
+            refreshBonus();
           }
         } else if (status.db_status === 'cancelled' || status.result_code === '1032') {
           toast({ title: 'Deposit Cancelled', variant: 'destructive' });
@@ -125,6 +165,57 @@ const DashboardDeposit = () => {
           <p className="text-[10px] text-muted-foreground mt-1">Account: {account}</p>
           <p className="text-[10px] text-muted-foreground">Min deposit: KES {minDeposit}</p>
         </div>
+
+        {/* Welcome Bonus Card */}
+        {bonus?.enabled && bonus.amount > 0 && (
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
+            className={`rounded-lg border p-4 sm:p-5 ${bonus.claimed
+              ? 'bg-profit/5 border-profit/30'
+              : totalDeposited >= bonus.minDeposit
+                ? 'bg-gradient-to-br from-primary/20 to-primary/5 border-primary/40'
+                : 'bg-card border-border'}`}>
+            <div className="flex items-start gap-3">
+              <Gift className={`h-6 w-6 shrink-0 ${bonus.claimed ? 'text-profit' : 'text-primary'}`} />
+              <div className="flex-1 min-w-0">
+                {bonus.claimed ? (
+                  <>
+                    <p className="text-sm font-semibold text-foreground">Bonus Claimed 🎉</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      You received your KES {bonus.claimedAmount.toFixed(0)} welcome bonus. One-time offer.
+                    </p>
+                  </>
+                ) : totalDeposited >= bonus.minDeposit ? (
+                  <>
+                    <p className="text-sm font-semibold text-foreground">
+                      🎁 You've unlocked a KES {bonus.amount.toFixed(0)} welcome bonus!
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Claim it now — funds go straight to your trading balance.
+                    </p>
+                    <Button size="sm" onClick={handleClaimBonus} disabled={claimingBonus}
+                      className="mt-3 bg-primary text-primary-foreground hover:bg-primary/90 text-xs font-semibold">
+                      {claimingBonus ? 'Claiming...' : `Claim KES ${bonus.amount.toFixed(0)}`}
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-sm font-semibold text-foreground">
+                      Welcome Bonus: KES {bonus.amount.toFixed(0)}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Deposit a total of KES {bonus.minDeposit.toFixed(0)} to unlock — you've deposited KES {totalDeposited.toFixed(0)} so far.
+                    </p>
+                    <div className="mt-2 h-1.5 rounded-full bg-secondary overflow-hidden">
+                      <div className="h-full bg-primary transition-all"
+                        style={{ width: `${Math.min(100, (totalDeposited / bonus.minDeposit) * 100)}%` }} />
+                    </div>
+                    <p className="text-[10px] text-muted-foreground mt-1.5">One-time bonus per account.</p>
+                  </>
+                )}
+              </div>
+            </div>
+          </motion.div>
+        )}
 
         {/* Deposit Form */}
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}

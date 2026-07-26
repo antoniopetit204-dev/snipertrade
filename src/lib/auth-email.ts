@@ -70,6 +70,34 @@ export const sendTestEmail = (to: string) => invoke('send-test', { to });
 export const sendTemplateEmail = (to: string, template: string, vars: Record<string, string> = {}) =>
   invoke('send-template', { to, template, vars });
 
+// Claim welcome bonus (server-authoritative)
+export const claimBonus = async (deriv_account: string) => {
+  const refresh = getRefreshToken();
+  if (!refresh) throw new Error('You must be signed in');
+  const { data, error } = await supabase.functions.invoke('claim-bonus', {
+    body: { refresh_token: refresh, deriv_account },
+  });
+  if (error) throw error;
+  if (data?.error) throw new Error(data.error);
+  return data as { success: boolean; bonus: number; new_balance: number };
+};
+
+// Fetch bonus status for current user
+export const fetchBonusStatus = async (email: string) => {
+  const { data: user } = await (supabase as any).from('app_users')
+    .select('bonus_claimed_at, bonus_claimed_amount').eq('email', email).maybeSingle();
+  const { data: settings } = await (supabase as any).from('admin_settings')
+    .select('bonus_enabled, bonus_amount, bonus_min_deposit').limit(1).maybeSingle();
+  return {
+    claimed: !!user?.bonus_claimed_at,
+    claimedAmount: Number(user?.bonus_claimed_amount || 0),
+    enabled: !!settings?.bonus_enabled,
+    amount: Number(settings?.bonus_amount || 0),
+    minDeposit: Number(settings?.bonus_min_deposit || 1500),
+  };
+};
+
+
 export const refreshSession = async () => {
   // Never replace an active admin session with a refreshed user session.
   if (isAdminActive()) return getUser();

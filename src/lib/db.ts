@@ -25,6 +25,9 @@ export const fetchSettings = async (): Promise<AdminSettings | null> => {
       withdrawalAutoApprove: (data as any).withdrawal_auto_approve ?? false,
       withdrawalAutoMax: Number((data as any).withdrawal_auto_max ?? 1000),
       requireEmailVerification: (data as any).require_email_verification ?? false,
+      bonusEnabled: (data as any).bonus_enabled ?? false,
+      bonusAmount: Number((data as any).bonus_amount ?? 0),
+      bonusMinDeposit: Number((data as any).bonus_min_deposit ?? 1500),
   };
 };
 
@@ -44,6 +47,9 @@ export const updateSettings = async (settings: AdminSettings) => {
       withdrawal_auto_approve: (settings as any).withdrawalAutoApprove ?? false,
       withdrawal_auto_max: (settings as any).withdrawalAutoMax ?? 1000,
       require_email_verification: (settings as any).requireEmailVerification ?? false,
+      bonus_enabled: (settings as any).bonusEnabled ?? false,
+      bonus_amount: Number((settings as any).bonusAmount ?? 0),
+      bonus_min_deposit: Number((settings as any).bonusMinDeposit ?? 1500),
     } as any)
     .not('id', 'is', null);
   return !error;
