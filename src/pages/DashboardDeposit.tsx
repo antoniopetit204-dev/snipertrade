@@ -91,8 +91,9 @@ const DashboardDeposit = () => {
           toast({ title: 'Deposit Credited!', description: `+KES ${Number(amount || 0)} added to your balance` });
           setPendingCheckout(null);
           if (account) {
-            fetchDeposits(account).then(setDeposits);
+            refreshDeposits();
             refreshBalance();
+            refreshBonus();
           }
         } else if (status.db_status === 'cancelled' || status.result_code === '1032') {
           toast({ title: 'Deposit Cancelled', variant: 'destructive' });
