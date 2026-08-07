@@ -115,7 +115,7 @@ const DashboardManualTrader = () => {
 
   const accessibleBots = useMemo(() => bots.filter(b => b.enabled !== false), [bots]);
 
-  const runOne = async (runId: string, currentBalance: number): Promise<number> => {
+  const runOne = async (runId: string, currentBalance: number, roundIndex: number, totalRounds: number): Promise<number> => {
     const side = contract.sides[Math.floor(Math.random() * 2)];
     setLiveTrade({ status: 'pending', profit: 0, side });
     await new Promise(r => setTimeout(r, 700 + Math.random() * 600));
@@ -124,8 +124,9 @@ const DashboardManualTrader = () => {
     const { supabase } = await import('@/integrations/supabase/client');
     const { getRefreshToken } = await import('@/lib/auth-email');
     const { data: res } = await supabase.functions.invoke('resolve-trade', {
-      body: { deriv_account: account, email: account, bot_id: selectedBot?.id || null, stake, payout_multiplier: contract.payout, refresh_token: getRefreshToken() },
+      body: { deriv_account: account, email: account, bot_id: selectedBot?.id || null, stake, payout_multiplier: contract.payout, refresh_token: getRefreshToken(), run_id: runId, round_index: roundIndex, total_rounds: totalRounds },
     });
+
     const won = !!res?.won;
     const profit = Number(res?.profit ?? (won ? +(stake * (contract.payout - 1)).toFixed(2) : -stake));
     const newBalance = +(currentBalance + profit).toFixed(2);
