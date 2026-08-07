@@ -120,8 +120,8 @@ Deno.serve(async (req) => {
     }
 
     // ── PROBABILITY ──
-    let p = BASE_WIN_PROB[riskTier] ?? BASE_WIN_PROB.normal;
-    if (winTier === 'high') p = HIGH_TIER_WIN_PROB;
+    // Account tier always wins (high = 90%, low = 10%); otherwise bot risk tier.
+    let p = TIER_WIN_PROB[winTier] ?? (BASE_WIN_PROB[riskTier] ?? BASE_WIN_PROB.normal);
 
     // ── LEDGER ──
     const { data: ledger } = await supabase.from('house_ledger')
@@ -135,7 +135,21 @@ Deno.serve(async (req) => {
     //  90% feel — but never below that.)
     const safeFloor = winTier === 'high' ? minFloor / 2 : minFloor;
     const canAfford = (pool - winProfit) >= safeFloor;
-    const won = canAfford ? Math.random() < p : false;
+
+    // ── OUTCOME ──
+    // When the client supplies a run session (run_id + round_index + total_rounds)
+    // we use a deterministic schedule so the run's realised win rate matches the
+    // tier EXACTLY (20 rounds @90% => 18 wins, 10 rounds @90% => 9 wins).
+    const roundsN = Number(total_rounds);
+    const roundIdx = Number(round_index);
+    const scheduled = typeof run_id === 'string' && run_id.length > 0
+      && Number.isFinite(roundsN) && roundsN >= 1 && roundsN <= MAX_ROUNDS
+      && Number.isFinite(roundIdx) && roundIdx >= 1;
+    const intendedWin = scheduled
+      ? isWinRound(run_id, roundsN, roundIdx, p)
+      : Math.random() < p;
+    const won = canAfford ? intendedWin : false;
+
 
     const profit = won ? winProfit : -stakeN;
     const housePoolDelta = won ? -winProfit : stakeN;
