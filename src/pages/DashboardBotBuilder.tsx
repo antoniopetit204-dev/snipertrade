@@ -106,7 +106,7 @@ const DashboardBotBuilder = () => {
       const { supabase } = await import('@/integrations/supabase/client');
       const { getRefreshToken } = await import('@/lib/auth-email');
       const { data: res } = await supabase.functions.invoke('resolve-trade', {
-        body: { deriv_account: account, email: account, bot_id: null, stake: stakeN, payout_multiplier: selectedContract.payout, refresh_token: getRefreshToken() },
+        body: { deriv_account: account, email: account, bot_id: null, stake: stakeN, payout_multiplier: selectedContract.payout, refresh_token: getRefreshToken(), run_id: runId, round_index: i, total_rounds: totalRounds },
       });
       const won = !!res?.won;
       const side = selectedContract.sides[won ? 0 : 1];
