@@ -77,7 +77,9 @@ Deno.serve(async (req) => {
     );
 
     const body = await req.json().catch(() => ({}));
-    const { deriv_account, email, bot_id, stake, payout_multiplier, refresh_token } = body || {};
+    const { deriv_account, email, bot_id, stake, payout_multiplier, refresh_token,
+            run_id, round_index, total_rounds } = body || {};
+
 
     // ── AUTH ── validate session token against auth_sessions
     if (!refresh_token || typeof refresh_token !== 'string') {
