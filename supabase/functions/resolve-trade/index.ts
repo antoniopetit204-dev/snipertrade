@@ -17,13 +17,55 @@ const BASE_WIN_PROB: Record<string, number> = {
   normal: 0.48,
   high: 0.32,
 };
-const HIGH_TIER_WIN_PROB = 0.90;
+// Account win tiers — enforced EXACTLY across a run session
+const TIER_WIN_PROB: Record<string, number> = {
+  high: 0.90,   // wins 90% of the rounds in a run (20 runs -> 18 wins)
+  normal: 0.50,
+  low: 0.10,    // the opposite of high
+};
 // Losses always cost full stake; wins are shrunk by this factor so the
 // magnitude of a loss exceeds the magnitude of a win even when users win often.
 const WIN_SHRINK = 0.80;
 // Hard cap on payout multiplier the client can request (defence in depth).
 const MAX_PAYOUT_MULT = 10;
 const MAX_STAKE = 100_000;
+const MAX_ROUNDS = 1000;
+
+// ── Deterministic run scheduling ──
+// Given a run_id, a total number of rounds and a target win probability, we
+// derive a fixed schedule of wins/losses so the realised win rate of the run
+// matches the tier exactly (e.g. 20 rounds @ 90% => exactly 18 wins).
+function hashSeed(str: string): number {
+  let h = 2166136261 >>> 0;
+  for (let i = 0; i < str.length; i++) {
+    h ^= str.charCodeAt(i);
+    h = Math.imul(h, 16777619) >>> 0;
+  }
+  return h >>> 0;
+}
+function mulberry32(seed: number) {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6D2B79F5) >>> 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+function isWinRound(runId: string, totalRounds: number, roundIndex: number, p: number): boolean {
+  const n = Math.max(1, Math.min(MAX_ROUNDS, Math.floor(totalRounds)));
+  const idx = Math.max(1, Math.min(n, Math.floor(roundIndex))) - 1;
+  const targetWins = Math.round(n * p);
+  const slots = Array.from({ length: n }, (_, i) => i);
+  const rand = mulberry32(hashSeed(runId));
+  // Fisher–Yates with a seeded PRNG → same permutation for every round of a run
+  for (let i = n - 1; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1));
+    [slots[i], slots[j]] = [slots[j], slots[i]];
+  }
+  return slots.slice(0, targetWins).includes(idx);
+}
+
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
