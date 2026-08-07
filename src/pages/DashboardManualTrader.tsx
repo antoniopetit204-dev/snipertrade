@@ -169,7 +169,7 @@ const DashboardManualTrader = () => {
         toast({ title: 'Balance depleted', description: 'Stopping bot run.', variant: 'destructive' });
         break;
       }
-      bal = await runOne(runId, bal);
+      bal = await runOne(runId, bal, i + 1, runs);
       setCompleted(i + 1);
     }
     setRunning(false);
