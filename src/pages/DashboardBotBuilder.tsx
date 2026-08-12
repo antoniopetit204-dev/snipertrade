@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { DashboardLayout } from '@/components/DashboardLayout';
 import { getUser, getAccountId } from '@/lib/store';
 import { useActiveSymbols } from '@/hooks/useDerivWS';
-import { fetchUserBalance, updateUserBalance, insertManualTrade, fetchManualTrades, type ManualTrade } from '@/lib/balance';
+import { fetchUserBalance, fetchManualTrades, type ManualTrade } from '@/lib/balance';
 import { tradeNotifications } from '@/lib/trade-notifications';
 import { Wrench, Play, Square, Settings, TrendingUp, TrendingDown, BarChart3, Zap, Wallet } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -83,59 +83,69 @@ const DashboardBotBuilder = () => {
     if (!(stakeN > 0)) { toast({ title: 'Stake must be > 0', variant: 'destructive' }); return; }
     if (balance < stakeN) { toast({ title: 'Insufficient balance', description: 'Deposit funds to start.', variant: 'destructive' }); return; }
 
+    const totalRounds = parseInt(rounds) || 10;
+    const symLabel = symbols.find((s: any) => s.symbol === selectedSymbol)?.display_name || selectedSymbol || 'Synthetic';
+    const { supabase } = await import('@/integrations/supabase/client');
+    const { getRefreshToken } = await import('@/lib/auth-email');
+
+    // Server creates the run and locks the win/loss schedule for the tier.
+    const { data: start } = await supabase.functions.invoke('resolve-trade', {
+      body: {
+        action: 'start', refresh_token: getRefreshToken(), deriv_account: account,
+        bot_id: null, stake: stakeN, payout_multiplier: selectedContract.payout, total_rounds: totalRounds,
+      },
+    });
+    if (!start?.success) {
+      toast({ title: 'Could not start bot', description: start?.error || 'Please sign in again', variant: 'destructive' });
+      return;
+    }
+    const runId: string = start.run_id;
+
     setRunning(true);
     runningRef.current = true;
     setResults([]);
     setCurrentRound(0);
-    const totalRounds = parseInt(rounds) || 10;
     let totalProfit = 0;
     let bal = balance;
-    const runId = crypto.randomUUID();
-    const symLabel = symbols.find((s: any) => s.symbol === selectedSymbol)?.display_name || selectedSymbol || 'Synthetic';
+    let finished = false;
 
     for (let i = 1; i <= totalRounds; i++) {
       if (!runningRef.current) break;
-      if (bal < stakeN) { toast({ title: 'Balance depleted', variant: 'destructive' }); break; }
       setCurrentRound(i);
 
-      // Simulate tick latency
       setResults(prev => [...prev, { round: i, profit: 0, status: 'PLACED', side: selectedContract.sides[0] }]);
       await new Promise(r => setTimeout(r, 700 + Math.random() * 500));
 
-      // Server-side house-edge resolver (requires authenticated session)
-      const { supabase } = await import('@/integrations/supabase/client');
-      const { getRefreshToken } = await import('@/lib/auth-email');
       const { data: res } = await supabase.functions.invoke('resolve-trade', {
-        body: { deriv_account: account, email: account, bot_id: null, stake: stakeN, payout_multiplier: selectedContract.payout, refresh_token: getRefreshToken(), run_id: runId, round_index: i, total_rounds: totalRounds },
+        body: {
+          action: 'resolve', refresh_token: getRefreshToken(), run_id: runId,
+          label: `${deployedBotName || 'Bot Builder'} · ${symLabel} · ${selectedContract.label}`,
+        },
       });
-      const won = !!res?.won;
+
+      if (!res?.success) {
+        setResults(prev => prev.filter(r => r.round !== i));
+        toast({ title: 'Bot stopped', description: res?.error || 'Could not resolve trade', variant: 'destructive' });
+        if (res?.run_complete) finished = true;
+        break;
+      }
+
+      const won = !!res.won;
       const side = selectedContract.sides[won ? 0 : 1];
-      const profit = Number(res?.profit ?? (won ? +(stakeN * (selectedContract.payout - 1)).toFixed(2) : -stakeN));
+      const profit = Number(res.profit);
       totalProfit += profit;
-      bal = +(bal + profit).toFixed(2);
+      bal = Number(res.balance_after);
       setBalance(bal);
-
-      const status = won ? 'WIN' : 'LOSS';
-      setResults(prev => prev.map(r => r.round === i ? { ...r, profit, status, side } : r));
-
-      await updateUserBalance(account, bal);
-      await insertManualTrade({
-        deriv_account: account,
-        bot_id: null,
-        bot_name: `${deployedBotName || 'Bot Builder'} · ${symLabel} · ${selectedContract.label} (${side})`,
-        stake: stakeN,
-        payout: won ? +(stakeN * selectedContract.payout).toFixed(2) : 0,
-        profit, result: won ? 'win' : 'loss',
-        balance_after: bal, run_id: runId,
-      });
+      setResults(prev => prev.map(r => r.round === i ? { ...r, profit, status: won ? 'WIN' : 'LOSS', side } : r));
 
       tradeNotifications.notify({
         type: won ? 'win' : 'loss',
-        title: `Round ${i}: ${status}`,
+        title: `Round ${i}: ${won ? 'WIN' : 'LOSS'}`,
         message: `${symLabel} ${selectedContract.label} — ${profit >= 0 ? '+' : ''}KES ${profit.toFixed(2)}`,
         profit,
       });
 
+      if (res.run_complete) { finished = true; break; }
       if (stopLoss && totalProfit <= -parseFloat(stopLoss)) {
         tradeNotifications.notify({ type: 'stop_loss', title: 'Stop Loss Hit!', message: `Total: KES ${totalProfit.toFixed(2)}`, profit: totalProfit });
         break;
@@ -147,8 +157,15 @@ const DashboardBotBuilder = () => {
       await new Promise(r => setTimeout(r, 400));
     }
 
+    if (!finished) {
+      await supabase.functions.invoke('resolve-trade', {
+        body: { action: 'stop', refresh_token: getRefreshToken(), run_id: runId },
+      }).catch(() => {});
+    }
+
     runningRef.current = false;
     setRunning(false);
+    fetchUserBalance(account).then(b => setBalance(b.balance));
     fetchManualTrades(account, 30).then(setHistory);
   };
 
