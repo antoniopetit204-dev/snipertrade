@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { DashboardLayout } from '@/components/DashboardLayout';
 import { getUser, getAccountId } from '@/lib/store';
 import { fetchBots } from '@/lib/db';
-import { fetchUserBalance, updateUserBalance, insertManualTrade, fetchManualTrades, type ManualTrade } from '@/lib/balance';
+import { fetchUserBalance, fetchManualTrades, type ManualTrade } from '@/lib/balance';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
