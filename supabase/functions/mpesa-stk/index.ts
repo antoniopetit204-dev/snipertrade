@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import forge from "https://esm.sh/node-forge@1.3.1";
+import { creditFirstDeposit } from "../_shared/affiliate.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -312,6 +313,7 @@ Deno.serve(async (req) => {
             await supabase.from('deposits')
               .update({ status: 'credited', mpesa_receipt: receipt, credited: true })
               .eq('mpesa_checkout_request_id', checkoutId);
+            await creditFirstDeposit(supabase, dep.deriv_account, Number(dep.amount), dep.id);
           }
         } else {
           await supabase.from('purchases').update({ status: 'cancelled' })
@@ -350,6 +352,7 @@ Deno.serve(async (req) => {
           await supabase.from('deposits')
             .update({ status: 'credited', credited: true })
             .eq('mpesa_checkout_request_id', checkout_request_id);
+          await creditFirstDeposit(supabase, dep.deriv_account, Number(dep.amount), dep.id);
         }
         await supabase.from('purchases')
           .update({ status: 'completed' })

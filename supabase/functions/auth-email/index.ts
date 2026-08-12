@@ -5,6 +5,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
 import bcrypt from 'npm:bcryptjs@2.4.3';
 import { SMTPClient } from 'https://deno.land/x/denomailer@1.6.0/mod.ts';
+import { ensureAffiliate, attributeSignup } from '../_shared/affiliate.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -237,13 +238,19 @@ Deno.serve(async (req) => {
       }
       await supabase.from('user_email_preferences').upsert({ identifier: email, email }, { onConflict: 'identifier' });
 
+      // ── Affiliate: give the new user their own code + lock in their referrer ──
+      await ensureAffiliate(supabase, email);
+      const refCode = String(body.ref_code || '').trim();
+      let referral: any = { attributed: false };
+      if (refCode) referral = await attributeSignup(supabase, email, refCode);
+
       const otp = otp6();
       const token = tokenHex(32);
       const expires = new Date(Date.now() + 15 * 60 * 1000).toISOString();
       await supabase.from('email_verifications').insert({ user_id: userId, email, token, otp_code: otp, expires_at: expires });
       const verifyUrl = `${origin}/auth?verify=${token}`;
       const sendRes = await sendTemplated(email, 'email_verification', { name: name || email, verify_url: verifyUrl, otp_code: otp, site_url: origin });
-      return json({ requireVerification: true, email, emailSent: sendRes.ok, sendError: sendRes.ok ? undefined : sendRes.error });
+      return json({ requireVerification: true, email, referral, emailSent: sendRes.ok, sendError: sendRes.ok ? undefined : sendRes.error });
     }
 
     if (action === 'verify-otp') {
