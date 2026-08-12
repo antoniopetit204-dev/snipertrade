@@ -17,6 +17,8 @@ import DashboardTrader from "./pages/DashboardTrader";
 import DashboardManualTrader from "./pages/DashboardManualTrader";
 import DashboardDeposit from "./pages/DashboardDeposit";
 import DashboardWithdraw from "./pages/DashboardWithdraw";
+import DashboardAffiliate from "./pages/DashboardAffiliate";
+import { ReferralCapture } from "./components/ReferralCapture";
 import Admin from "./pages/Admin";
 import Auth from "./pages/Auth";
 import ForgotPassword from "./pages/ForgotPassword";
@@ -42,6 +44,7 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
+        <ReferralCapture />
         <Routes>
           <Route path="/" element={<Landing />} />
           <Route path="/auth" element={<Auth />} />
@@ -61,6 +64,8 @@ const App = () => (
           <Route path="/dashboard/risk" element={<AuthGuard><DashboardRisk /></AuthGuard>} />
           <Route path="/dashboard/deposit" element={<AuthGuard><DashboardDeposit /></AuthGuard>} />
           <Route path="/dashboard/withdraw" element={<AuthGuard><DashboardWithdraw /></AuthGuard>} />
+          <Route path="/dashboard/affiliate" element={<AuthGuard><DashboardAffiliate /></AuthGuard>} />
+          <Route path="/r/:code" element={<Landing />} />
           <Route path="/adminking" element={<Admin />} />
           <Route path="*" element={<NotFound />} />
         </Routes>

@@ -1,4 +1,4 @@
-import { Activity, BarChart3, Bot, LineChart, LogOut, TrendingUp, Wallet, ChevronLeft, ChevronRight, BookOpen, Shield, Lightbulb, Wrench, X, Crosshair, ArrowDownToLine, ArrowUpFromLine, Zap, Settings } from 'lucide-react';
+import { Activity, BarChart3, Bot, LineChart, LogOut, TrendingUp, Wallet, ChevronLeft, ChevronRight, BookOpen, Shield, Lightbulb, Wrench, X, Crosshair, ArrowDownToLine, ArrowUpFromLine, Zap, Settings, Users } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { setUser, getSettings, getUser } from '@/lib/store';
 import { useState } from 'react';
@@ -17,6 +17,7 @@ const navItems = [
   { label: 'Portfolio', icon: Wallet, path: '/dashboard/portfolio' },
   { label: 'Deposit', icon: ArrowDownToLine, path: '/dashboard/deposit' },
   { label: 'Withdraw', icon: ArrowUpFromLine, path: '/dashboard/withdraw' },
+  { label: 'Affiliate', icon: Users, path: '/dashboard/affiliate' },
   { label: 'Risk Mgmt', icon: Shield, path: '/dashboard/risk' },
   { label: 'Settings', icon: Settings, path: '/dashboard/settings' },
   { label: 'Tutorial', icon: BookOpen, path: '/dashboard/tutorial' },
