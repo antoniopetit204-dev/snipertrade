@@ -33,6 +33,11 @@ export interface AdminSettings {
   bonusEnabled?: boolean;
   bonusAmount?: number;
   bonusMinDeposit?: number;
+  affiliateEnabled?: boolean;
+  affiliateL1Percent?: number;
+  affiliateL2Percent?: number;
+  affiliateL3Percent?: number;
+  affiliateMinPayout?: number;
 }
 
 export interface Bot {
