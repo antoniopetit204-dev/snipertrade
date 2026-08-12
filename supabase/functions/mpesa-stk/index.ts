@@ -530,6 +530,47 @@ Deno.serve(async (req) => {
       return json({ success: true, status: 'completed', message: 'Marked completed (manual payout — configure B2C for automation)' });
     }
 
+    // ─── B2C TRANSACTION STATUS QUERY (admin "Check status" button) ───
+    if (action === 'b2c_status') {
+      const body = await req.json().catch(() => ({}));
+      const { withdrawal_id } = body || {};
+      if (!withdrawal_id) return json({ error: 'withdrawal_id required' }, 400);
+      const { data: w } = await supabase.from('withdrawals').select('*').eq('id', withdrawal_id).maybeSingle();
+      if (!w) return json({ error: 'Withdrawal not found' }, 404);
+      if (!w.mpesa_transaction_id)
+        return json({ success: true, status: w.status, message: 'No B2C conversation id yet' });
+      if (!config?.b2c_enabled || !config?.initiator_name || !config?.security_credential)
+        return json({ error: 'B2C not configured' }, 400);
+
+      const base = config.environment === 'production'
+        ? 'https://api.safaricom.co.ke' : 'https://sandbox.safaricom.co.ke';
+      const tokResp = await fetch(`${base}/oauth/v1/generate?grant_type=client_credentials`, {
+        headers: { Authorization: `Basic ${btoa(`${config.consumer_key}:${config.consumer_secret}`)}` },
+      });
+      const tok = await tokResp.json();
+      if (!tok.access_token) return json({ error: 'OAuth failed — check consumer key/secret' }, 502);
+
+      const statusResp = await fetch(`${base}/mpesa/transactionstatus/v1/query`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${tok.access_token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          Initiator: config.initiator_name,
+          SecurityCredential: config.security_credential,
+          CommandID: 'TransactionStatusQuery',
+          TransactionID: w.mpesa_receipt || '',
+          OriginatorConversationID: w.mpesa_transaction_id,
+          PartyA: config.b2c_shortcode,
+          IdentifierType: '4',
+          ResultURL: config.result_url || `${supabaseUrl}/functions/v1/mpesa-stk?action=b2c_result`,
+          QueueTimeOutURL: config.queue_timeout_url || `${supabaseUrl}/functions/v1/mpesa-stk?action=b2c_timeout`,
+          Remarks: 'Withdrawal status check',
+          Occasion: 'Withdrawal',
+        }),
+      });
+      const statusData = await statusResp.json();
+      return json({ success: true, status: w.status, daraja: statusData });
+    }
+
     return json({ error: 'Invalid action' }, 400);
   } catch (err) {
     return json({ error: (err as Error).message }, 500);
