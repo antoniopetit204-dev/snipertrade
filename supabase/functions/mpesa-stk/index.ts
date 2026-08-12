@@ -77,6 +77,14 @@ const generateSecurityCredential = (initiatorPassword: string, env: string, cust
   return forge.util.encode64(encrypted);
 };
 
+// ── Kenyan MSISDN normaliser: returns 2547XXXXXXXX / 2541XXXXXXXX or null ──
+function normalizeMsisdn(raw: string): string | null {
+  let p = String(raw || '').replace(/[^0-9+]/g, '').replace(/^\+/, '');
+  if (p.startsWith('0')) p = '254' + p.slice(1);
+  else if (/^(7|1)\d{8}$/.test(p)) p = '254' + p;
+  return /^254(7|1)\d{8}$/.test(p) ? p : null;
+}
+
 // Atomic-ish balance helpers
 async function creditBalance(supabase: any, account: string, amount: number) {
   const { data: existing } = await supabase
@@ -250,8 +258,9 @@ Deno.serve(async (req) => {
       if (!isDeposit && Number(amount) < 1)
         return json({ error: 'Minimum amount is KES 1' }, 400);
 
-      let formattedPhone = phone_number.replace(/\s+/g, '').replace(/^0/, '254').replace(/^\+/, '');
-      if (!formattedPhone.startsWith('254')) formattedPhone = '254' + formattedPhone;
+      const formattedPhone = normalizeMsisdn(phone_number);
+      if (!formattedPhone)
+        return json({ error: 'Enter a valid Safaricom number, e.g. 07XXXXXXXX' }, 400);
 
       const timestamp = new Date().toISOString().replace(/[-T:.Z]/g, '').slice(0, 14);
       const password = btoa(`${config.shortcode}${config.passkey}${timestamp}`);
@@ -391,8 +400,11 @@ Deno.serve(async (req) => {
       const ok = await debitBalance(supabase, deriv_account, Number(amount));
       if (!ok) return json({ error: 'Insufficient balance' }, 400);
 
-      let formattedPhone = phone_number.replace(/\s+/g, '').replace(/^0/, '254').replace(/^\+/, '');
-      if (!formattedPhone.startsWith('254')) formattedPhone = '254' + formattedPhone;
+      const formattedPhone = normalizeMsisdn(phone_number);
+      if (!formattedPhone)
+        return json({ error: 'Enter a valid Safaricom number, e.g. 07XXXXXXXX' }, 400);
+      if (!Number.isInteger(Number(amount)) || Number(amount) < 10)
+        return json({ error: 'Withdrawal amount must be a whole number of at least KES 10' }, 400);
 
       const { data: withdrawal, error: insertErr } = await supabase.from('withdrawals').insert({
         deriv_account, phone_number: formattedPhone, amount: Number(amount), status: 'pending',
