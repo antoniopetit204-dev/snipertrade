@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Activity, Mail, Lock, User as UserIcon, ArrowRight, CheckCircle2, ShieldCheck, Phone, IdCard, AlertCircle } from 'lucide-react';
+import { Activity, Mail, Lock, User as UserIcon, ArrowRight, CheckCircle2, ShieldCheck, Phone, IdCard, AlertCircle, Gift } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -10,6 +10,7 @@ import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp
 import { useToast } from '@/hooks/use-toast';
 import { useSettings } from '@/hooks/useSettings';
 import { signupEmail, loginEmail, verifyEmail, verifyOtp, resendVerification } from '@/lib/auth-email';
+import { getStoredRef, storeRef, validateRefCode, normalizeCode } from '@/lib/affiliate';
 
 type Stage = 'form' | 'otp';
 const RESEND_SECONDS = 60;
@@ -28,6 +29,8 @@ export default function Auth() {
   const [notRegistered, setNotRegistered] = useState(false);
   const [login, setLogin] = useState({ identifier: '', password: '' });
   const [signup, setSignup] = useState({ name: '', email: '', password: '', phone: '', id_number: '', country: '' });
+  const [refCode, setRefCode] = useState(getStoredRef());
+  const [refStatus, setRefStatus] = useState<{ valid: boolean; name?: string } | null>(null);
   const [verifyState, setVerifyState] = useState<'idle' | 'checking' | 'ok' | 'fail'>('idle');
 
   // Magic-link verification (?verify=)
@@ -66,6 +69,19 @@ export default function Auth() {
     return () => clearTimeout(t);
   }, [resendIn]);
 
+  // Validate referral code (auto-filled from the link, or typed manually)
+  useEffect(() => {
+    const code = normalizeCode(refCode);
+    if (!code) { setRefStatus(null); return; }
+    let cancelled = false;
+    const t = setTimeout(() => {
+      validateRefCode(code)
+        .then((r) => { if (!cancelled) setRefStatus({ valid: !!r.valid, name: r.referrer_name }); })
+        .catch(() => { if (!cancelled) setRefStatus(null); });
+    }, 350);
+    return () => { cancelled = true; clearTimeout(t); };
+  }, [refCode]);
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -96,6 +112,7 @@ export default function Auth() {
     try {
       const res = await signupEmail(signup.email, signup.password, signup.name, {
         phone: signup.phone, id_number: signup.id_number, country: signup.country,
+        ref_code: normalizeCode(refCode) || getStoredRef(),
       });
       setPendingEmail(res.email);
       setStage('otp');
@@ -286,6 +303,23 @@ export default function Auth() {
                         <Input value={signup.id_number} onChange={e => setSignup({ ...signup, id_number: e.target.value })} className="pl-9" placeholder="National ID" />
                       </div>
                     </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Referral code (optional)</Label>
+                    <div className="relative">
+                      <Gift className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        value={refCode}
+                        onChange={e => { const v = normalizeCode(e.target.value); setRefCode(v); storeRef(v); }}
+                        className="pl-9 uppercase tracking-widest font-mono"
+                        placeholder="e.g. K7X2M9QP"
+                      />
+                    </div>
+                    {refCode && refStatus && (
+                      <p className={`text-[10px] ${refStatus.valid ? 'text-profit' : 'text-loss'}`}>
+                        {refStatus.valid ? `✓ Referred by ${refStatus.name}` : 'Code not found — you can still sign up'}
+                      </p>
+                    )}
                   </div>
                   <div className="space-y-1.5">
                     <Label className="text-xs">Password (min 6 chars)</Label>

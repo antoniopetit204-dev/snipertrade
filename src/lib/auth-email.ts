@@ -32,10 +32,10 @@ const persistSession = (data: any): User => {
 
 export const signupEmail = async (
   email: string, password: string, name: string,
-  extras: { phone?: string; id_number?: string; country?: string } = {}
+  extras: { phone?: string; id_number?: string; country?: string; ref_code?: string } = {}
 ) => {
   const data = await invoke('signup', { email, password, name, ...extras });
-  return { user: null, requireVerification: true, email: data.email || email, emailSent: data.emailSent !== false, sendError: data.sendError };
+  return { user: null, requireVerification: true, email: data.email || email, referral: data.referral, emailSent: data.emailSent !== false, sendError: data.sendError };
 };
 
 export const loginEmail = async (email: string, password: string) => {

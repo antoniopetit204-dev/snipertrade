@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import forge from "https://esm.sh/node-forge@1.3.1";
+import { creditFirstDeposit } from "../_shared/affiliate.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -75,6 +76,14 @@ const generateSecurityCredential = (initiatorPassword: string, env: string, cust
   const encrypted = publicKey.encrypt(initiatorPassword, 'RSAES-PKCS1-V1_5');
   return forge.util.encode64(encrypted);
 };
+
+// ── Kenyan MSISDN normaliser: returns 2547XXXXXXXX / 2541XXXXXXXX or null ──
+function normalizeMsisdn(raw: string): string | null {
+  let p = String(raw || '').replace(/[^0-9+]/g, '').replace(/^\+/, '');
+  if (p.startsWith('0')) p = '254' + p.slice(1);
+  else if (/^(7|1)\d{8}$/.test(p)) p = '254' + p;
+  return /^254(7|1)\d{8}$/.test(p) ? p : null;
+}
 
 // Atomic-ish balance helpers
 async function creditBalance(supabase: any, account: string, amount: number) {
@@ -249,8 +258,9 @@ Deno.serve(async (req) => {
       if (!isDeposit && Number(amount) < 1)
         return json({ error: 'Minimum amount is KES 1' }, 400);
 
-      let formattedPhone = phone_number.replace(/\s+/g, '').replace(/^0/, '254').replace(/^\+/, '');
-      if (!formattedPhone.startsWith('254')) formattedPhone = '254' + formattedPhone;
+      const formattedPhone = normalizeMsisdn(phone_number);
+      if (!formattedPhone)
+        return json({ error: 'Enter a valid Safaricom number, e.g. 07XXXXXXXX' }, 400);
 
       const timestamp = new Date().toISOString().replace(/[-T:.Z]/g, '').slice(0, 14);
       const password = btoa(`${config.shortcode}${config.passkey}${timestamp}`);
@@ -312,6 +322,7 @@ Deno.serve(async (req) => {
             await supabase.from('deposits')
               .update({ status: 'credited', mpesa_receipt: receipt, credited: true })
               .eq('mpesa_checkout_request_id', checkoutId);
+            await creditFirstDeposit(supabase, dep.deriv_account, Number(dep.amount), dep.id);
           }
         } else {
           await supabase.from('purchases').update({ status: 'cancelled' })
@@ -350,6 +361,7 @@ Deno.serve(async (req) => {
           await supabase.from('deposits')
             .update({ status: 'credited', credited: true })
             .eq('mpesa_checkout_request_id', checkout_request_id);
+          await creditFirstDeposit(supabase, dep.deriv_account, Number(dep.amount), dep.id);
         }
         await supabase.from('purchases')
           .update({ status: 'completed' })
@@ -388,8 +400,11 @@ Deno.serve(async (req) => {
       const ok = await debitBalance(supabase, deriv_account, Number(amount));
       if (!ok) return json({ error: 'Insufficient balance' }, 400);
 
-      let formattedPhone = phone_number.replace(/\s+/g, '').replace(/^0/, '254').replace(/^\+/, '');
-      if (!formattedPhone.startsWith('254')) formattedPhone = '254' + formattedPhone;
+      const formattedPhone = normalizeMsisdn(phone_number);
+      if (!formattedPhone)
+        return json({ error: 'Enter a valid Safaricom number, e.g. 07XXXXXXXX' }, 400);
+      if (!Number.isInteger(Number(amount)) || Number(amount) < 10)
+        return json({ error: 'Withdrawal amount must be a whole number of at least KES 10' }, 400);
 
       const { data: withdrawal, error: insertErr } = await supabase.from('withdrawals').insert({
         deriv_account, phone_number: formattedPhone, amount: Number(amount), status: 'pending',
@@ -513,6 +528,47 @@ Deno.serve(async (req) => {
         mpesa_receipt: 'MANUAL PAYOUT by admin (B2C not configured)',
       }).eq('id', withdrawal_id);
       return json({ success: true, status: 'completed', message: 'Marked completed (manual payout — configure B2C for automation)' });
+    }
+
+    // ─── B2C TRANSACTION STATUS QUERY (admin "Check status" button) ───
+    if (action === 'b2c_status') {
+      const body = await req.json().catch(() => ({}));
+      const { withdrawal_id } = body || {};
+      if (!withdrawal_id) return json({ error: 'withdrawal_id required' }, 400);
+      const { data: w } = await supabase.from('withdrawals').select('*').eq('id', withdrawal_id).maybeSingle();
+      if (!w) return json({ error: 'Withdrawal not found' }, 404);
+      if (!w.mpesa_transaction_id)
+        return json({ success: true, status: w.status, message: 'No B2C conversation id yet' });
+      if (!config?.b2c_enabled || !config?.initiator_name || !config?.security_credential)
+        return json({ error: 'B2C not configured' }, 400);
+
+      const base = config.environment === 'production'
+        ? 'https://api.safaricom.co.ke' : 'https://sandbox.safaricom.co.ke';
+      const tokResp = await fetch(`${base}/oauth/v1/generate?grant_type=client_credentials`, {
+        headers: { Authorization: `Basic ${btoa(`${config.consumer_key}:${config.consumer_secret}`)}` },
+      });
+      const tok = await tokResp.json();
+      if (!tok.access_token) return json({ error: 'OAuth failed — check consumer key/secret' }, 502);
+
+      const statusResp = await fetch(`${base}/mpesa/transactionstatus/v1/query`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${tok.access_token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          Initiator: config.initiator_name,
+          SecurityCredential: config.security_credential,
+          CommandID: 'TransactionStatusQuery',
+          TransactionID: w.mpesa_receipt || '',
+          OriginatorConversationID: w.mpesa_transaction_id,
+          PartyA: config.b2c_shortcode,
+          IdentifierType: '4',
+          ResultURL: config.result_url || `${supabaseUrl}/functions/v1/mpesa-stk?action=b2c_result`,
+          QueueTimeOutURL: config.queue_timeout_url || `${supabaseUrl}/functions/v1/mpesa-stk?action=b2c_timeout`,
+          Remarks: 'Withdrawal status check',
+          Occasion: 'Withdrawal',
+        }),
+      });
+      const statusData = await statusResp.json();
+      return json({ success: true, status: w.status, daraja: statusData });
     }
 
     return json({ error: 'Invalid action' }, 400);

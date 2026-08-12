@@ -54,6 +54,11 @@ export type Database = {
       }
       admin_settings: {
         Row: {
+          affiliate_enabled: boolean
+          affiliate_l1_percent: number
+          affiliate_l2_percent: number
+          affiliate_l3_percent: number
+          affiliate_min_payout: number
           allow_signups: boolean
           announcement_bar: string
           api_key: string
@@ -91,6 +96,11 @@ export type Database = {
           withdrawal_enabled: boolean
         }
         Insert: {
+          affiliate_enabled?: boolean
+          affiliate_l1_percent?: number
+          affiliate_l2_percent?: number
+          affiliate_l3_percent?: number
+          affiliate_min_payout?: number
           allow_signups?: boolean
           announcement_bar?: string
           api_key?: string
@@ -128,6 +138,11 @@ export type Database = {
           withdrawal_enabled?: boolean
         }
         Update: {
+          affiliate_enabled?: boolean
+          affiliate_l1_percent?: number
+          affiliate_l2_percent?: number
+          affiliate_l3_percent?: number
+          affiliate_min_payout?: number
           allow_signups?: boolean
           announcement_bar?: string
           api_key?: string
@@ -166,6 +181,114 @@ export type Database = {
         }
         Relationships: []
       }
+      affiliate_clicks: {
+        Row: {
+          code: string
+          created_at: string
+          id: string
+          ip: string
+          landing_origin: string
+          referer: string
+          user_agent: string
+          visitor_id: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          id?: string
+          ip?: string
+          landing_origin?: string
+          referer?: string
+          user_agent?: string
+          visitor_id: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          id?: string
+          ip?: string
+          landing_origin?: string
+          referer?: string
+          user_agent?: string
+          visitor_id?: string
+        }
+        Relationships: []
+      }
+      affiliate_commissions: {
+        Row: {
+          affiliate_email: string
+          amount: number
+          created_at: string
+          deposit_amount: number
+          deposit_id: string | null
+          id: string
+          level: number
+          percent: number
+          referred_email: string
+          status: string
+        }
+        Insert: {
+          affiliate_email: string
+          amount?: number
+          created_at?: string
+          deposit_amount?: number
+          deposit_id?: string | null
+          id?: string
+          level?: number
+          percent?: number
+          referred_email: string
+          status?: string
+        }
+        Update: {
+          affiliate_email?: string
+          amount?: number
+          created_at?: string
+          deposit_amount?: number
+          deposit_id?: string | null
+          id?: string
+          level?: number
+          percent?: number
+          referred_email?: string
+          status?: string
+        }
+        Relationships: []
+      }
+      affiliates: {
+        Row: {
+          clicks: number
+          code: string
+          conversions: number
+          created_at: string
+          email: string
+          id: string
+          signups: number
+          total_earned: number
+          updated_at: string
+        }
+        Insert: {
+          clicks?: number
+          code: string
+          conversions?: number
+          created_at?: string
+          email: string
+          id?: string
+          signups?: number
+          total_earned?: number
+          updated_at?: string
+        }
+        Update: {
+          clicks?: number
+          code?: string
+          conversions?: number
+          created_at?: string
+          email?: string
+          id?: string
+          signups?: number
+          total_earned?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       app_users: {
         Row: {
           avatar_url: string | null
@@ -179,6 +302,8 @@ export type Database = {
           name: string
           password_hash: string
           phone: string | null
+          referral_code: string | null
+          referred_by_code: string | null
           role: string
           updated_at: string
           verified: boolean
@@ -196,6 +321,8 @@ export type Database = {
           name?: string
           password_hash: string
           phone?: string | null
+          referral_code?: string | null
+          referred_by_code?: string | null
           role?: string
           updated_at?: string
           verified?: boolean
@@ -213,6 +340,8 @@ export type Database = {
           name?: string
           password_hash?: string
           phone?: string | null
+          referral_code?: string | null
+          referred_by_code?: string | null
           role?: string
           updated_at?: string
           verified?: boolean
@@ -669,6 +798,48 @@ export type Database = {
           },
         ]
       }
+      referrals: {
+        Row: {
+          commission_paid: number
+          converted_at: string | null
+          created_at: string
+          first_deposit_amount: number
+          id: string
+          level: number
+          referred_email: string
+          referrer_code: string
+          referrer_email: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          commission_paid?: number
+          converted_at?: string | null
+          created_at?: string
+          first_deposit_amount?: number
+          id?: string
+          level?: number
+          referred_email: string
+          referrer_code: string
+          referrer_email: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          commission_paid?: number
+          converted_at?: string | null
+          created_at?: string
+          first_deposit_amount?: number
+          id?: string
+          level?: number
+          referred_email?: string
+          referrer_code?: string
+          referrer_email?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       smtp_config: {
         Row: {
           created_at: string
@@ -708,6 +879,72 @@ export type Database = {
           secure?: boolean
           updated_at?: string
           username?: string
+        }
+        Relationships: []
+      }
+      trade_runs: {
+        Row: {
+          bot_id: string | null
+          completed_at: string | null
+          created_at: string
+          deriv_account: string
+          email: string
+          id: string
+          losses: number
+          next_round: number
+          payout_multiplier: number
+          realized_pnl: number
+          run_id: string
+          schedule: Json
+          stake: number
+          status: string
+          target_wins: number
+          total_rounds: number
+          updated_at: string
+          win_tier: string
+          wins: number
+        }
+        Insert: {
+          bot_id?: string | null
+          completed_at?: string | null
+          created_at?: string
+          deriv_account: string
+          email: string
+          id?: string
+          losses?: number
+          next_round?: number
+          payout_multiplier: number
+          realized_pnl?: number
+          run_id: string
+          schedule?: Json
+          stake: number
+          status?: string
+          target_wins?: number
+          total_rounds: number
+          updated_at?: string
+          win_tier?: string
+          wins?: number
+        }
+        Update: {
+          bot_id?: string | null
+          completed_at?: string | null
+          created_at?: string
+          deriv_account?: string
+          email?: string
+          id?: string
+          losses?: number
+          next_round?: number
+          payout_multiplier?: number
+          realized_pnl?: number
+          run_id?: string
+          schedule?: Json
+          stake?: number
+          status?: string
+          target_wins?: number
+          total_rounds?: number
+          updated_at?: string
+          win_tier?: string
+          wins?: number
         }
         Relationships: []
       }

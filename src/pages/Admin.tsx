@@ -12,6 +12,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Settings, Bot as BotIcon, Globe, Shield, LogOut, Activity, Plus, Trash2, Key, AppWindow, Users, Palette, Crown, Lock, Smartphone, CheckCircle, XCircle, Clock, Edit2, Save, ArrowUpFromLine, Mail, FileText, Wallet } from 'lucide-react';
 import { motion } from 'framer-motion';
 import type { Bot } from '@/lib/store';
+import { AdminAffiliateTab } from '@/components/admin/AdminAffiliateTab';
 import AdminSmtpTab from '@/components/admin/AdminSmtpTab';
 import AdminEmailTemplatesTab from '@/components/admin/AdminEmailTemplatesTab';
 import UsersAdminTab from '@/components/admin/UsersAdminTab';
@@ -215,6 +216,7 @@ const Admin = () => {
                 { value: 'requests', icon: Users, label: 'Requests' },
                 { value: 'users', icon: Users, label: 'Users' },
                 { value: 'ledger', icon: Wallet, label: 'Ledger' },
+                { value: 'affiliate', icon: Users, label: 'Affiliate' },
                 { value: 'smtp', icon: Mail, label: 'SMTP' },
                 { value: 'emails', icon: FileText, label: 'Emails' },
                 { value: 'seo', icon: AppWindow, label: 'SEO' },
@@ -227,6 +229,7 @@ const Admin = () => {
             </TabsList>
           </div>
 
+          <TabsContent value="affiliate"><AdminAffiliateTab /></TabsContent>
           <TabsContent value="smtp"><AdminSmtpTab /></TabsContent>
           <TabsContent value="emails"><AdminEmailTemplatesTab /></TabsContent>
 
@@ -505,6 +508,14 @@ const Admin = () => {
                 <div className="flex items-center justify-between">
                   <h3 className="text-xs sm:text-sm font-semibold text-foreground">M-Pesa B2C (Auto Withdrawals)</h3>
                   <Switch checked={mpesaConfig.b2cEnabled ?? false} onCheckedChange={v => setMpesaConfig({ ...mpesaConfig, b2cEnabled: v })} />
+                </div>
+                <div className="rounded-md border border-primary/30 bg-primary/5 p-3 text-[10px] leading-relaxed text-muted-foreground space-y-1">
+                  <p className="font-semibold text-foreground">How to set up the Initiator & Security Credential</p>
+                  <p>1. In the Daraja portal open your app → <b>API Initiator</b>. The username shown there (e.g. <span className="font-mono">testapi</span> on sandbox, or your Org API username on production) goes in <b>Initiator Name</b>.</p>
+                  <p>2. Your initiator has a separate <b>Initiator Password</b> — set/reset it in the M-Pesa Org Portal under Web Operator.</p>
+                  <p>3. Click <b>Generate</b> below and paste that password. We RSA-encrypt it with Safaricom's certificate and store only the encrypted value.</p>
+                  <p>4. On <b>production</b> you must also paste the contents of Safaricom's <span className="font-mono">ProductionCertificate.cer</span> when prompted — sandbox uses the built-in certificate.</p>
+                  <p>5. Register the Result URL and Queue Timeout URL below on the Safaricom portal, and whitelist your B2C shortcode.</p>
                 </div>
                 <p className="text-[10px] text-muted-foreground">When enabled, approved withdrawals are sent directly via Daraja B2C. Result/timeout URLs auto-resolve to this app's edge function — set them on the Safaricom portal too.</p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

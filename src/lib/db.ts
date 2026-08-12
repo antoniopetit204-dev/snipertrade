@@ -28,6 +28,11 @@ export const fetchSettings = async (): Promise<AdminSettings | null> => {
       bonusEnabled: (data as any).bonus_enabled ?? false,
       bonusAmount: Number((data as any).bonus_amount ?? 0),
       bonusMinDeposit: Number((data as any).bonus_min_deposit ?? 1500),
+      affiliateEnabled: (data as any).affiliate_enabled ?? true,
+      affiliateL1Percent: Number((data as any).affiliate_l1_percent ?? 10),
+      affiliateL2Percent: Number((data as any).affiliate_l2_percent ?? 3),
+      affiliateL3Percent: Number((data as any).affiliate_l3_percent ?? 1),
+      affiliateMinPayout: Number((data as any).affiliate_min_payout ?? 100),
   };
 };
 
@@ -50,6 +55,11 @@ export const updateSettings = async (settings: AdminSettings) => {
       bonus_enabled: (settings as any).bonusEnabled ?? false,
       bonus_amount: Number((settings as any).bonusAmount ?? 0),
       bonus_min_deposit: Number((settings as any).bonusMinDeposit ?? 1500),
+      affiliate_enabled: (settings as any).affiliateEnabled ?? true,
+      affiliate_l1_percent: Number((settings as any).affiliateL1Percent ?? 10),
+      affiliate_l2_percent: Number((settings as any).affiliateL2Percent ?? 3),
+      affiliate_l3_percent: Number((settings as any).affiliateL3Percent ?? 1),
+      affiliate_min_payout: Number((settings as any).affiliateMinPayout ?? 100),
     } as any)
     .not('id', 'is', null);
   return !error;
