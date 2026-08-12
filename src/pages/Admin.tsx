@@ -12,6 +12,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Settings, Bot as BotIcon, Globe, Shield, LogOut, Activity, Plus, Trash2, Key, AppWindow, Users, Palette, Crown, Lock, Smartphone, CheckCircle, XCircle, Clock, Edit2, Save, ArrowUpFromLine, Mail, FileText, Wallet } from 'lucide-react';
 import { motion } from 'framer-motion';
 import type { Bot } from '@/lib/store';
+import { AdminAffiliateTab } from '@/components/admin/AdminAffiliateTab';
 import AdminSmtpTab from '@/components/admin/AdminSmtpTab';
 import AdminEmailTemplatesTab from '@/components/admin/AdminEmailTemplatesTab';
 import UsersAdminTab from '@/components/admin/UsersAdminTab';
