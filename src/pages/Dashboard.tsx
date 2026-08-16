@@ -5,6 +5,8 @@ import { OpenPositions } from '@/components/OpenPositions';
 import { getUser, getAccountId } from '@/lib/store';
 import { useDerivConnection } from '@/hooks/useDerivWS';
 import { derivWS } from '@/lib/deriv-ws';
+import { getSymbols } from '@/lib/symbols';
+
 import { tradeNotifications } from '@/lib/trade-notifications';
 import { fetchUserBalance } from '@/lib/balance';
 import { fetchManualTrades, type ManualTrade } from '@/lib/balance';
