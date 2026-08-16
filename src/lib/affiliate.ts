@@ -97,9 +97,9 @@ export const captureReferral = async () => {
 
 export const validateRefCode = (code: string) => invoke('validate', { code: normalizeCode(code) });
 
-export const fetchAffiliateStats = () => invoke('stats', { refresh_token: getRefreshToken() });
+export const fetchAffiliateStats = () => invokeAuthed('stats');
 
-export const fetchAffiliateAdmin = () => invoke('admin-list', { refresh_token: getRefreshToken() });
+export const fetchAffiliateAdmin = () => invokeAuthed('admin-list');
 
 /** Builds the share link on the CURRENT domain the affiliate is using. */
 export const buildAffiliateLink = (code: string) =>
