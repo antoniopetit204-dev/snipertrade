@@ -1,5 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import forge from "https://esm.sh/node-forge@1.3.1";
+import { encryptSecurityCredential } from "./rsa.ts";
 import { creditFirstDeposit } from "../_shared/affiliate.ts";
 
 const corsHeaders = {
@@ -55,26 +55,16 @@ M6rT44PaLs9ymA4SX/Q88OYa5/dHmEs59SihrFulIN2NwI8=
 // root cause of "Too few bytes to read ASN.1 value" failures.
 
 const generateSecurityCredential = (initiatorPassword: string, env: string, customCertPem?: string): string => {
+  const cert = (customCertPem || '').trim();
   let certPem: string;
-  if (customCertPem && customCertPem.includes('BEGIN CERTIFICATE')) {
-    certPem = customCertPem.trim();
+  if (cert && cert.replace(/-----[A-Z ]+-----/g, '').replace(/\s+/g, '').length > 200) {
+    certPem = cert;
   } else if (env === 'production') {
-    throw new Error('Production requires cert_pem: paste the contents of Safaricom\'s ProductionCertificate.cer file.');
+    throw new Error("Production requires cert_pem: paste the contents of Safaricom's ProductionCertificate.cer file.");
   } else {
     certPem = SANDBOX_CERT;
   }
-  // Sanity check PEM structure before forge tries to parse it.
-  const b64Body = certPem
-    .replace(/-----BEGIN CERTIFICATE-----/g, '')
-    .replace(/-----END CERTIFICATE-----/g, '')
-    .replace(/\s+/g, '');
-  if (!b64Body || b64Body.length < 200 || !/^[A-Za-z0-9+/=]+$/.test(b64Body)) {
-    throw new Error('Certificate body is empty, malformed, or contains non-base64 characters.');
-  }
-  const cert = forge.pki.certificateFromPem(certPem);
-  const publicKey = cert.publicKey as forge.pki.rsa.PublicKey;
-  const encrypted = publicKey.encrypt(initiatorPassword, 'RSAES-PKCS1-V1_5');
-  return forge.util.encode64(encrypted);
+  return encryptSecurityCredential(initiatorPassword, certPem);
 };
 
 // ── Kenyan MSISDN normaliser: returns 2547XXXXXXXX / 2541XXXXXXXX or null ──

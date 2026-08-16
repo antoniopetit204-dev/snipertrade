@@ -50,6 +50,26 @@ const invoke = async (action: string, body: Record<string, unknown> = {}) => {
 };
 
 /**
+ * Authenticated call that survives refresh-token rotation: on Unauthorized it
+ * refreshes the session once and retries with the new token.
+ */
+const invokeAuthed = async (action: string, extra: Record<string, unknown> = {}) => {
+  const { getUser } = await import('./store');
+  const attempt = () =>
+    invoke(action, { refresh_token: getRefreshToken(), email: getUser()?.email || '', ...extra });
+  try {
+    return await attempt();
+  } catch (e) {
+    const msg = String((e as Error)?.message || '');
+    if (!/unauthor/i.test(msg)) throw e;
+    const { refreshSession } = await import('./auth-email');
+    await refreshSession().catch(() => null);
+    return attempt();
+  }
+};
+
+
+/**
  * Reads ?ref= / ?r= / ?code= (or /r/CODE) from the current URL, stores it and
  * registers one unique click. Safe to call on every route change.
  */
@@ -77,9 +97,9 @@ export const captureReferral = async () => {
 
 export const validateRefCode = (code: string) => invoke('validate', { code: normalizeCode(code) });
 
-export const fetchAffiliateStats = () => invoke('stats', { refresh_token: getRefreshToken() });
+export const fetchAffiliateStats = () => invokeAuthed('stats');
 
-export const fetchAffiliateAdmin = () => invoke('admin-list', { refresh_token: getRefreshToken() });
+export const fetchAffiliateAdmin = () => invokeAuthed('admin-list');
 
 /** Builds the share link on the CURRENT domain the affiliate is using. */
 export const buildAffiliateLink = (code: string) =>

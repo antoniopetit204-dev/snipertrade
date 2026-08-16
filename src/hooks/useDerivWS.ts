@@ -2,6 +2,8 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { derivWS } from '@/lib/deriv-ws';
 import { getUser, getSettings, setCachedSettings } from '@/lib/store';
 import { fetchSettings } from '@/lib/db';
+import { getSymbols, refreshSymbols, readCachedSymbols, FALLBACK_SYMBOLS } from '@/lib/symbols';
+
 
 export const useDerivConnection = () => {
   const [connected, setConnected] = useState(false);
@@ -88,36 +90,29 @@ export const useDerivConnection = () => {
 };
 
 export const useActiveSymbols = () => {
-  const [symbols, setSymbols] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [symbols, setSymbols] = useState<any[]>(() => {
+    const cached = readCachedSymbols();
+    return cached.length ? cached : FALLBACK_SYMBOLS;
+  });
+  const [loading, setLoading] = useState(() => readCachedSymbols().length === 0);
 
   useEffect(() => {
     let cancelled = false;
-    let retryTimer: ReturnType<typeof setTimeout> | null = null;
 
-    const fetch = async () => {
+    (async () => {
       try {
-        if (!derivWS.isConnected) {
-          retryTimer = setTimeout(fetch, 1000);
-          return;
-        }
-        const resp = await derivWS.getActiveSymbols();
-        if (!cancelled && resp.active_symbols) {
-          setSymbols(resp.active_symbols);
-        }
+        const list = await getSymbols();
+        if (!cancelled && list.length) setSymbols(list);
       } catch (err) {
-        console.error('Failed to fetch symbols:', err);
+        console.error('Failed to load symbols:', err);
       } finally {
         if (!cancelled) setLoading(false);
       }
-    };
-    
-    retryTimer = setTimeout(fetch, 500);
-    return () => {
-      cancelled = true;
-      if (retryTimer) clearTimeout(retryTimer);
-    };
+    })();
+
+    return () => { cancelled = true; };
   }, []);
 
-  return { symbols, loading };
+  return { symbols, loading, refresh: refreshSymbols };
 };
+

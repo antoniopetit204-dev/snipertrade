@@ -9,7 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-import { Settings, Bot as BotIcon, Globe, Shield, LogOut, Activity, Plus, Trash2, Key, AppWindow, Users, Palette, Crown, Lock, Smartphone, CheckCircle, XCircle, Clock, Edit2, Save, ArrowUpFromLine, Mail, FileText, Wallet } from 'lucide-react';
+import { Settings, Bot as BotIcon, Globe, Shield, LogOut, Activity, Plus, Trash2, Key, AppWindow, Users, Palette, Crown, Lock, Smartphone, CheckCircle, XCircle, Clock, Edit2, Save, ArrowUpFromLine, Mail, FileText, Wallet, Menu } from 'lucide-react';
 import { motion } from 'framer-motion';
 import type { Bot } from '@/lib/store';
 import { AdminAffiliateTab } from '@/components/admin/AdminAffiliateTab';
@@ -36,6 +36,11 @@ const Admin = () => {
   const [wSearch, setWSearch] = useState('');
   const [wPage, setWPage] = useState(1);
   const W_PAGE_SIZE = 10;
+  const [navOpen, setNavOpen] = useState(false);
+  const [certPem, setCertPem] = useState('');
+
+
+
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -188,10 +193,29 @@ const Admin = () => {
   const inputClass = "bg-secondary border-border text-foreground text-xs sm:text-sm";
   const labelClass = "text-[10px] sm:text-xs text-muted-foreground uppercase tracking-wider";
 
+  const adminTabs = [
+    { value: 'api', icon: Key, label: 'API' },
+    { value: 'general', icon: Globe, label: 'General' },
+    { value: 'bots', icon: BotIcon, label: 'Bots' },
+    { value: 'mpesa', icon: Smartphone, label: 'M-Pesa' },
+    { value: 'withdrawals', icon: ArrowUpFromLine, label: 'Withdrawals' },
+    { value: 'requests', icon: Users, label: 'Requests' },
+    { value: 'users', icon: Users, label: 'Users' },
+    { value: 'ledger', icon: Wallet, label: 'Ledger' },
+    { value: 'affiliate', icon: Users, label: 'Affiliate' },
+    { value: 'smtp', icon: Mail, label: 'SMTP' },
+    { value: 'emails', icon: FileText, label: 'Emails' },
+    { value: 'seo', icon: AppWindow, label: 'SEO' },
+    { value: 'appearance', icon: Palette, label: 'Look' },
+  ];
+
   return (
     <div className="min-h-screen bg-background">
-      <header className="border-b border-border px-3 sm:px-6 py-3 flex items-center justify-between bg-card">
+      <header className="border-b border-border px-3 sm:px-6 py-3 flex items-center justify-between bg-card sticky top-0 z-40">
         <div className="flex items-center gap-2 sm:gap-3">
+          <button onClick={() => setNavOpen(true)} className="lg:hidden p-1.5 rounded-md hover:bg-accent" aria-label="Open admin menu">
+            <Menu className="h-5 w-5 text-foreground" />
+          </button>
           <Activity className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
           <div>
             <h1 className="text-sm sm:text-lg font-bold text-foreground">Admin Panel</h1>
@@ -203,31 +227,37 @@ const Admin = () => {
         </Button>
       </header>
 
-      <div className="max-w-6xl mx-auto p-3 sm:p-6">
-        <Tabs defaultValue="api" className="space-y-4 sm:space-y-6">
-          <div className="overflow-x-auto -mx-3 px-3 sm:mx-0 sm:px-0">
-            <TabsList className="bg-card border border-border flex-wrap h-auto gap-1 p-1 inline-flex min-w-full sm:min-w-0">
-              {[
-                { value: 'api', icon: Key, label: 'API' },
-                { value: 'general', icon: Globe, label: 'General' },
-                { value: 'bots', icon: BotIcon, label: 'Bots' },
-                { value: 'mpesa', icon: Smartphone, label: 'M-Pesa' },
-                { value: 'withdrawals', icon: ArrowUpFromLine, label: 'Withdrawals' },
-                { value: 'requests', icon: Users, label: 'Requests' },
-                { value: 'users', icon: Users, label: 'Users' },
-                { value: 'ledger', icon: Wallet, label: 'Ledger' },
-                { value: 'affiliate', icon: Users, label: 'Affiliate' },
-                { value: 'smtp', icon: Mail, label: 'SMTP' },
-                { value: 'emails', icon: FileText, label: 'Emails' },
-                { value: 'seo', icon: AppWindow, label: 'SEO' },
-                { value: 'appearance', icon: Palette, label: 'Look' },
-              ].map(tab => (
-                <TabsTrigger key={tab.value} value={tab.value} className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground text-[10px] sm:text-xs px-2 sm:px-3 py-1 sm:py-1.5 whitespace-nowrap">
-                  <tab.icon className="h-3 w-3 mr-1" /> {tab.label}
-                </TabsTrigger>
-              ))}
-            </TabsList>
+      <Tabs defaultValue="api" className="flex items-stretch">
+        {/* Mobile overlay */}
+        {navOpen && (
+          <div className="fixed inset-0 z-40 bg-black/60 lg:hidden" onClick={() => setNavOpen(false)} />
+        )}
+
+        <aside
+          className={`fixed lg:sticky top-0 lg:top-[57px] left-0 z-50 h-screen lg:h-[calc(100vh-57px)] w-60 shrink-0 bg-card border-r border-border overflow-y-auto transition-transform lg:translate-x-0 ${navOpen ? 'translate-x-0' : '-translate-x-full'}`}
+        >
+          <div className="flex items-center justify-between px-4 py-3 border-b border-border lg:hidden">
+            <span className="text-sm font-semibold">Menu</span>
+            <button onClick={() => setNavOpen(false)} className="p-1 rounded hover:bg-accent" aria-label="Close admin menu">
+              <XCircle className="h-4 w-4 text-muted-foreground" />
+            </button>
           </div>
+          <TabsList className="flex flex-col items-stretch h-auto w-full bg-transparent p-2 gap-0.5">
+            {adminTabs.map(tab => (
+              <TabsTrigger
+                key={tab.value}
+                value={tab.value}
+                onClick={() => setNavOpen(false)}
+                className="justify-start gap-2 w-full data-[state=active]:bg-primary/10 data-[state=active]:text-primary text-xs px-3 py-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent"
+              >
+                <tab.icon className="h-4 w-4 shrink-0" /> {tab.label}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </aside>
+
+        <main className="flex-1 min-w-0 p-3 sm:p-6 space-y-4 sm:space-y-6">
+
 
           <TabsContent value="affiliate"><AdminAffiliateTab /></TabsContent>
           <TabsContent value="smtp"><AdminSmtpTab /></TabsContent>
@@ -530,15 +560,35 @@ const Admin = () => {
                       <Button type="button" variant="outline" size="sm" className="text-[10px] h-9 shrink-0" onClick={async () => {
                         const pwd = window.prompt('Enter Initiator Password (will be RSA-encrypted with Safaricom cert):');
                         if (!pwd) return;
+                        if (mpesaConfig.environment === 'production' && !certPem.includes('BEGIN CERTIFICATE') && certPem.replace(/\s+/g, '').length < 200) {
+                          toast({ title: 'Production certificate required', description: 'Paste the ProductionCertificate.cer contents in the field below first.', variant: 'destructive' });
+                          return;
+                        }
                         try {
-                          const { data, error } = await (await import('@/integrations/supabase/client')).supabase.functions.invoke('mpesa-stk?action=b2c_generate_credential', { body: { initiator_password: pwd, environment: mpesaConfig.environment } });
-                          if (error || !data?.security_credential) throw new Error(data?.error || error?.message || 'Failed');
+                          const { data, error } = await (await import('@/integrations/supabase/client')).supabase.functions.invoke('mpesa-stk?action=b2c_generate_credential', { body: { initiator_password: pwd, environment: mpesaConfig.environment, cert_pem: certPem } });
+                          if (error || !data?.security_credential) throw new Error(data?.detail || data?.error || error?.message || 'Failed');
                           setMpesaConfig({ ...mpesaConfig, securityCredential: data.security_credential });
-                          toast({ title: 'Security Credential generated ✓' });
+                          toast({ title: 'Security Credential generated ✓', description: 'Remember to save the M-Pesa config.' });
                         } catch (e: any) { toast({ title: 'Generation failed', description: e.message, variant: 'destructive' }); }
                       }}>Generate</Button>
                     </div>
                   </div>
+                  <div className="space-y-2 sm:col-span-2">
+                    <Label className={labelClass}>
+                      Safaricom Certificate {mpesaConfig.environment === 'production' ? '(required for production)' : '(optional — sandbox cert built in)'}
+                    </Label>
+                    <Textarea
+                      value={certPem}
+                      onChange={e => setCertPem(e.target.value)}
+                      rows={4}
+                      placeholder={'-----BEGIN CERTIFICATE-----\nMIIG...\n-----END CERTIFICATE-----'}
+                      className={`${inputClass} font-mono text-[10px]`}
+                    />
+                    <p className="text-[10px] text-muted-foreground">
+                      Only used in your browser session to encrypt the initiator password — it is never stored.
+                    </p>
+                  </div>
+
                   <div className="space-y-2">
                     <Label className={labelClass}>B2C Shortcode</Label>
                     <Input value={mpesaConfig.b2cShortcode ?? ''} onChange={e => setMpesaConfig({ ...mpesaConfig, b2cShortcode: e.target.value })} placeholder="B2C Paybill / Till" className={`${inputClass} font-mono`} />
@@ -837,9 +887,10 @@ const Admin = () => {
               <Button onClick={handleSaveSettings} className="bg-primary text-primary-foreground hover:bg-primary/90 text-xs sm:text-sm">Save Appearance</Button>
             </motion.div>
           </TabsContent>
-        </Tabs>
-      </div>
+        </main>
+      </Tabs>
     </div>
+
   );
 };
 
