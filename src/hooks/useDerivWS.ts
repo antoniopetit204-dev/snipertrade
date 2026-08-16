@@ -2,6 +2,8 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { derivWS } from '@/lib/deriv-ws';
 import { getUser, getSettings, setCachedSettings } from '@/lib/store';
 import { fetchSettings } from '@/lib/db';
+import { getSymbols, refreshSymbols, readCachedSymbols, FALLBACK_SYMBOLS } from '@/lib/symbols';
+
 
 export const useDerivConnection = () => {
   const [connected, setConnected] = useState(false);
