@@ -38,7 +38,7 @@ const Admin = () => {
   const W_PAGE_SIZE = 10;
   const [navOpen, setNavOpen] = useState(false);
 
-  const [navOpen, setNavOpen] = useState(false);
+
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
