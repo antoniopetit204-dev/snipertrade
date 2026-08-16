@@ -61,7 +61,7 @@ Deno.serve(async (req) => {
 
     // ── Personal affiliate dashboard (auth) ──
     if (action === 'stats' || action === 'my-link') {
-      const email = await sessionEmail(body?.refresh_token);
+      const email = await sessionEmail(body?.refresh_token, body?.email);
       if (!email) return json({ error: 'Unauthorized' }, 401);
 
       const aff = await ensureAffiliate(sb, email);
@@ -116,7 +116,7 @@ Deno.serve(async (req) => {
 
     // ── Admin overview (auth + admin role) ──
     if (action === 'admin-list') {
-      const email = await sessionEmail(body?.refresh_token);
+      const email = await sessionEmail(body?.refresh_token, body?.email);
       if (!email) return json({ error: 'Unauthorized' }, 401);
       const { data: me } = await sb.from('app_users').select('role').eq('email', email).maybeSingle();
       if (me?.role !== 'admin') return json({ error: 'Forbidden' }, 403);
