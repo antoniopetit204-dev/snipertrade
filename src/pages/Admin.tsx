@@ -862,9 +862,10 @@ const Admin = () => {
               <Button onClick={handleSaveSettings} className="bg-primary text-primary-foreground hover:bg-primary/90 text-xs sm:text-sm">Save Appearance</Button>
             </motion.div>
           </TabsContent>
-        </Tabs>
-      </div>
+        </main>
+      </Tabs>
     </div>
+
   );
 };
 
