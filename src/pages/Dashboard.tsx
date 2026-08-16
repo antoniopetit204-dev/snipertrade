@@ -32,21 +32,22 @@ const Dashboard = () => {
 
 
   useEffect(() => {
-    if (!connected) return;
-    const fetchData = async () => {
-      try {
-        const resp = await derivWS.getActiveSymbols();
-        if (resp.active_symbols) {
-          const top = resp.active_symbols.slice(0, 12);
-          setSymbols(top);
-          for (const sym of top) {
-            derivWS.subscribeTicks(sym.symbol).catch(() => {});
-          }
-        }
-      } catch {}
+    let cancelled = false;
+    (async () => {
+      const list = await getSymbols().catch(() => []);
+      if (cancelled || !list.length) return;
+      const top = list.slice(0, 12);
+      setSymbols(top);
+      if (derivWS.isConnected) {
+        for (const sym of top) derivWS.subscribeTicks(sym.symbol).catch(() => {});
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [connected]);
 
-    };
-    fetchData();
+  useEffect(() => {
+    if (!connected) return;
+
 
     const unsub = derivWS.subscribe('tick', (data) => {
       if (data.tick) {
