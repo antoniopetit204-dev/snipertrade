@@ -37,6 +37,8 @@ const Admin = () => {
   const [wPage, setWPage] = useState(1);
   const W_PAGE_SIZE = 10;
   const [navOpen, setNavOpen] = useState(false);
+  const [certPem, setCertPem] = useState('');
+
 
 
 
