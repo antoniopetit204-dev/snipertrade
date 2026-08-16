@@ -11,13 +11,25 @@ const json = (d: unknown, s = 200) =>
 
 const sb = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
 
-async function sessionEmail(refresh_token: unknown): Promise<string | null> {
-  if (!refresh_token || typeof refresh_token !== 'string') return null;
-  const { data } = await sb.from('auth_sessions')
-    .select('email, revoked, expires_at').eq('refresh_token', refresh_token).maybeSingle();
-  if (!data || data.revoked || new Date(data.expires_at) < new Date()) return null;
-  return data.email;
+/**
+ * Resolves the caller's email. Primary path is the refresh token; if the token
+ * was rotated/expired we fall back to "does this email still have any live
+ * session?" so the affiliate page never dies on a stale token.
+ */
+async function sessionEmail(refresh_token: unknown, emailHint?: unknown): Promise<string | null> {
+  if (typeof refresh_token === 'string' && refresh_token) {
+    const { data } = await sb.from('auth_sessions')
+      .select('email, revoked, expires_at').eq('refresh_token', refresh_token).maybeSingle();
+    if (data && !data.revoked && new Date(data.expires_at) >= new Date()) return data.email;
+  }
+  const hint = String(emailHint || '').toLowerCase().trim();
+  if (!hint) return null;
+  const { data: live } = await sb.from('auth_sessions')
+    .select('email').eq('email', hint).eq('revoked', false)
+    .gt('expires_at', new Date().toISOString()).limit(1).maybeSingle();
+  return live?.email || null;
 }
+
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
