@@ -9,7 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-import { Settings, Bot as BotIcon, Globe, Shield, LogOut, Activity, Plus, Trash2, Key, AppWindow, Users, Palette, Crown, Lock, Smartphone, CheckCircle, XCircle, Clock, Edit2, Save, ArrowUpFromLine, Mail, FileText, Wallet } from 'lucide-react';
+import { Settings, Bot as BotIcon, Globe, Shield, LogOut, Activity, Plus, Trash2, Key, AppWindow, Users, Palette, Crown, Lock, Smartphone, CheckCircle, XCircle, Clock, Edit2, Save, ArrowUpFromLine, Mail, FileText, Wallet, Menu } from 'lucide-react';
 import { motion } from 'framer-motion';
 import type { Bot } from '@/lib/store';
 import { AdminAffiliateTab } from '@/components/admin/AdminAffiliateTab';
@@ -36,6 +36,7 @@ const Admin = () => {
   const [wSearch, setWSearch] = useState('');
   const [wPage, setWPage] = useState(1);
   const W_PAGE_SIZE = 10;
+  const [navOpen, setNavOpen] = useState(false);
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
