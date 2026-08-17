@@ -334,8 +334,10 @@ export const processWithdrawal = async (withdrawalId: string, approve: boolean) 
     body: { withdrawal_id: withdrawalId, approve },
   });
   if (error) throw error;
+  if (data && data.success === false) throw new Error(data.error || 'Payout failed');
   return data;
 };
+
 
 export const fetchAllWithdrawals = async () => {
   const { data } = await (supabase.from('withdrawals' as any) as any).select('*').order('created_at', { ascending: false });

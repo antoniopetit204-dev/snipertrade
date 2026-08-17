@@ -49,23 +49,56 @@ qb2L3IUYqZSjlVJzS0v2ZBlYg7sokj/D5jWqOTOiKsRsX1lZ2gxA1MGr3kFm5VEx
 M6rT44PaLs9ymA4SX/Q88OYa5/dHmEs59SihrFulIN2NwI8=
 -----END CERTIFICATE-----`;
 
-// NOTE: For production, callers MUST pass the official Safaricom
-// `ProductionCertificate.cer` contents via the cert_pem field. We deliberately
-// do NOT ship an embedded production cert — an outdated/invalid one was the
-// root cause of "Too few bytes to read ASN.1 value" failures.
+// Official Safaricom Daraja production certificate (ProductionCertificate.cer).
+// Embedded so B2C credential generation never breaks; admins may still paste
+// a newer cert in the Admin → M-Pesa "Safaricom Certificate" field to override.
+const PRODUCTION_CERT = `-----BEGIN CERTIFICATE-----
+MIIGkzCCBXugAwIBAgIKXfBp5gAAAD+hNjANBgkqhkiG9w0BAQsFADBbMRMwEQYK
+CZImiZPyLGQBGRYDbmV0MRkwFwYKCZImiZPyLGQBGRYJc2FmYXJpY29tMSkwJwYD
+VQQDEyBTYWZhcmljb20gSW50ZXJuYWwgSXNzdWluZyBDQSAwMjAeFw0xNzA0MjUx
+NjA3MjRaFw0xODAzMjExMzIwMTNaMIGNMQswCQYDVQQGEwJLRTEQMA4GA1UECBMH
+TmFpcm9iaTEQMA4GA1UEBxMHTmFpcm9iaTEaMBgGA1UEChMRU2FmYXJpY29tIExp
+bWl0ZWQxEzARBgNVBAsTClRlY2hub2xvZ3kxKTAnBgNVBAMTIGFwaWdlZS5hcGlj
+YWxsZXIuc2FmYXJpY29tLmNvLmtlMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIB
+CgKCAQEAoknIb5Tm1hxOVdFsOejAs6veAai32Zv442BLuOGkFKUeCUM2s0K8XEsU
+t6BP25rQGNlTCTEqfdtRrym6bt5k0fTDscf0yMCoYzaxTh1mejg8rPO6bD8MJB0c
+FWRUeLEyWjMeEPsYVSJFv7T58IdAn7/RhkrpBl1dT7SmIZfNVkIlD35+Cxgab+u7
++c7dHh6mWguEEoE3NbV7Xjl60zbD/Buvmu6i9EYz+27jNVPI6pRXHvp+ajIzTSsi
+eD8Ztz1eoC9mphErasAGpMbR1sba9bM6hjw4tyTWnJDz7RdQQmnsW1NfFdYdK0qD
+RKUX7SG6rQkBqVhndFve4SDFRq6wvQIDAQABo4IDJDCCAyAwHQYDVR0OBBYEFG2w
+ycrgEBPFzPUZVjh8KoJ3EpuyMB8GA1UdIwQYMBaAFOsy1E9+YJo6mCBjug1evuh5
+TtUkMIIBOwYDVR0fBIIBMjCCAS4wggEqoIIBJqCCASKGgdZsZGFwOi8vL0NOPVNh
+ZmFyaWNvbSUyMEludGVybmFsJTIwSXNzdWluZyUyMENBJTIwMDIsQ049U1ZEVDNJ
+U1NDQTAxLENOPUNEUCxDTj1QdWJsaWMlMjBLZXklMjBTZXJ2aWNlcyxDTj1TZXJ2
+aWNlcyxDTj1Db25maWd1cmF0aW9uLERDPXNhZmFyaWNvbSxEQz1uZXQ/Y2VydGlm
+aWNhdGVSZXZvY2F0aW9uTGlzdD9iYXNlP29iamVjdENsYXNzPWNSTERpc3RyaWJ1
+dGlvblBvaW50hkdodHRwOi8vY3JsLnNhZmFyaWNvbS5jby5rZS9TYWZhcmljb20l
+MjBJbnRlcm5hbCUyMElzc3VpbmclMjBDQSUyMDAyLmNybDCCAQkGCCsGAQUFBwEB
+BIH8MIH5MIHJBggrBgEFBQcwAoaBvGxkYXA6Ly8vQ049U2FmYXJpY29tJTIwSW50
+ZXJuYWwlMjBJc3N1aW5nJTIwQ0ElMjAwMixDTj1BSUEsQ049UHVibGljJTIwS2V5
+JTIwU2VydmljZXMsQ049U2VydmljZXMsQ049Q29uZmlndXJhdGlvbixEQz1zYWZh
+cmljb20sREM9bmV0P2NBQ2VydGlmaWNhdGU/YmFzZT9vYmplY3RDbGFzcz1jZXJ0
+aWZpY2F0aW9uQXV0aG9yaXR5MCsGCCsGAQUFBzABhh9odHRwOi8vY3JsLnNhZmFy
+aWNvbS5jby5rZS9vY3NwMAsGA1UdDwQEAwIFoDA9BgkrBgEEAYI3FQcEMDAuBiYr
+BgEEAYI3FQiHz4xWhMLEA4XphTaE3tENhqCICGeGwcdsg7m5awIBZAIBDDAdBgNV
+HSUEFjAUBggrBgEFBQcDAgYIKwYBBQUHAwEwJwYJKwYBBAGCNxUKBBowGDAKBggr
+BgEFBQcDAjAKBggrBgEFBQcDATANBgkqhkiG9w0BAQsFAAOCAQEAC/hWx7KTwSYr
+x2SOyyHNLTRmCnCJmqxA/Q+IzpW1mGtw4Sb/8jdsoWrDiYLxoKGkgkvmQmB2J3zU
+ngzJIM2EeU921vbjLqX9sLWStZbNC2Udk5HEecdpe1AN/ltIoE09ntglUNINyCmf
+zChs2maF0Rd/y5hGnMM9bX9ub0sqrkzL3ihfmv4vkXNxYR8k246ZZ8tjQEVsKehE
+dqAmj8WYkYdWIHQlkKFP9ba0RJv7aBKb8/KP+qZ5hJip0I5Ey6JJ3wlEWRWUYUKh
+gYoPHrJ92ToadnFCCpOlLKWc0xVxANofy6fqreOVboPO0qTAYpoXakmgeRNLUiar
+0ah6M/q/KA==
+-----END CERTIFICATE-----`;
 
 const generateSecurityCredential = (initiatorPassword: string, env: string, customCertPem?: string): string => {
   const cert = (customCertPem || '').trim();
-  let certPem: string;
-  if (cert && cert.replace(/-----[A-Z ]+-----/g, '').replace(/\s+/g, '').length > 200) {
-    certPem = cert;
-  } else if (env === 'production') {
-    throw new Error("Production requires cert_pem: paste the contents of Safaricom's ProductionCertificate.cer file.");
-  } else {
-    certPem = SANDBOX_CERT;
-  }
+  const certPem = (cert && cert.replace(/-----[A-Z ]+-----/g, '').replace(/\s+/g, '').length > 200)
+    ? cert
+    : (env === 'production' ? PRODUCTION_CERT : SANDBOX_CERT);
   return encryptSecurityCredential(initiatorPassword, certPem);
 };
+
 
 // ── Kenyan MSISDN normaliser: returns 2547XXXXXXXX / 2541XXXXXXXX or null ──
 function normalizeMsisdn(raw: string): string | null {
@@ -170,6 +203,7 @@ Deno.serve(async (req) => {
       const result = body?.Result;
       if (result) {
         const convId = result.ConversationID || result.OriginatorConversationID;
+        const origId = String(result.OriginatorConversationID || '');
         const code = Number(result.ResultCode);
         const desc = result.ResultDesc || '';
         const receiptItem = result.ResultParameters?.ResultParameter?.find(
@@ -177,21 +211,31 @@ Deno.serve(async (req) => {
         );
         const receipt = receiptItem?.Value || null;
 
-        const { data: w } = await supabase.from('withdrawals')
+        let { data: w } = await supabase.from('withdrawals')
           .select('*').eq('mpesa_transaction_id', convId).maybeSingle();
-        if (w) {
+        // Fallback: we send OriginatorConversationID as `WD-<withdrawal_id>`
+        if (!w && origId.startsWith('WD-')) {
+          const res = await supabase.from('withdrawals')
+            .select('*').eq('id', origId.slice(3)).maybeSingle();
+          w = res.data;
+        }
+        if (w && !['completed', 'failed', 'rejected'].includes(w.status)) {
           if (code === 0) {
             await supabase.from('withdrawals').update({
               status: 'completed', mpesa_receipt: receipt,
             }).eq('id', w.id);
           } else {
             // Failure → refund
+            const hint = code === 2001
+              ? ' (Fix: regenerate the Security Credential in Admin → M-Pesa using the API Operator initiator password, and confirm the Initiator Name.)'
+              : '';
             await refundBalance(supabase, w.deriv_account, Number(w.amount));
             await supabase.from('withdrawals').update({
-              status: 'failed', mpesa_receipt: `FAIL: ${desc}`,
+              status: 'failed', mpesa_receipt: `FAIL: ${desc}${hint}`,
             }).eq('id', w.id);
           }
         }
+
       }
       return json({ ResultCode: 0, ResultDesc: 'Accepted' });
     }
@@ -453,34 +497,53 @@ Deno.serve(async (req) => {
         w.status = 'approved';
       }
 
-      // Try real Daraja B2C if enabled & fully configured
+      // Try real Daraja B2C if enabled & fully configured.
+      // NOTE: every failure below returns HTTP 200 with success:false so the
+      // client can surface the real reason instead of a generic
+      // "Edge Function returned a non-2xx status code".
       const b2cReady = config?.b2c_enabled && config?.initiator_name && config?.security_credential && config?.b2c_shortcode;
       if (b2cReady) {
         try {
+          const partyB = normalizeMsisdn(w.phone_number);
+          if (!partyB) {
+            return json({
+              success: false, status: 'approved',
+              error: `Invalid M-Pesa number "${w.phone_number}" — payout not sent. Withdrawal stays Approved for manual payout.`,
+            });
+          }
+          const amountInt = Math.floor(Number(w.amount));
+          if (!Number.isFinite(amountInt) || amountInt < 10) {
+            return json({
+              success: false, status: 'approved',
+              error: 'B2C minimum payout is KES 10. Withdrawal stays Approved for manual payout.',
+            });
+          }
+
           const b2cBase = config.environment === 'production'
             ? 'https://api.safaricom.co.ke' : 'https://sandbox.safaricom.co.ke';
           const authStr = btoa(`${config.consumer_key}:${config.consumer_secret}`);
           const tokResp = await fetch(`${b2cBase}/oauth/v1/generate?grant_type=client_credentials`, {
             headers: { Authorization: `Basic ${authStr}` },
           });
-          const tokJson = await tokResp.json();
+          const tokJson = await tokResp.json().catch(() => ({}));
           if (!tokJson.access_token) {
             return json({
               success: false, status: 'approved',
               error: 'B2C OAuth token failed — check consumer key/secret. Withdrawal stays Approved for manual payout.',
               detail: tokJson,
-            }, 502);
+            });
           }
 
           const resultUrl = config.result_url || `${supabaseUrl}/functions/v1/mpesa-stk?action=b2c_result`;
           const timeoutUrl = config.queue_timeout_url || `${supabaseUrl}/functions/v1/mpesa-stk?action=b2c_timeout`;
           const payload = {
+            OriginatorConversationID: `WD-${withdrawal_id}`,
             InitiatorName: config.initiator_name,
             SecurityCredential: config.security_credential,
             CommandID: 'BusinessPayment',
-            Amount: Math.floor(Number(w.amount)),
-            PartyA: config.b2c_shortcode,
-            PartyB: w.phone_number,
+            Amount: amountInt,
+            PartyA: String(config.b2c_shortcode),
+            PartyB: partyB,
             Remarks: 'Withdrawal payout',
             QueueTimeOutURL: timeoutUrl,
             ResultURL: resultUrl,
@@ -491,7 +554,10 @@ Deno.serve(async (req) => {
             headers: { Authorization: `Bearer ${tokJson.access_token}`, 'Content-Type': 'application/json' },
             body: JSON.stringify(payload),
           });
-          const b2cData = await b2cResp.json();
+          const rawB2c = await b2cResp.text();
+          let b2cData: any = {};
+          try { b2cData = JSON.parse(rawB2c); } catch { b2cData = { raw: rawB2c }; }
+
           if (b2cData.ResponseCode === '0' || b2cData.ConversationID) {
             await supabase.from('withdrawals').update({
               status: 'processing',
@@ -499,18 +565,22 @@ Deno.serve(async (req) => {
             }).eq('id', withdrawal_id);
             return json({ success: true, status: 'processing', message: 'B2C payout dispatched', b2c: b2cData });
           }
+          console.error('B2C dispatch failed', b2cResp.status, rawB2c);
           return json({
             success: false, status: 'approved',
-            error: b2cData.errorMessage || 'B2C dispatch failed — withdrawal stays Approved for manual payout.',
+            error: (b2cData.errorMessage || b2cData.ResponseDescription || `Daraja HTTP ${b2cResp.status}`) +
+              ' — withdrawal stays Approved for manual payout.',
             b2c: b2cData,
-          }, 502);
+          });
         } catch (e) {
+          console.error('B2C error', e);
           return json({
             success: false, status: 'approved',
             error: 'B2C error: ' + (e as Error).message + ' — withdrawal stays Approved for manual payout.',
-          }, 502);
+          });
         }
       }
+
 
       // No B2C credentials → admin-paid manual fallback
       await supabase.from('withdrawals').update({

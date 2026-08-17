@@ -82,9 +82,11 @@ const DashboardWithdraw = () => {
             await processWithdrawal(result.withdrawal_id, true);
             toast({ title: 'Withdrawal Auto-Approved ✓', description: 'M-Pesa payout processing...' });
           } catch (e: any) {
-            toast({ title: 'Submitted', description: 'Awaiting admin approval (auto-approve failed: ' + e.message + ')' });
+            toast({ title: 'Withdrawal Submitted', description: 'Our team will release your payout shortly.' });
+            console.warn('Auto-approve payout deferred:', e?.message || e);
           }
         } else {
+
           toast({ title: 'Withdrawal Submitted', description: 'Pending admin approval' });
         }
         setPendingId(result.withdrawal_id);
