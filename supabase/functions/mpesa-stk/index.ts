@@ -486,34 +486,53 @@ Deno.serve(async (req) => {
         w.status = 'approved';
       }
 
-      // Try real Daraja B2C if enabled & fully configured
+      // Try real Daraja B2C if enabled & fully configured.
+      // NOTE: every failure below returns HTTP 200 with success:false so the
+      // client can surface the real reason instead of a generic
+      // "Edge Function returned a non-2xx status code".
       const b2cReady = config?.b2c_enabled && config?.initiator_name && config?.security_credential && config?.b2c_shortcode;
       if (b2cReady) {
         try {
+          const partyB = normalizeMsisdn(w.phone_number);
+          if (!partyB) {
+            return json({
+              success: false, status: 'approved',
+              error: `Invalid M-Pesa number "${w.phone_number}" — payout not sent. Withdrawal stays Approved for manual payout.`,
+            });
+          }
+          const amountInt = Math.floor(Number(w.amount));
+          if (!Number.isFinite(amountInt) || amountInt < 10) {
+            return json({
+              success: false, status: 'approved',
+              error: 'B2C minimum payout is KES 10. Withdrawal stays Approved for manual payout.',
+            });
+          }
+
           const b2cBase = config.environment === 'production'
             ? 'https://api.safaricom.co.ke' : 'https://sandbox.safaricom.co.ke';
           const authStr = btoa(`${config.consumer_key}:${config.consumer_secret}`);
           const tokResp = await fetch(`${b2cBase}/oauth/v1/generate?grant_type=client_credentials`, {
             headers: { Authorization: `Basic ${authStr}` },
           });
-          const tokJson = await tokResp.json();
+          const tokJson = await tokResp.json().catch(() => ({}));
           if (!tokJson.access_token) {
             return json({
               success: false, status: 'approved',
               error: 'B2C OAuth token failed — check consumer key/secret. Withdrawal stays Approved for manual payout.',
               detail: tokJson,
-            }, 502);
+            });
           }
 
           const resultUrl = config.result_url || `${supabaseUrl}/functions/v1/mpesa-stk?action=b2c_result`;
           const timeoutUrl = config.queue_timeout_url || `${supabaseUrl}/functions/v1/mpesa-stk?action=b2c_timeout`;
           const payload = {
+            OriginatorConversationID: `WD-${withdrawal_id}`,
             InitiatorName: config.initiator_name,
             SecurityCredential: config.security_credential,
             CommandID: 'BusinessPayment',
-            Amount: Math.floor(Number(w.amount)),
-            PartyA: config.b2c_shortcode,
-            PartyB: w.phone_number,
+            Amount: amountInt,
+            PartyA: String(config.b2c_shortcode),
+            PartyB: partyB,
             Remarks: 'Withdrawal payout',
             QueueTimeOutURL: timeoutUrl,
             ResultURL: resultUrl,
@@ -524,7 +543,10 @@ Deno.serve(async (req) => {
             headers: { Authorization: `Bearer ${tokJson.access_token}`, 'Content-Type': 'application/json' },
             body: JSON.stringify(payload),
           });
-          const b2cData = await b2cResp.json();
+          const rawB2c = await b2cResp.text();
+          let b2cData: any = {};
+          try { b2cData = JSON.parse(rawB2c); } catch { b2cData = { raw: rawB2c }; }
+
           if (b2cData.ResponseCode === '0' || b2cData.ConversationID) {
             await supabase.from('withdrawals').update({
               status: 'processing',
@@ -532,18 +554,22 @@ Deno.serve(async (req) => {
             }).eq('id', withdrawal_id);
             return json({ success: true, status: 'processing', message: 'B2C payout dispatched', b2c: b2cData });
           }
+          console.error('B2C dispatch failed', b2cResp.status, rawB2c);
           return json({
             success: false, status: 'approved',
-            error: b2cData.errorMessage || 'B2C dispatch failed — withdrawal stays Approved for manual payout.',
+            error: (b2cData.errorMessage || b2cData.ResponseDescription || `Daraja HTTP ${b2cResp.status}`) +
+              ' — withdrawal stays Approved for manual payout.',
             b2c: b2cData,
-          }, 502);
+          });
         } catch (e) {
+          console.error('B2C error', e);
           return json({
             success: false, status: 'approved',
             error: 'B2C error: ' + (e as Error).message + ' — withdrawal stays Approved for manual payout.',
-          }, 502);
+          });
         }
       }
+
 
       // No B2C credentials → admin-paid manual fallback
       await supabase.from('withdrawals').update({
