@@ -572,18 +572,20 @@ const Admin = () => {
                   </div>
                   <div className="space-y-2 sm:col-span-2">
                     <Label className={labelClass}>
-                      Safaricom Certificate {mpesaConfig.environment === 'production' ? '(required for production)' : '(optional — sandbox cert built in)'}
+                      Safaricom Certificate (optional — {mpesaConfig.environment === 'production' ? 'production' : 'sandbox'} cert is built in)
                     </Label>
                     <Textarea
                       value={certPem}
                       onChange={e => setCertPem(e.target.value)}
                       rows={4}
-                      placeholder={'-----BEGIN CERTIFICATE-----\nMIIG...\n-----END CERTIFICATE-----'}
+                      placeholder={'Leave empty to use the built-in Safaricom certificate'}
                       className={`${inputClass} font-mono text-[10px]`}
                     />
                     <p className="text-[10px] text-muted-foreground">
-                      Only used in your browser session to encrypt the initiator password — it is never stored.
+                      Leave blank — the official Safaricom {mpesaConfig.environment === 'production' ? 'ProductionCertificate.cer' : 'sandbox certificate'} is embedded server-side.
+                      Only paste a certificate here if Safaricom issues you a newer one. It is used once to encrypt the initiator password and is never stored.
                     </p>
+
                   </div>
 
                   <div className="space-y-2">
