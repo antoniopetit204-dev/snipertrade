@@ -203,6 +203,7 @@ Deno.serve(async (req) => {
       const result = body?.Result;
       if (result) {
         const convId = result.ConversationID || result.OriginatorConversationID;
+        const origId = String(result.OriginatorConversationID || '');
         const code = Number(result.ResultCode);
         const desc = result.ResultDesc || '';
         const receiptItem = result.ResultParameters?.ResultParameter?.find(
@@ -210,21 +211,31 @@ Deno.serve(async (req) => {
         );
         const receipt = receiptItem?.Value || null;
 
-        const { data: w } = await supabase.from('withdrawals')
+        let { data: w } = await supabase.from('withdrawals')
           .select('*').eq('mpesa_transaction_id', convId).maybeSingle();
-        if (w) {
+        // Fallback: we send OriginatorConversationID as `WD-<withdrawal_id>`
+        if (!w && origId.startsWith('WD-')) {
+          const res = await supabase.from('withdrawals')
+            .select('*').eq('id', origId.slice(3)).maybeSingle();
+          w = res.data;
+        }
+        if (w && !['completed', 'failed', 'rejected'].includes(w.status)) {
           if (code === 0) {
             await supabase.from('withdrawals').update({
               status: 'completed', mpesa_receipt: receipt,
             }).eq('id', w.id);
           } else {
             // Failure → refund
+            const hint = code === 2001
+              ? ' (Fix: regenerate the Security Credential in Admin → M-Pesa using the API Operator initiator password, and confirm the Initiator Name.)'
+              : '';
             await refundBalance(supabase, w.deriv_account, Number(w.amount));
             await supabase.from('withdrawals').update({
-              status: 'failed', mpesa_receipt: `FAIL: ${desc}`,
+              status: 'failed', mpesa_receipt: `FAIL: ${desc}${hint}`,
             }).eq('id', w.id);
           }
         }
+
       }
       return json({ ResultCode: 0, ResultDesc: 'Accepted' });
     }
