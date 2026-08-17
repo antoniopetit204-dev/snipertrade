@@ -560,10 +560,7 @@ const Admin = () => {
                       <Button type="button" variant="outline" size="sm" className="text-[10px] h-9 shrink-0" onClick={async () => {
                         const pwd = window.prompt('Enter Initiator Password (will be RSA-encrypted with Safaricom cert):');
                         if (!pwd) return;
-                        if (mpesaConfig.environment === 'production' && !certPem.includes('BEGIN CERTIFICATE') && certPem.replace(/\s+/g, '').length < 200) {
-                          toast({ title: 'Production certificate required', description: 'Paste the ProductionCertificate.cer contents in the field below first.', variant: 'destructive' });
-                          return;
-                        }
+
                         try {
                           const { data, error } = await (await import('@/integrations/supabase/client')).supabase.functions.invoke('mpesa-stk?action=b2c_generate_credential', { body: { initiator_password: pwd, environment: mpesaConfig.environment, cert_pem: certPem } });
                           if (error || !data?.security_credential) throw new Error(data?.detail || data?.error || error?.message || 'Failed');
