@@ -229,8 +229,87 @@ Deno.serve(async (req) => {
   let body: any = {};
   try { body = await req.json(); } catch {}
 
+  // Origin is always derived from the caller's window so tokens/links keep the
+  // same domain the user is actually on (custom domain, preview, or localhost).
+  const reqOrigin = String(body?.origin || req.headers.get('origin') || '').replace(/\/+$/, '');
+
+  // Global suspicious-traffic guard
+  const suspicion = suspicionScore({ ua, ip, email: body?.email, body });
+  if (suspicion.length) {
+    await logSecurity('suspicious_request', suspicion.includes('injection_pattern') ? 'critical' : 'warning',
+      String(body?.email || ip || 'unknown'), ip, ua, { action, reasons: suspicion });
+    if (suspicion.includes('injection_pattern') || suspicion.includes('oversized_payload')) {
+      return json({ error: 'Request blocked by security policy.' }, 400);
+    }
+  }
+  // Per-IP flood limiter across every auth action
+  if (ip) {
+    const flood = await checkRateLimit(`ip:${ip}`, 'any', 40, 5);
+    if (!flood.allowed) {
+      await logSecurity('rate_limit_ip', 'warning', `ip:${ip}`, ip, ua, { action });
+      return json({ error: 'Too many requests. Please slow down and try again shortly.' }, 429);
+    }
+    recordAttempt(`ip:${ip}`, 'any', false, ip).catch(() => {});
+  }
+
   try {
+    // ───────── Admin step-up OTP (sensitive settings) ─────────
+    if (action === 'admin-otp-request') {
+      const purpose = String(body.purpose || '').slice(0, 60) || 'sensitive_change';
+      const { data: admin } = await supabase.from('app_users')
+        .select('email, name').eq('role', 'admin').order('created_at').limit(1).maybeSingle();
+      const { data: st } = await supabase.from('admin_settings').select('contact_email, site_name').limit(1).maybeSingle();
+      const to = admin?.email || (st as any)?.contact_email || '';
+      if (!to) return json({ error: 'No admin email configured' }, 400);
+
+      const rl = await checkRateLimit(`admin:${purpose}`, 'admin-otp', 5, 10);
+      if (!rl.allowed) return json({ error: 'Too many code requests. Try again in a few minutes.' }, 429);
+
+      const code = otp6();
+      await supabase.from('admin_otps').insert({
+        purpose, email: to, code, ip,
+        expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
+      });
+      await recordAttempt(`admin:${purpose}`, 'admin-otp', false, ip);
+      const res = await sendTemplated(to, 'admin_security_code', {
+        name: admin?.name || 'Administrator',
+        otp_code: code,
+        purpose: purpose.replace(/_/g, ' '),
+        ip: ip || 'unknown',
+        time: new Date().toUTCString(),
+        site_url: reqOrigin,
+      });
+      await logSecurity('admin_otp_requested', 'info', to, ip, ua, { purpose });
+      return json({ ok: true, sent: res.ok, error: res.ok ? undefined : res.error, masked: to.replace(/^(.).*(@.*)$/, '$1***$2') });
+    }
+
+    if (action === 'admin-otp-verify') {
+      const purpose = String(body.purpose || '').slice(0, 60) || 'sensitive_change';
+      const code = String(body.code || '').trim();
+      if (!/^\d{6}$/.test(code)) return json({ error: 'Enter the 6-digit code' }, 400);
+      const rl = await checkRateLimit(`admin-verify:${purpose}`, 'admin-otp-verify', 8, 15);
+      if (!rl.allowed) return json({ error: 'Too many attempts. Try again later.' }, 429);
+      const { data: row } = await supabase.from('admin_otps')
+        .select('*').eq('purpose', purpose).eq('code', code).eq('used', false)
+        .order('created_at', { ascending: false }).limit(1).maybeSingle();
+      if (!row || new Date(row.expires_at) < new Date()) {
+        await recordAttempt(`admin-verify:${purpose}`, 'admin-otp-verify', false, ip);
+        await logSecurity('admin_otp_failed', 'warning', purpose, ip, ua, {});
+        return json({ error: 'Invalid or expired code' }, 400);
+      }
+      await supabase.from('admin_otps').update({ used: true }).eq('id', row.id);
+      await recordAttempt(`admin-verify:${purpose}`, 'admin-otp-verify', true, ip);
+      const grant = tokenHex(24);
+      await supabase.from('admin_otps').insert({
+        purpose: `grant:${purpose}`, email: row.email, code: grant, ip,
+        expires_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+      });
+      await logSecurity('admin_otp_verified', 'info', row.email, ip, ua, { purpose });
+      return json({ ok: true, grant });
+    }
+
     if (action === 'signup') {
+
       const email = String(body.email || '').toLowerCase().trim();
       const password = String(body.password || '');
       const name = String(body.name || '').trim();
