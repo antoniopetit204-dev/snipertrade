@@ -61,6 +61,34 @@ async function recordAttempt(identifier: string, action: string, success: boolea
   await supabase.from('login_attempts').insert({ identifier, action, success, ip });
 }
 
+// ───────── Security event log / suspicious activity flagging ─────────
+async function logSecurity(
+  event_type: string,
+  severity: 'info' | 'warning' | 'critical',
+  identifier: string,
+  ip = '',
+  user_agent = '',
+  details: Record<string, unknown> = {},
+) {
+  try {
+    await supabase.from('security_events').insert({ event_type, severity, identifier, ip, user_agent, details });
+  } catch { /* never block the request on logging */ }
+}
+
+/** Heuristics that flag obviously abusive or automated traffic. */
+function suspicionScore(opts: { ua: string; ip: string; email?: string; body?: any }) {
+  const reasons: string[] = [];
+  const ua = (opts.ua || '').toLowerCase();
+  if (!ua) reasons.push('missing_user_agent');
+  if (/(curl|python|wget|scrapy|httpclient|postman|go-http|axios\/)/.test(ua)) reasons.push('automated_client');
+  const raw = JSON.stringify(opts.body ?? {});
+  if (/(<script|onerror=|union\s+select|;\s*drop\s+table|\.\.\/\.\.\/)/i.test(raw)) reasons.push('injection_pattern');
+  if (raw.length > 20_000) reasons.push('oversized_payload');
+  if (opts.email && /(\+.*){3,}/.test(opts.email)) reasons.push('email_alias_farming');
+  return reasons;
+}
+
+
 // ───────── SMTP ─────────
 async function loadSmtp() {
   const { data } = await supabase.from('smtp_config').select('*').limit(1).maybeSingle();
