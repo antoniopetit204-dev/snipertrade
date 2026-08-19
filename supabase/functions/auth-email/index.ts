@@ -526,17 +526,29 @@ Deno.serve(async (req) => {
       const refresh = String(body.refresh_token || '');
       if (!refresh) return json({ error: 'Missing token' }, 400);
       const { data: sess } = await supabase.from('auth_sessions').select('*').eq('refresh_token', refresh).maybeSingle();
-      if (!sess || sess.revoked || new Date(sess.expires_at) < new Date()) return json({ error: 'Invalid session' }, 401);
+      if (!sess) return json({ error: 'Invalid session', code: 'SESSION_INVALID' }, 401);
+      if (sess.revoked) return json({ error: 'Session revoked', code: 'SESSION_INVALID' }, 401);
+      if (new Date(sess.expires_at) < new Date()) return json({ error: 'Session expired', code: 'SESSION_INVALID' }, 401);
       const { data: user } = await supabase.from('app_users').select('*').eq('id', sess.user_id).maybeSingle();
-      if (!user) return json({ error: 'User not found' }, 401);
-      // rotate refresh token
-      const newRefresh = tokenHex(32);
+      if (!user) return json({ error: 'User not found', code: 'SESSION_INVALID' }, 401);
+
+      // Sliding expiry, lazy rotation. Rotating on *every* refresh caused
+      // parallel tabs/requests to invalidate each other and kicked users out.
+      // We only mint a new refresh token when the current one is older than
+      // 12 hours, and always extend the expiry window.
+      const lastRotated = new Date(sess.last_used_at || sess.created_at || Date.now()).getTime();
+      const shouldRotate = Date.now() - lastRotated > 12 * 60 * 60 * 1000;
+      const newRefresh = shouldRotate ? tokenHex(32) : sess.refresh_token;
       const newExpires = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
-      await supabase.from('auth_sessions').update({
-        refresh_token: newRefresh, expires_at: newExpires, last_used_at: new Date().toISOString(), user_agent: ua, ip,
-      }).eq('id', sess.id);
-      return json({ user: { id: user.id, email: user.email, name: user.name, role: user.role }, refresh_token: newRefresh, expires_at: newExpires });
+      const patch: any = { expires_at: newExpires, last_used_at: new Date().toISOString(), user_agent: ua, ip };
+      if (shouldRotate) patch.refresh_token = newRefresh;
+      await supabase.from('auth_sessions').update(patch).eq('id', sess.id);
+      return json({
+        user: { id: user.id, email: user.email, name: user.name, role: user.role, verified: user.verified !== false },
+        refresh_token: newRefresh, expires_at: newExpires,
+      });
     }
+
 
     if (action === 'logout') {
       const refresh = String(body.refresh_token || '');
