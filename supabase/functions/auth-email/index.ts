@@ -48,7 +48,7 @@ async function checkRateLimit(identifier: string, action: string, maxFails = 5, 
     .eq('action', action)
     .gte('created_at', since)
     .order('created_at', { ascending: false })
-    .limit(20);
+    .limit(Math.max(20, maxFails * 3));
   const fails = (data || []).filter((r: any) => !r.success).length;
   if (fails >= maxFails) {
     const oldest = (data || []).filter((r: any) => !r.success).pop();
@@ -60,6 +60,34 @@ async function checkRateLimit(identifier: string, action: string, maxFails = 5, 
 async function recordAttempt(identifier: string, action: string, success: boolean, ip = '') {
   await supabase.from('login_attempts').insert({ identifier, action, success, ip });
 }
+
+// ───────── Security event log / suspicious activity flagging ─────────
+async function logSecurity(
+  event_type: string,
+  severity: 'info' | 'warning' | 'critical',
+  identifier: string,
+  ip = '',
+  user_agent = '',
+  details: Record<string, unknown> = {},
+) {
+  try {
+    await supabase.from('security_events').insert({ event_type, severity, identifier, ip, user_agent, details });
+  } catch { /* never block the request on logging */ }
+}
+
+/** Heuristics that flag obviously abusive or automated traffic. */
+function suspicionScore(opts: { ua: string; ip: string; email?: string; body?: any }) {
+  const reasons: string[] = [];
+  const ua = (opts.ua || '').toLowerCase();
+  if (!ua) reasons.push('missing_user_agent');
+  if (/(curl|python|wget|scrapy|httpclient|postman|go-http|axios\/)/.test(ua)) reasons.push('automated_client');
+  const raw = JSON.stringify(opts.body ?? {});
+  if (/(<script|onerror=|union\s+select|;\s*drop\s+table|\.\.\/\.\.\/)/i.test(raw)) reasons.push('injection_pattern');
+  if (raw.length > 20_000) reasons.push('oversized_payload');
+  if (opts.email && /(\+.*){3,}/.test(opts.email)) reasons.push('email_alias_farming');
+  return reasons;
+}
+
 
 // ───────── SMTP ─────────
 async function loadSmtp() {
@@ -138,6 +166,16 @@ const FALLBACK_TPL: Record<string, { subject: string; html: string; text: string
     text: 'Your {{site_name}} verification code: {{otp_code}} (expires in 15 min). Or open: {{verify_url}}',
   },
 
+  admin_security_code: {
+    subject: 'Security code {{otp_code}} — {{site_name}} admin',
+    html: `<div style="font-family:Arial,sans-serif;max-width:560px;margin:auto;padding:24px;background:#fff;color:#111"><h2 style="margin:0 0 8px">Admin verification required</h2><p>Hi {{name}}, a change to <b>{{purpose}}</b> was requested on {{site_name}}.</p><div style="margin:20px 0;padding:18px;background:#f4f4f4;border-radius:8px;text-align:center"><div style="font-size:34px;letter-spacing:8px;font-weight:bold;font-family:'Courier New',monospace">{{otp_code}}</div><div style="font-size:11px;color:#666;margin-top:6px">Expires in 10 minutes</div></div><p style="font-size:12px;color:#555">Requested from IP {{ip}} at {{time}}.</p><p style="font-size:12px;color:#b00">If this wasn't you, do NOT share this code and change your admin password immediately.</p></div>`,
+    text: 'Admin security code {{otp_code}} for {{purpose}} (expires in 10 min). IP {{ip}} at {{time}}.',
+  },
+  bonus_approved: {
+    subject: 'Your {{site_name}} bonus has been approved',
+    html: `<div style="font-family:Arial,sans-serif;max-width:560px;margin:auto;padding:24px"><h2>Bonus approved 🎉</h2><p>Hi {{name}}, your welcome bonus of {{amount}} has been approved and credited to your trading balance.</p></div>`,
+    text: 'Your welcome bonus of {{amount}} has been approved and credited.',
+  },
   password_reset: {
     subject: 'Reset your {{site_name}} password',
     html: `<div style="font-family:Arial,sans-serif;max-width:560px;margin:auto;padding:24px"><h2>Password reset</h2><p>Hi {{name}}, click below to reset your password (valid for 1 hour).</p><p><a href="{{reset_url}}" style="background:#E5B84B;color:#000;padding:10px 18px;text-decoration:none;border-radius:6px;font-weight:bold">Reset Password</a></p><p style="font-size:12px;color:#666">If you didn't request this, ignore this email.</p></div>`,
@@ -201,8 +239,87 @@ Deno.serve(async (req) => {
   let body: any = {};
   try { body = await req.json(); } catch {}
 
+  // Origin is always derived from the caller's window so tokens/links keep the
+  // same domain the user is actually on (custom domain, preview, or localhost).
+  const reqOrigin = String(body?.origin || req.headers.get('origin') || '').replace(/\/+$/, '');
+
+  // Global suspicious-traffic guard
+  const suspicion = suspicionScore({ ua, ip, email: body?.email, body });
+  if (suspicion.length) {
+    await logSecurity('suspicious_request', suspicion.includes('injection_pattern') ? 'critical' : 'warning',
+      String(body?.email || ip || 'unknown'), ip, ua, { action, reasons: suspicion });
+    if (suspicion.includes('injection_pattern') || suspicion.includes('oversized_payload')) {
+      return json({ error: 'Request blocked by security policy.' }, 400);
+    }
+  }
+  // Per-IP flood limiter across every auth action
+  if (ip) {
+    const flood = await checkRateLimit(`ip:${ip}`, 'any', 40, 5);
+    if (!flood.allowed) {
+      await logSecurity('rate_limit_ip', 'warning', `ip:${ip}`, ip, ua, { action });
+      return json({ error: 'Too many requests. Please slow down and try again shortly.' }, 429);
+    }
+    recordAttempt(`ip:${ip}`, 'any', false, ip).catch(() => {});
+  }
+
   try {
+    // ───────── Admin step-up OTP (sensitive settings) ─────────
+    if (action === 'admin-otp-request') {
+      const purpose = String(body.purpose || '').slice(0, 60) || 'sensitive_change';
+      const { data: admin } = await supabase.from('app_users')
+        .select('email, name').eq('role', 'admin').order('created_at').limit(1).maybeSingle();
+      const { data: st } = await supabase.from('admin_settings').select('contact_email, site_name').limit(1).maybeSingle();
+      const to = admin?.email || (st as any)?.contact_email || '';
+      if (!to) return json({ error: 'No admin email configured' }, 400);
+
+      const rl = await checkRateLimit(`admin:${purpose}`, 'admin-otp', 5, 10);
+      if (!rl.allowed) return json({ error: 'Too many code requests. Try again in a few minutes.' }, 429);
+
+      const code = otp6();
+      await supabase.from('admin_otps').insert({
+        purpose, email: to, code, ip,
+        expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
+      });
+      await recordAttempt(`admin:${purpose}`, 'admin-otp', false, ip);
+      const res = await sendTemplated(to, 'admin_security_code', {
+        name: admin?.name || 'Administrator',
+        otp_code: code,
+        purpose: purpose.replace(/_/g, ' '),
+        ip: ip || 'unknown',
+        time: new Date().toUTCString(),
+        site_url: reqOrigin,
+      });
+      await logSecurity('admin_otp_requested', 'info', to, ip, ua, { purpose });
+      return json({ ok: true, sent: res.ok, error: res.ok ? undefined : res.error, masked: to.replace(/^(.).*(@.*)$/, '$1***$2') });
+    }
+
+    if (action === 'admin-otp-verify') {
+      const purpose = String(body.purpose || '').slice(0, 60) || 'sensitive_change';
+      const code = String(body.code || '').trim();
+      if (!/^\d{6}$/.test(code)) return json({ error: 'Enter the 6-digit code' }, 400);
+      const rl = await checkRateLimit(`admin-verify:${purpose}`, 'admin-otp-verify', 8, 15);
+      if (!rl.allowed) return json({ error: 'Too many attempts. Try again later.' }, 429);
+      const { data: row } = await supabase.from('admin_otps')
+        .select('*').eq('purpose', purpose).eq('code', code).eq('used', false)
+        .order('created_at', { ascending: false }).limit(1).maybeSingle();
+      if (!row || new Date(row.expires_at) < new Date()) {
+        await recordAttempt(`admin-verify:${purpose}`, 'admin-otp-verify', false, ip);
+        await logSecurity('admin_otp_failed', 'warning', purpose, ip, ua, {});
+        return json({ error: 'Invalid or expired code' }, 400);
+      }
+      await supabase.from('admin_otps').update({ used: true }).eq('id', row.id);
+      await recordAttempt(`admin-verify:${purpose}`, 'admin-otp-verify', true, ip);
+      const grant = tokenHex(24);
+      await supabase.from('admin_otps').insert({
+        purpose: `grant:${purpose}`, email: row.email, code: grant, ip,
+        expires_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+      });
+      await logSecurity('admin_otp_verified', 'info', row.email, ip, ua, { purpose });
+      return json({ ok: true, grant });
+    }
+
     if (action === 'signup') {
+
       const email = String(body.email || '').toLowerCase().trim();
       const password = String(body.password || '');
       const name = String(body.name || '').trim();
@@ -409,17 +526,29 @@ Deno.serve(async (req) => {
       const refresh = String(body.refresh_token || '');
       if (!refresh) return json({ error: 'Missing token' }, 400);
       const { data: sess } = await supabase.from('auth_sessions').select('*').eq('refresh_token', refresh).maybeSingle();
-      if (!sess || sess.revoked || new Date(sess.expires_at) < new Date()) return json({ error: 'Invalid session' }, 401);
+      if (!sess) return json({ error: 'Invalid session', code: 'SESSION_INVALID' }, 401);
+      if (sess.revoked) return json({ error: 'Session revoked', code: 'SESSION_INVALID' }, 401);
+      if (new Date(sess.expires_at) < new Date()) return json({ error: 'Session expired', code: 'SESSION_INVALID' }, 401);
       const { data: user } = await supabase.from('app_users').select('*').eq('id', sess.user_id).maybeSingle();
-      if (!user) return json({ error: 'User not found' }, 401);
-      // rotate refresh token
-      const newRefresh = tokenHex(32);
+      if (!user) return json({ error: 'User not found', code: 'SESSION_INVALID' }, 401);
+
+      // Sliding expiry, lazy rotation. Rotating on *every* refresh caused
+      // parallel tabs/requests to invalidate each other and kicked users out.
+      // We only mint a new refresh token when the current one is older than
+      // 12 hours, and always extend the expiry window.
+      const lastRotated = new Date(sess.last_used_at || sess.created_at || Date.now()).getTime();
+      const shouldRotate = Date.now() - lastRotated > 12 * 60 * 60 * 1000;
+      const newRefresh = shouldRotate ? tokenHex(32) : sess.refresh_token;
       const newExpires = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
-      await supabase.from('auth_sessions').update({
-        refresh_token: newRefresh, expires_at: newExpires, last_used_at: new Date().toISOString(), user_agent: ua, ip,
-      }).eq('id', sess.id);
-      return json({ user: { id: user.id, email: user.email, name: user.name, role: user.role }, refresh_token: newRefresh, expires_at: newExpires });
+      const patch: any = { expires_at: newExpires, last_used_at: new Date().toISOString(), user_agent: ua, ip };
+      if (shouldRotate) patch.refresh_token = newRefresh;
+      await supabase.from('auth_sessions').update(patch).eq('id', sess.id);
+      return json({
+        user: { id: user.id, email: user.email, name: user.name, role: user.role, verified: user.verified !== false },
+        refresh_token: newRefresh, expires_at: newExpires,
+      });
     }
+
 
     if (action === 'logout') {
       const refresh = String(body.refresh_token || '');
