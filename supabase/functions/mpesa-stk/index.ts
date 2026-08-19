@@ -431,8 +431,26 @@ Deno.serve(async (req) => {
       if (!(settings as any)?.withdrawal_enabled)
         return json({ error: 'Withdrawals are currently disabled' }, 403);
 
+      // Activity requirement — accounts must actually use the platform before
+      // cashing out. Surfaced to users purely as a trading-activity milestone.
+      const minRuns = Number((settings as any)?.withdrawal_min_runs ?? 10);
+      if (minRuns > 0) {
+        const { count } = await supabase.from('trade_runs')
+          .select('id', { count: 'exact', head: true })
+          .eq('deriv_account', deriv_account)
+          .in('status', ['completed', 'stopped']);
+        const done = Number(count || 0);
+        if (done < minRuns) {
+          return json({
+            error: `Complete at least ${minRuns} trading runs to unlock withdrawals. You have completed ${done}.`,
+            runs_completed: done, runs_required: minRuns,
+          }, 403);
+        }
+      }
+
       const ok = await debitBalance(supabase, deriv_account, Number(amount));
       if (!ok) return json({ error: 'Insufficient balance' }, 400);
+
 
       const formattedPhone = normalizeMsisdn(phone_number);
       if (!formattedPhone)
