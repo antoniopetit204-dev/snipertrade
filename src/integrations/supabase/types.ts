@@ -52,6 +52,39 @@ export type Database = {
           },
         ]
       }
+      admin_otps: {
+        Row: {
+          code: string
+          created_at: string
+          email: string
+          expires_at: string
+          id: string
+          ip: string
+          purpose: string
+          used: boolean
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          email: string
+          expires_at: string
+          id?: string
+          ip?: string
+          purpose: string
+          used?: boolean
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          email?: string
+          expires_at?: string
+          id?: string
+          ip?: string
+          purpose?: string
+          used?: boolean
+        }
+        Relationships: []
+      }
       admin_settings: {
         Row: {
           affiliate_enabled: boolean
@@ -67,6 +100,7 @@ export type Database = {
           bonus_amount: number
           bonus_enabled: boolean
           bonus_min_deposit: number
+          bonus_require_approval: boolean
           contact_email: string
           contact_phone: string
           created_at: string
@@ -85,6 +119,7 @@ export type Database = {
           primary_color: string
           privacy_url: string
           require_email_verification: boolean
+          sensitive_lock_enabled: boolean
           site_name: string
           site_title: string
           support_url: string
@@ -94,6 +129,7 @@ export type Database = {
           withdrawal_auto_approve: boolean
           withdrawal_auto_max: number
           withdrawal_enabled: boolean
+          withdrawal_min_runs: number
         }
         Insert: {
           affiliate_enabled?: boolean
@@ -109,6 +145,7 @@ export type Database = {
           bonus_amount?: number
           bonus_enabled?: boolean
           bonus_min_deposit?: number
+          bonus_require_approval?: boolean
           contact_email?: string
           contact_phone?: string
           created_at?: string
@@ -127,6 +164,7 @@ export type Database = {
           primary_color?: string
           privacy_url?: string
           require_email_verification?: boolean
+          sensitive_lock_enabled?: boolean
           site_name?: string
           site_title?: string
           support_url?: string
@@ -136,6 +174,7 @@ export type Database = {
           withdrawal_auto_approve?: boolean
           withdrawal_auto_max?: number
           withdrawal_enabled?: boolean
+          withdrawal_min_runs?: number
         }
         Update: {
           affiliate_enabled?: boolean
@@ -151,6 +190,7 @@ export type Database = {
           bonus_amount?: number
           bonus_enabled?: boolean
           bonus_min_deposit?: number
+          bonus_require_approval?: boolean
           contact_email?: string
           contact_phone?: string
           created_at?: string
@@ -169,6 +209,7 @@ export type Database = {
           primary_color?: string
           privacy_url?: string
           require_email_verification?: boolean
+          sensitive_lock_enabled?: boolean
           site_name?: string
           site_title?: string
           support_url?: string
@@ -178,6 +219,7 @@ export type Database = {
           withdrawal_auto_approve?: boolean
           withdrawal_auto_max?: number
           withdrawal_enabled?: boolean
+          withdrawal_min_runs?: number
         }
         Relationships: []
       }
@@ -292,11 +334,16 @@ export type Database = {
       app_users: {
         Row: {
           avatar_url: string | null
+          bonus_approved_at: string | null
           bonus_claimed_amount: number
           bonus_claimed_at: string | null
+          bonus_requested_at: string | null
+          bonus_status: string
+          completed_runs: number
           country: string | null
           created_at: string
           email: string
+          flagged: boolean
           id: string
           id_number: string | null
           name: string
@@ -305,17 +352,23 @@ export type Database = {
           referral_code: string | null
           referred_by_code: string | null
           role: string
+          terms_accepted_at: string | null
           updated_at: string
           verified: boolean
           win_tier: string
         }
         Insert: {
           avatar_url?: string | null
+          bonus_approved_at?: string | null
           bonus_claimed_amount?: number
           bonus_claimed_at?: string | null
+          bonus_requested_at?: string | null
+          bonus_status?: string
+          completed_runs?: number
           country?: string | null
           created_at?: string
           email: string
+          flagged?: boolean
           id?: string
           id_number?: string | null
           name?: string
@@ -324,17 +377,23 @@ export type Database = {
           referral_code?: string | null
           referred_by_code?: string | null
           role?: string
+          terms_accepted_at?: string | null
           updated_at?: string
           verified?: boolean
           win_tier?: string
         }
         Update: {
           avatar_url?: string | null
+          bonus_approved_at?: string | null
           bonus_claimed_amount?: number
           bonus_claimed_at?: string | null
+          bonus_requested_at?: string | null
+          bonus_status?: string
+          completed_runs?: number
           country?: string | null
           created_at?: string
           email?: string
+          flagged?: boolean
           id?: string
           id_number?: string | null
           name?: string
@@ -343,6 +402,7 @@ export type Database = {
           referral_code?: string | null
           referred_by_code?: string | null
           role?: string
+          terms_accepted_at?: string | null
           updated_at?: string
           verified?: boolean
           win_tier?: string
@@ -837,6 +897,39 @@ export type Database = {
           referrer_email?: string
           status?: string
           updated_at?: string
+        }
+        Relationships: []
+      }
+      security_events: {
+        Row: {
+          created_at: string
+          details: Json
+          event_type: string
+          id: string
+          identifier: string
+          ip: string
+          severity: string
+          user_agent: string
+        }
+        Insert: {
+          created_at?: string
+          details?: Json
+          event_type: string
+          id?: string
+          identifier?: string
+          ip?: string
+          severity?: string
+          user_agent?: string
+        }
+        Update: {
+          created_at?: string
+          details?: Json
+          event_type?: string
+          id?: string
+          identifier?: string
+          ip?: string
+          severity?: string
+          user_agent?: string
         }
         Relationships: []
       }
