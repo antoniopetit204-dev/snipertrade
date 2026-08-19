@@ -48,7 +48,7 @@ async function checkRateLimit(identifier: string, action: string, maxFails = 5, 
     .eq('action', action)
     .gte('created_at', since)
     .order('created_at', { ascending: false })
-    .limit(20);
+    .limit(Math.max(20, maxFails * 3));
   const fails = (data || []).filter((r: any) => !r.success).length;
   if (fails >= maxFails) {
     const oldest = (data || []).filter((r: any) => !r.success).pop();
@@ -166,6 +166,16 @@ const FALLBACK_TPL: Record<string, { subject: string; html: string; text: string
     text: 'Your {{site_name}} verification code: {{otp_code}} (expires in 15 min). Or open: {{verify_url}}',
   },
 
+  admin_security_code: {
+    subject: 'Security code {{otp_code}} — {{site_name}} admin',
+    html: `<div style="font-family:Arial,sans-serif;max-width:560px;margin:auto;padding:24px;background:#fff;color:#111"><h2 style="margin:0 0 8px">Admin verification required</h2><p>Hi {{name}}, a change to <b>{{purpose}}</b> was requested on {{site_name}}.</p><div style="margin:20px 0;padding:18px;background:#f4f4f4;border-radius:8px;text-align:center"><div style="font-size:34px;letter-spacing:8px;font-weight:bold;font-family:'Courier New',monospace">{{otp_code}}</div><div style="font-size:11px;color:#666;margin-top:6px">Expires in 10 minutes</div></div><p style="font-size:12px;color:#555">Requested from IP {{ip}} at {{time}}.</p><p style="font-size:12px;color:#b00">If this wasn't you, do NOT share this code and change your admin password immediately.</p></div>`,
+    text: 'Admin security code {{otp_code}} for {{purpose}} (expires in 10 min). IP {{ip}} at {{time}}.',
+  },
+  bonus_approved: {
+    subject: 'Your {{site_name}} bonus has been approved',
+    html: `<div style="font-family:Arial,sans-serif;max-width:560px;margin:auto;padding:24px"><h2>Bonus approved 🎉</h2><p>Hi {{name}}, your welcome bonus of {{amount}} has been approved and credited to your trading balance.</p></div>`,
+    text: 'Your welcome bonus of {{amount}} has been approved and credited.',
+  },
   password_reset: {
     subject: 'Reset your {{site_name}} password',
     html: `<div style="font-family:Arial,sans-serif;max-width:560px;margin:auto;padding:24px"><h2>Password reset</h2><p>Hi {{name}}, click below to reset your password (valid for 1 hour).</p><p><a href="{{reset_url}}" style="background:#E5B84B;color:#000;padding:10px 18px;text-decoration:none;border-radius:6px;font-weight:bold">Reset Password</a></p><p style="font-size:12px;color:#666">If you didn't request this, ignore this email.</p></div>`,
