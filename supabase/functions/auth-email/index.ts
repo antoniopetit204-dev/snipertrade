@@ -103,18 +103,63 @@ async function loadTemplate(key: string) {
   return data;
 }
 
+// Origin of the current request — used so every link in an email points at the
+// domain the user is actually using (custom domain, preview or localhost).
+let CURRENT_ORIGIN = '';
+const siteUrl = () => CURRENT_ORIGIN || 'https://hifrequencytrade.lovable.app';
+
+/** Deterministic, unguessable unsubscribe token (no extra table needed). */
+async function unsubToken(email: string) {
+  const secret = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || 'fallback';
+  const data = new TextEncoder().encode(`unsub:${email.toLowerCase()}:${secret}`);
+  const digest = await crypto.subtle.digest('SHA-256', data);
+  return Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('').slice(0, 40);
+}
+const unsubUrl = async (email: string) =>
+  `${siteUrl()}/unsubscribe?e=${encodeURIComponent(email)}&t=${await unsubToken(email)}`;
+
+// Security/transactional mail is always delivered, even to unsubscribed users.
+const TRANSACTIONAL = new Set([
+  'email_verification', 'password_reset', 'admin_security_code', 'test', 'login_alert',
+]);
+
+function emailFooter(link: string, prefs: string, siteName: string, address: string) {
+  return `<div style="max-width:560px;margin:24px auto 0;padding:16px 24px;border-top:1px solid #e5e5e5;font-family:Arial,sans-serif;font-size:11px;line-height:1.6;color:#888">
+    <p style="margin:0 0 6px">You are receiving this email because you have an account on ${siteName}.</p>
+    <p style="margin:0 0 6px"><a href="${prefs}" style="color:#888">Email preferences</a> &nbsp;·&nbsp; <a href="${link}" style="color:#888">Unsubscribe</a></p>
+    <p style="margin:0;color:#aaa">${address}</p>
+  </div>`;
+}
+
 async function sendMail(to: string, subject: string, html: string, text: string, templateKey = '') {
   const smtp = await loadSmtp();
   if (!smtp || !smtp.enabled || !smtp.host) {
     await supabase.from('email_log').insert({ to_email: to, template_key: templateKey, subject, status: 'skipped', error: 'SMTP not configured' });
     return { ok: false, error: 'SMTP not configured' };
   }
+
+  // Honour unsubscribes for everything except security/transactional mail.
+  if (!TRANSACTIONAL.has(templateKey)) {
+    const { data: pref } = await supabase.from('user_email_preferences')
+      .select('enabled').eq('email', to).maybeSingle();
+    if (pref && pref.enabled === false) {
+      await supabase.from('email_log').insert({ to_email: to, template_key: templateKey, subject, status: 'skipped', error: 'recipient unsubscribed' });
+      return { ok: false, error: 'recipient unsubscribed' };
+    }
+  }
+
   // Auto-correct TLS mode based on port (most shared hosts misconfigure this)
   const port = Number(smtp.port) || 587;
   const tlsImplicit = port === 465 ? true : port === 587 || port === 25 || port === 2525 ? false : Boolean(smtp.secure);
 
-  const fromName = smtp.from_name || (await loadSiteName());
+  const siteName = smtp.from_name || (await loadSiteName());
+  const fromName = smtp.from_name || siteName;
   const fromEmail = smtp.from_email || smtp.username;
+
+  const link = await unsubUrl(to);
+  const prefs = `${siteUrl()}/dashboard/settings`;
+  const fullHtml = `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${subject}</title></head><body style="margin:0;background:#ffffff">${html}${emailFooter(link, prefs, siteName, `${siteName} · Sent to ${to}`)}</body></html>`;
+  const fullText = `${text || ''}\n\n---\nYou are receiving this because you have an account on ${siteName}.\nEmail preferences: ${prefs}\nUnsubscribe: ${link}`;
 
   const client = new SMTPClient({
     connection: {
@@ -131,12 +176,17 @@ async function sendMail(to: string, subject: string, html: string, text: string,
     await client.send({
       from: `${fromName} <${fromEmail}>`,
       to,
+      replyTo: fromEmail,
       subject,
-      content: text || ' ',
-      html,
-      // Headers to improve inbox placement on shared hosting
+      content: fullText,
+      html: fullHtml,
+      // Deliverability headers (RFC 8058 one-click unsubscribe + list identity)
       headers: {
-        'List-Unsubscribe': `<mailto:${fromEmail}?subject=unsubscribe>`,
+        'List-Unsubscribe': `<${link}>, <mailto:${fromEmail}?subject=unsubscribe>`,
+        'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+        'List-Id': `${siteName} notifications <notifications.${String(fromEmail).split('@')[1] || 'localhost'}>`,
+        'Auto-Submitted': 'auto-generated',
+        'X-Entity-Ref-ID': crypto.randomUUID(),
         'X-Mailer': fromName,
         'X-Priority': '3',
         'MIME-Version': '1.0',
@@ -152,6 +202,7 @@ async function sendMail(to: string, subject: string, html: string, text: string,
     try { await client.close(); } catch {}
   }
 }
+
 
 // Sensible HTML fallback for templates that aren't seeded
 const FALLBACK_TPL: Record<string, { subject: string; html: string; text: string }> = {
@@ -242,6 +293,47 @@ Deno.serve(async (req) => {
   // Origin is always derived from the caller's window so tokens/links keep the
   // same domain the user is actually on (custom domain, preview, or localhost).
   const reqOrigin = String(body?.origin || req.headers.get('origin') || '').replace(/\/+$/, '');
+  CURRENT_ORIGIN = reqOrigin;
+
+  // ───────── Public unsubscribe / email preference centre ─────────
+  if (action === 'unsub-status' || action === 'unsubscribe' || action === 'unsub-prefs') {
+    const email = String(body?.email || '').trim().toLowerCase();
+    const token = String(body?.token || '');
+    if (!email || !token) return json({ error: 'Invalid unsubscribe link' }, 400);
+    if (token !== await unsubToken(email)) return json({ error: 'Invalid or expired unsubscribe link' }, 400);
+
+    const { data: existing } = await supabase.from('user_email_preferences')
+      .select('*').eq('email', email).maybeSingle();
+
+    if (action === 'unsub-status') {
+      return json({
+        ok: true, email,
+        prefs: existing || {
+          enabled: true, notify_login: true, notify_trades: false,
+          notify_deposits: true, notify_withdrawals: true, marketing: false,
+        },
+      });
+    }
+
+    const patch = action === 'unsubscribe'
+      ? { enabled: false, marketing: false, notify_login: false, notify_trades: false, notify_deposits: false, notify_withdrawals: false }
+      : {
+          enabled: body?.prefs?.enabled !== false,
+          notify_login: !!body?.prefs?.notify_login,
+          notify_trades: !!body?.prefs?.notify_trades,
+          notify_deposits: !!body?.prefs?.notify_deposits,
+          notify_withdrawals: !!body?.prefs?.notify_withdrawals,
+          marketing: !!body?.prefs?.marketing,
+        };
+
+    await supabase.from('user_email_preferences').upsert(
+      { identifier: existing?.identifier || email, email, ...patch, updated_at: new Date().toISOString() },
+      { onConflict: 'identifier' },
+    );
+    return json({ ok: true, email, prefs: patch });
+  }
+
+
 
   // Global suspicious-traffic guard
   const suspicion = suspicionScore({ ua, ip, email: body?.email, body });

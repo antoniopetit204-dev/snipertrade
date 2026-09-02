@@ -24,6 +24,8 @@ import Auth from "./pages/Auth";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import DashboardSettings from "./pages/DashboardSettings";
+import Unsubscribe from "./pages/Unsubscribe";
+
 import NotFound from "./pages/NotFound";
 import { WebAppMeta } from "./components/WebAppMeta";
 import { AuthGuard } from "./components/AuthGuard";
@@ -50,6 +52,8 @@ const App = () => (
           <Route path="/auth" element={<Auth />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password" element={<ResetPassword />} />
+          <Route path="/unsubscribe" element={<Unsubscribe />} />
+
           <Route path="/dashboard/settings" element={<AuthGuard><DashboardSettings /></AuthGuard>} />
           <Route path="/dashboard" element={<AuthGuard><Dashboard /></AuthGuard>} />
           <Route path="/dashboard/trader" element={<AuthGuard><DashboardTrader /></AuthGuard>} />
