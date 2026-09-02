@@ -147,9 +147,6 @@ const DashboardManualTrader = () => {
     setSessionPnL(p => +(p + profit).toFixed(2));
     if (won) setWins(w => w + 1); else setLosses(l => l + 1);
     setBalance(newBalance);
-    if (res.payout_capped) {
-      toast({ title: 'Payout capped', description: 'Liquidity limit reached — the win still counts.' });
-    }
 
     await new Promise(r => setTimeout(r, 450));
     setLiveTrade(null);
