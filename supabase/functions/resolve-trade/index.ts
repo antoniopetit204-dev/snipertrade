@@ -181,23 +181,22 @@ Deno.serve(async (req) => {
       return json({ error: 'Insufficient balance', run_complete: true, balance }, 400);
     }
 
-    // ── HOUSE LEDGER + PAYOUT CAP ──
+    // ── HOUSE LEDGER ──
+    // The pool is an accounting record only: it never alters a round's outcome
+    // and never shrinks a payout. Wins always pay in full; the ledger simply
+    // tracks exposure so admins can be warned when the pool runs thin.
     const { data: ledger } = await supabase.from('house_ledger').select('*').limit(1).maybeSingle();
     const pool = Number(ledger?.pool || 0);
     const minFloor = Number(ledger?.min_floor || 0);
-    const safeFloor = run.win_tier === 'high' ? minFloor / 2 : minFloor;
 
-    const fullWinProfit = +(stakeN * (payoutMult - 1) * WIN_SHRINK).toFixed(2);
-    // Cap — never flip the outcome, only shrink the payout.
-    const affordable = Math.max(0, +(pool - safeFloor).toFixed(2));
-    const winProfit = intendedWin ? Math.min(fullWinProfit, affordable) : 0;
-    const payoutCapped = intendedWin && winProfit < fullWinProfit;
+    const winProfit = intendedWin ? +(stakeN * (payoutMult - 1) * WIN_SHRINK).toFixed(2) : 0;
 
     const won = intendedWin;
     const profit = won ? winProfit : -stakeN;
     const newBalance = +(balance + profit).toFixed(2);
     const effectivePayout = won ? +(stakeN + winProfit).toFixed(2) : 0;
     const newPool = +(pool + (won ? -winProfit : stakeN)).toFixed(2);
+
 
     // Persist balance
     if (balRow) {
