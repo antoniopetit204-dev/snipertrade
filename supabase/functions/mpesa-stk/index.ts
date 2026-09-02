@@ -421,15 +421,24 @@ Deno.serve(async (req) => {
 
     // ─── WITHDRAW ───
     if (action === 'withdraw') {
-      const body = await req.json();
-      const { phone_number, amount, deriv_account } = body;
+      const body = await req.json().catch(() => ({}));
+      const { phone_number, amount, deriv_account } = body || {};
 
       if (!phone_number || !amount || !deriv_account)
         return json({ error: 'phone_number, amount, deriv_account required' }, 400);
-      if (Number(amount) < minWithdrawal)
-        return json({ error: `Minimum withdrawal is KES ${minWithdrawal}` }, 400);
       if (!(settings as any)?.withdrawal_enabled)
         return json({ error: 'Withdrawals are currently disabled' }, 403);
+
+      // ── Validate everything BEFORE touching the balance ──
+      const amt = Number(amount);
+      if (!Number.isFinite(amt) || !Number.isInteger(amt) || amt < 10)
+        return json({ error: 'Withdrawal amount must be a whole number of at least KES 10' }, 400);
+      if (amt < minWithdrawal)
+        return json({ error: `Minimum withdrawal is KES ${minWithdrawal}` }, 400);
+
+      const formattedPhone = normalizeMsisdn(phone_number);
+      if (!formattedPhone)
+        return json({ error: 'Enter a valid Safaricom number, e.g. 07XXXXXXXX' }, 400);
 
       // Activity requirement — accounts must actually use the platform before
       // cashing out. Surfaced to users purely as a trading-activity milestone.
@@ -448,27 +457,28 @@ Deno.serve(async (req) => {
         }
       }
 
-      const ok = await debitBalance(supabase, deriv_account, Number(amount));
+      // No other withdrawal may be in flight for this account.
+      const { data: inflight } = await supabase.from('withdrawals')
+        .select('id').eq('deriv_account', deriv_account)
+        .in('status', ['pending', 'approved', 'processing']).limit(1);
+      if (inflight && inflight.length)
+        return json({ error: 'You already have a withdrawal in progress. Please wait for it to finish.' }, 409);
+
+      const ok = await debitBalance(supabase, deriv_account, amt);
       if (!ok) return json({ error: 'Insufficient balance' }, 400);
 
-
-      const formattedPhone = normalizeMsisdn(phone_number);
-      if (!formattedPhone)
-        return json({ error: 'Enter a valid Safaricom number, e.g. 07XXXXXXXX' }, 400);
-      if (!Number.isInteger(Number(amount)) || Number(amount) < 10)
-        return json({ error: 'Withdrawal amount must be a whole number of at least KES 10' }, 400);
-
       const { data: withdrawal, error: insertErr } = await supabase.from('withdrawals').insert({
-        deriv_account, phone_number: formattedPhone, amount: Number(amount), status: 'pending',
+        deriv_account, phone_number: formattedPhone, amount: amt, status: 'pending',
       }).select().single();
 
-      if (insertErr) {
-        await refundBalance(supabase, deriv_account, Number(amount));
+      if (insertErr || !withdrawal) {
+        await refundBalance(supabase, deriv_account, amt);
         return json({ error: 'Failed to create withdrawal record' }, 500);
       }
 
       return json({ success: true, withdrawal_id: withdrawal.id, message: 'Withdrawal submitted' });
     }
+
 
     // ─── PROCESS WITHDRAWAL (admin approve / reject, or auto) ───
     // Idempotent and explicit status machine:
