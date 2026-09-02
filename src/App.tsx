@@ -24,6 +24,8 @@ import Auth from "./pages/Auth";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import DashboardSettings from "./pages/DashboardSettings";
+import Unsubscribe from "./pages/Unsubscribe";
+
 import NotFound from "./pages/NotFound";
 import { WebAppMeta } from "./components/WebAppMeta";
 import { AuthGuard } from "./components/AuthGuard";
