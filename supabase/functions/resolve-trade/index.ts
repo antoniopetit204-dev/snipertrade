@@ -250,7 +250,7 @@ Deno.serve(async (req) => {
       won,
       profit,
       payout: effectivePayout,
-      payout_capped: payoutCapped,
+      payout_capped: false,
       balance_after: newBalance,
       round: roundIndex,
       total_rounds: totalRounds,
