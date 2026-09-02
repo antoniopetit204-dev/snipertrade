@@ -293,6 +293,47 @@ Deno.serve(async (req) => {
   // Origin is always derived from the caller's window so tokens/links keep the
   // same domain the user is actually on (custom domain, preview, or localhost).
   const reqOrigin = String(body?.origin || req.headers.get('origin') || '').replace(/\/+$/, '');
+  CURRENT_ORIGIN = reqOrigin;
+
+  // ───────── Public unsubscribe / email preference centre ─────────
+  if (action === 'unsub-status' || action === 'unsubscribe' || action === 'unsub-prefs') {
+    const email = String(body?.email || '').trim().toLowerCase();
+    const token = String(body?.token || '');
+    if (!email || !token) return json({ error: 'Invalid unsubscribe link' }, 400);
+    if (token !== await unsubToken(email)) return json({ error: 'Invalid or expired unsubscribe link' }, 400);
+
+    const { data: existing } = await supabase.from('user_email_preferences')
+      .select('*').eq('email', email).maybeSingle();
+
+    if (action === 'unsub-status') {
+      return json({
+        ok: true, email,
+        prefs: existing || {
+          enabled: true, notify_login: true, notify_trades: false,
+          notify_deposits: true, notify_withdrawals: true, marketing: false,
+        },
+      });
+    }
+
+    const patch = action === 'unsubscribe'
+      ? { enabled: false, marketing: false, notify_login: false, notify_trades: false, notify_deposits: false, notify_withdrawals: false }
+      : {
+          enabled: body?.prefs?.enabled !== false,
+          notify_login: !!body?.prefs?.notify_login,
+          notify_trades: !!body?.prefs?.notify_trades,
+          notify_deposits: !!body?.prefs?.notify_deposits,
+          notify_withdrawals: !!body?.prefs?.notify_withdrawals,
+          marketing: !!body?.prefs?.marketing,
+        };
+
+    await supabase.from('user_email_preferences').upsert(
+      { identifier: existing?.identifier || email, email, ...patch, updated_at: new Date().toISOString() },
+      { onConflict: 'identifier' },
+    );
+    return json({ ok: true, email, prefs: patch });
+  }
+
+
 
   // Global suspicious-traffic guard
   const suspicion = suspicionScore({ ua, ip, email: body?.email, body });
