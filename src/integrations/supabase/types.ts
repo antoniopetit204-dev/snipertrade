@@ -116,6 +116,8 @@ export type Database = {
           meta_keywords: string
           min_deposit: number
           min_withdrawal: number
+          partner_min_deposit: number
+          partner_require_approval: boolean
           primary_color: string
           privacy_url: string
           require_email_verification: boolean
@@ -125,6 +127,9 @@ export type Database = {
           support_url: string
           telegram_link: string
           terms_url: string
+          transfer_enabled: boolean
+          transfer_fee_percent: number
+          transfer_min: number
           updated_at: string
           withdrawal_auto_approve: boolean
           withdrawal_auto_max: number
@@ -161,6 +166,8 @@ export type Database = {
           meta_keywords?: string
           min_deposit?: number
           min_withdrawal?: number
+          partner_min_deposit?: number
+          partner_require_approval?: boolean
           primary_color?: string
           privacy_url?: string
           require_email_verification?: boolean
@@ -170,6 +177,9 @@ export type Database = {
           support_url?: string
           telegram_link?: string
           terms_url?: string
+          transfer_enabled?: boolean
+          transfer_fee_percent?: number
+          transfer_min?: number
           updated_at?: string
           withdrawal_auto_approve?: boolean
           withdrawal_auto_max?: number
@@ -206,6 +216,8 @@ export type Database = {
           meta_keywords?: string
           min_deposit?: number
           min_withdrawal?: number
+          partner_min_deposit?: number
+          partner_require_approval?: boolean
           primary_color?: string
           privacy_url?: string
           require_email_verification?: boolean
@@ -215,6 +227,9 @@ export type Database = {
           support_url?: string
           telegram_link?: string
           terms_url?: string
+          transfer_enabled?: boolean
+          transfer_fee_percent?: number
+          transfer_min?: number
           updated_at?: string
           withdrawal_auto_approve?: boolean
           withdrawal_auto_max?: number
@@ -333,6 +348,7 @@ export type Database = {
       }
       app_users: {
         Row: {
+          account_number: string | null
           avatar_url: string | null
           bonus_approved_at: string | null
           bonus_claimed_amount: number
@@ -347,6 +363,10 @@ export type Database = {
           id: string
           id_number: string | null
           name: string
+          partner_approved_at: string | null
+          partner_note: string
+          partner_requested_at: string | null
+          partner_status: string
           password_hash: string
           phone: string | null
           referral_code: string | null
@@ -358,6 +378,7 @@ export type Database = {
           win_tier: string
         }
         Insert: {
+          account_number?: string | null
           avatar_url?: string | null
           bonus_approved_at?: string | null
           bonus_claimed_amount?: number
@@ -372,6 +393,10 @@ export type Database = {
           id?: string
           id_number?: string | null
           name?: string
+          partner_approved_at?: string | null
+          partner_note?: string
+          partner_requested_at?: string | null
+          partner_status?: string
           password_hash: string
           phone?: string | null
           referral_code?: string | null
@@ -383,6 +408,7 @@ export type Database = {
           win_tier?: string
         }
         Update: {
+          account_number?: string | null
           avatar_url?: string | null
           bonus_approved_at?: string | null
           bonus_claimed_amount?: number
@@ -397,6 +423,10 @@ export type Database = {
           id?: string
           id_number?: string | null
           name?: string
+          partner_approved_at?: string | null
+          partner_note?: string
+          partner_requested_at?: string | null
+          partner_status?: string
           password_hash?: string
           phone?: string | null
           referral_code?: string | null
@@ -1038,6 +1068,45 @@ export type Database = {
           updated_at?: string
           win_tier?: string
           wins?: number
+        }
+        Relationships: []
+      }
+      transfers: {
+        Row: {
+          amount: number
+          created_at: string
+          fee: number
+          from_account_number: string
+          from_email: string
+          id: string
+          note: string
+          status: string
+          to_account_number: string
+          to_email: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          fee?: number
+          from_account_number?: string
+          from_email: string
+          id?: string
+          note?: string
+          status?: string
+          to_account_number?: string
+          to_email: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          fee?: number
+          from_account_number?: string
+          from_email?: string
+          id?: string
+          note?: string
+          status?: string
+          to_account_number?: string
+          to_email?: string
         }
         Relationships: []
       }
