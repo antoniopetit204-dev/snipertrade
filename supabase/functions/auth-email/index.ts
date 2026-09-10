@@ -16,6 +16,22 @@ const corsHeaders = {
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
+// Expected, user-facing errors are returned with HTTP 200 + an `error` field.
+// Any non-2xx makes supabase-js throw an opaque "non-2xx status code" message,
+// which is what used to surface to users instead of a readable explanation.
+const fail = (error: string, code = 'ERROR', extra: Record<string, unknown> = {}) =>
+  json({ error, code, ...extra });
+
+const publicUser = (u: any) => ({
+  id: u.id,
+  email: u.email,
+  name: u.name,
+  role: u.role,
+  verified: u.verified !== false,
+  account_number: u.account_number || '',
+  partner_status: u.partner_status || 'none',
+});
+
 const supabase = createClient(
   Deno.env.get('SUPABASE_URL')!,
   Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
@@ -341,15 +357,18 @@ Deno.serve(async (req) => {
     await logSecurity('suspicious_request', suspicion.includes('injection_pattern') ? 'critical' : 'warning',
       String(body?.email || ip || 'unknown'), ip, ua, { action, reasons: suspicion });
     if (suspicion.includes('injection_pattern') || suspicion.includes('oversized_payload')) {
-      return json({ error: 'Request blocked by security policy.' }, 400);
+      return fail('Your request was blocked by our security filter. Please remove any unusual characters and try again.', 'BLOCKED');
     }
   }
-  // Per-IP flood limiter across every auth action
-  if (ip) {
-    const flood = await checkRateLimit(`ip:${ip}`, 'any', 40, 5);
+  // Per-IP flood limiter. Session/read actions are exempt so that many clients
+  // sharing one IP (mobile carriers, offices, one user with several tabs)
+  // can never lock each other out of the platform.
+  const FLOOD_EXEMPT = new Set(['refresh-session', 'get-profile', 'list-sessions', 'logout', 'verify-token']);
+  if (ip && !FLOOD_EXEMPT.has(action)) {
+    const flood = await checkRateLimit(`ip:${ip}`, 'any', 200, 5);
     if (!flood.allowed) {
       await logSecurity('rate_limit_ip', 'warning', `ip:${ip}`, ip, ua, { action });
-      return json({ error: 'Too many requests. Please slow down and try again shortly.' }, 429);
+      return fail('Too many requests from your network. Please wait about a minute and try again.', 'RATE_LIMITED');
     }
     recordAttempt(`ip:${ip}`, 'any', false, ip).catch(() => {});
   }
@@ -419,14 +438,17 @@ Deno.serve(async (req) => {
       const id_number = String(body.id_number || '').trim();
       const country = String(body.country || '').trim();
       const origin = body.origin || req.headers.get('origin') || '';
-      if (!email || !password || password.length < 6) return json({ error: 'Invalid input' }, 400);
+      if (!email) return fail('Please enter your email address.', 'EMAIL_REQUIRED');
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) return fail('That email address does not look valid.', 'EMAIL_INVALID');
+      if (!password) return fail('Please choose a password.', 'PASSWORD_REQUIRED');
+      if (password.length < 6) return fail('Your password must be at least 6 characters long.', 'PASSWORD_SHORT');
       const { data: existing } = await supabase.from('app_users').select('id, verified').eq('email', email).maybeSingle();
-      if (existing && existing.verified) return json({ error: 'Account already exists. Please sign in.' }, 409);
+      if (existing && existing.verified) return fail('An account with this email already exists. Please sign in instead.', 'ALREADY_EXISTS');
 
       if (phone) {
         const { data: phoneTaken } = await supabase.from('app_users').select('id, verified').eq('phone', phone).maybeSingle();
         if (phoneTaken && phoneTaken.verified && phoneTaken.id !== existing?.id) {
-          return json({ error: 'Phone already in use' }, 409);
+          return fail('That phone number is already registered to another account.', 'PHONE_TAKEN');
         }
       }
 
@@ -442,7 +464,7 @@ Deno.serve(async (req) => {
         const { data: created, error } = await supabase.from('app_users')
           .insert({ email, password_hash: hash, name, verified: false, phone, id_number, country })
           .select().single();
-        if (error) return json({ error: error.message }, 500);
+        if (error) return fail('We could not create your account right now. Please try again in a moment.', 'SIGNUP_FAILED');
         userId = created.id;
       }
       await supabase.from('user_email_preferences').upsert({ identifier: email, email }, { onConflict: 'identifier' });
@@ -465,15 +487,16 @@ Deno.serve(async (req) => {
     if (action === 'verify-otp') {
       const email = String(body.email || '').toLowerCase().trim();
       const code = String(body.code || '').trim();
-      if (!email || !/^\d{6}$/.test(code)) return json({ error: 'Enter the 6-digit code' }, 400);
+      if (!email) return fail('We lost track of your email. Please sign in again to get a new code.', 'EMAIL_REQUIRED');
+      if (!/^\d{6}$/.test(code)) return fail('Please enter the full 6-digit code from your email.', 'CODE_INVALID');
       const rl = await checkRateLimit(email, 'verify-otp', 10, 15);
-      if (!rl.allowed) return json({ error: 'Too many attempts. Try again later.' }, 429);
+      if (!rl.allowed) return fail('Too many incorrect codes. Please wait 15 minutes and try again.', 'RATE_LIMITED');
       const { data: row } = await supabase.from('email_verifications')
         .select('*').eq('email', email).eq('otp_code', code).eq('used', false)
         .order('created_at', { ascending: false }).limit(1).maybeSingle();
       if (!row || new Date(row.expires_at) < new Date()) {
         await recordAttempt(email, 'verify-otp', false, ip);
-        return json({ error: 'Invalid or expired code' }, 400);
+        return fail('That code is incorrect or has expired. Tap "Resend code" to get a fresh one.', 'CODE_EXPIRED');
       }
       await supabase.from('app_users').update({ verified: true, updated_at: new Date().toISOString() }).eq('id', row.user_id);
       await supabase.from('email_verifications').update({ used: true }).eq('id', row.id);
@@ -481,7 +504,7 @@ Deno.serve(async (req) => {
       const { data: user } = await supabase.from('app_users').select('*').eq('id', row.user_id).maybeSingle();
       const session = user ? await createSession(user.id, user.email, ua, ip) : null;
       sendTemplated(email, 'welcome', { name: user?.name || email, site_url: body.origin || '' }).catch(() => {});
-      return json({ ok: true, user: user ? { id: user.id, email: user.email, name: user.name, role: user.role, verified: true } : null, ...(session || {}) });
+      return json({ ok: true, user: user ? publicUser(user) : null, ...(session || {}) });
     }
 
     if (action === 'login') {
@@ -489,8 +512,13 @@ Deno.serve(async (req) => {
       const identifier = idRaw.toLowerCase();
       const password = String(body.password || '');
       const origin = body.origin || req.headers.get('origin') || '';
-      const rl = await checkRateLimit(identifier, 'login', 5, 15);
-      if (!rl.allowed) return json({ error: `Too many attempts. Try again in ${Math.ceil(rl.retryAfter / 60)} min.`, retryAfter: rl.retryAfter }, 429);
+      if (!idRaw) return fail('Please enter your email address or phone number.', 'IDENTIFIER_REQUIRED');
+      if (!password) return fail('Please enter your password.', 'PASSWORD_REQUIRED');
+
+      const rl = await checkRateLimit(identifier, 'login', 8, 15);
+      if (!rl.allowed) {
+        return fail(`Too many failed sign-in attempts. Please try again in ${Math.ceil(rl.retryAfter / 60)} minute(s), or reset your password.`, 'RATE_LIMITED', { retryAfter: rl.retryAfter });
+      }
 
       // Allow login by email OR phone in the same field
       const isPhone = /^[+0-9][0-9\s\-]{6,}$/.test(idRaw);
@@ -506,10 +534,13 @@ Deno.serve(async (req) => {
       }
       if (!user) {
         await recordAttempt(identifier, 'login', false, ip);
-        return json({ error: 'No account found. Please sign up first.', code: 'NOT_REGISTERED' }, 404);
+        return fail('We could not find an account with those details. Please check them, or create a new account.', 'NOT_REGISTERED');
       }
-      const ok = await bcrypt.compare(password, user.password_hash);
-      if (!ok) { await recordAttempt(identifier, 'login', false, ip); return json({ error: 'Incorrect password' }, 401); }
+      const ok = await bcrypt.compare(password, user.password_hash || '');
+      if (!ok) {
+        await recordAttempt(identifier, 'login', false, ip);
+        return fail('That password is incorrect. Please try again or use "Forgot password".', 'WRONG_PASSWORD');
+      }
       if (!user.verified) {
         const otp = otp6();
         const token = tokenHex(32);
@@ -517,7 +548,7 @@ Deno.serve(async (req) => {
         await supabase.from('email_verifications').insert({ user_id: user.id, email: user.email, token, otp_code: otp, expires_at: expires });
         sendTemplated(user.email, 'email_verification', { name: user.name || user.email, verify_url: `${origin}/auth?verify=${token}`, otp_code: otp, site_url: origin }).catch(() => {});
         await recordAttempt(identifier, 'login', false, ip);
-        return json({ error: 'Email not verified. We sent you a fresh code.', requireVerification: true, email: user.email }, 403);
+        return fail('Your email is not verified yet. We just sent you a fresh 6-digit code.', 'REQUIRE_VERIFICATION', { requireVerification: true, email: user.email });
       }
 
       await recordAttempt(identifier, 'login', true, ip);
@@ -525,7 +556,7 @@ Deno.serve(async (req) => {
         sendTemplated(user.email, 'login_alert', { name: user.name || user.email, time: new Date().toUTCString() }).catch(() => {});
       }
       const session = await createSession(user.id, user.email, ua, ip);
-      return json({ user: { id: user.id, email: user.email, name: user.name, role: user.role, verified: true }, ...session });
+      return json({ user: publicUser(user), ...session });
     }
 
     if (action === 'get-profile') {
