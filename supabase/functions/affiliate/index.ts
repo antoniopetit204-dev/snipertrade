@@ -59,13 +59,62 @@ Deno.serve(async (req) => {
       return json({ valid: true, code: aff.code, referrer_name: u?.name || 'A trader' });
     }
 
-    // ── Personal affiliate dashboard (auth) ──
+    // ── Partnership request (auth) ──
+    if (action === 'partner-request') {
+      const email = await sessionEmail(body?.refresh_token, body?.email);
+      if (!email) return json({ error: 'Your session has expired. Please sign in again.' });
+
+      const { data: settings } = await sb.from('admin_settings').select('*').limit(1).maybeSingle();
+      const minDeposit = Number(settings?.partner_min_deposit ?? 0);
+      const needsApproval = settings?.partner_require_approval !== false;
+
+      const { data: u } = await sb.from('app_users').select('partner_status').eq('email', email).maybeSingle();
+      if (u?.partner_status === 'approved') return json({ success: true, status: 'approved' });
+      if (u?.partner_status === 'pending') return json({ success: true, status: 'pending' });
+
+      const { data: bal } = await sb.from('user_balances').select('total_deposited').eq('deriv_account', email).maybeSingle();
+      const deposited = Number(bal?.total_deposited || 0);
+      if (deposited < minDeposit) {
+        return json({ error: `You need total deposits of at least KES ${minDeposit} to apply. You have deposited KES ${deposited.toFixed(2)} so far.` });
+      }
+
+      const now = new Date().toISOString();
+      const status = needsApproval ? 'pending' : 'approved';
+      await sb.from('app_users').update({
+        partner_status: status,
+        partner_requested_at: now,
+        ...(status === 'approved' ? { partner_approved_at: now } : {}),
+      }).eq('email', email);
+      if (status === 'approved') await ensureAffiliate(sb, email);
+      return json({ success: true, status });
+    }
+
+    // ── Admin: approve / reject a partnership request ──
+    if (action === 'partner-approve' || action === 'partner-reject') {
+      const email = await sessionEmail(body?.refresh_token, body?.email);
+      if (!email) return json({ error: 'Your session has expired. Please sign in again.' });
+      const { data: me } = await sb.from('app_users').select('role').eq('email', email).maybeSingle();
+      if (me?.role !== 'admin') return json({ error: 'Only an administrator can do that.' });
+
+      const target = String(body?.target_email || '').toLowerCase().trim();
+      if (!target) return json({ error: 'Missing the account to update.' });
+      const approved = action === 'partner-approve';
+      await sb.from('app_users').update({
+        partner_status: approved ? 'approved' : 'rejected',
+        partner_approved_at: approved ? new Date().toISOString() : null,
+        partner_note: String(body?.note || '').slice(0, 300),
+      }).eq('email', target);
+      if (approved) await ensureAffiliate(sb, target);
+      return json({ success: true });
+    }
+
+    // ── Personal partnership dashboard (auth) ──
     if (action === 'stats' || action === 'my-link') {
       const email = await sessionEmail(body?.refresh_token, body?.email);
-      if (!email) return json({ error: 'Unauthorized' }, 401);
+      if (!email) return json({ error: 'Your session has expired. Please sign in again.' });
 
       const aff = await ensureAffiliate(sb, email);
-      if (!aff) return json({ error: 'Could not create affiliate profile' }, 500);
+      if (!aff) return json({ error: 'Could not create your partnership profile. Please try again.' });
 
       const { data: settings } = await sb.from('admin_settings').select('*').limit(1).maybeSingle();
       const rates = {
@@ -76,7 +125,28 @@ Deno.serve(async (req) => {
         min_payout: Number(settings?.affiliate_min_payout ?? 100),
       };
 
-      if (action === 'my-link') return json({ success: true, code: aff.code, rates });
+      const { data: meUser } = await sb.from('app_users')
+        .select('partner_status, partner_note, account_number').eq('email', email).maybeSingle();
+      const { data: myBal } = await sb.from('user_balances')
+        .select('total_deposited').eq('deriv_account', email).maybeSingle();
+      const partner = {
+        status: meUser?.partner_status || 'none',
+        note: meUser?.partner_note || '',
+        account_number: meUser?.account_number || '',
+        min_deposit: Number(settings?.partner_min_deposit ?? 0),
+        require_approval: settings?.partner_require_approval !== false,
+        total_deposited: Number(myBal?.total_deposited || 0),
+      };
+
+      if (action === 'my-link') return json({ success: true, code: aff.code, rates, partner });
+
+      if (partner.status !== 'approved') {
+        return json({
+          success: true, code: aff.code, rates, partner, locked: true,
+          summary: { clicks: 0, signups: 0, conversions: 0, total_earned: 0, pending: 0 },
+          referrals: [], commissions: [],
+        });
+      }
 
       const [{ data: referrals }, { data: commissions }] = await Promise.all([
         sb.from('referrals').select('*').eq('referrer_email', email).order('created_at', { ascending: false }).limit(200),
@@ -92,6 +162,7 @@ Deno.serve(async (req) => {
         success: true,
         code: aff.code,
         rates,
+        partner,
         summary: {
           clicks: Number(aff.clicks || 0),
           signups: Number(aff.signups || 0),
@@ -121,12 +192,27 @@ Deno.serve(async (req) => {
       const { data: me } = await sb.from('app_users').select('role').eq('email', email).maybeSingle();
       if (me?.role !== 'admin') return json({ error: 'Forbidden' }, 403);
 
-      const [{ data: affiliates }, { data: commissions }, { data: referrals }] = await Promise.all([
+      const [{ data: affiliates }, { data: commissions }, { data: referrals }, { data: requests }] = await Promise.all([
         sb.from('affiliates').select('*').order('total_earned', { ascending: false }).limit(500),
         sb.from('affiliate_commissions').select('*').order('created_at', { ascending: false }).limit(500),
         sb.from('referrals').select('*').order('created_at', { ascending: false }).limit(500),
+        sb.from('app_users')
+          .select('email, name, account_number, partner_status, partner_requested_at, partner_approved_at, partner_note')
+          .neq('partner_status', 'none').order('partner_requested_at', { ascending: false }).limit(500),
       ]);
-      return json({ success: true, affiliates: affiliates || [], commissions: commissions || [], referrals: referrals || [] });
+      // Attach lifetime deposits so admins can verify the qualifying deposit.
+      const emails = (requests || []).map((r: any) => r.email);
+      const { data: bals } = emails.length
+        ? await sb.from('user_balances').select('deriv_account, total_deposited').in('deriv_account', emails)
+        : { data: [] as any[] };
+      const depMap = new Map((bals || []).map((b: any) => [b.deriv_account, Number(b.total_deposited || 0)]));
+      return json({
+        success: true,
+        affiliates: affiliates || [],
+        commissions: commissions || [],
+        referrals: referrals || [],
+        requests: (requests || []).map((r: any) => ({ ...r, total_deposited: depMap.get(r.email) || 0 })),
+      });
     }
 
     return json({ error: 'Invalid action' }, 400);

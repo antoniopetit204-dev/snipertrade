@@ -1,5 +1,5 @@
 // Affiliate client helpers — link capture, click tracking, stats.
-import { supabase } from '@/integrations/supabase/client';
+import { invokeFn } from './fn';
 import { getRefreshToken } from './auth-email';
 
 const REF_KEY = 'hft_ref_code';
@@ -42,12 +42,8 @@ export const storeRef = (code: string) => {
   localStorage.setItem(REF_TS_KEY, String(Date.now()));
 };
 
-const invoke = async (action: string, body: Record<string, unknown> = {}) => {
-  const { data, error } = await supabase.functions.invoke(`affiliate?action=${action}`, { body });
-  if (error) throw error;
-  if ((data as any)?.error) throw new Error((data as any).error);
-  return data as any;
-};
+const invoke = async (action: string, body: Record<string, unknown> = {}) =>
+  invokeFn<any>(`affiliate?action=${action}`, body);
 
 /**
  * Authenticated call that survives refresh-token rotation: on Unauthorized it
@@ -101,6 +97,14 @@ export const fetchAffiliateStats = () => invokeAuthed('stats');
 
 export const fetchAffiliateAdmin = () => invokeAuthed('admin-list');
 
-/** Builds the share link on the CURRENT domain the affiliate is using. */
+/** Partnership (formerly "affiliate") — deposit-first, admin-approved. */
+export const fetchPartnershipStats = fetchAffiliateStats;
+export const fetchPartnershipAdmin = fetchAffiliateAdmin;
+export const requestPartnership = () => invokeAuthed('partner-request');
+export const decidePartnership = (target_email: string, approve: boolean, note = '') =>
+  invokeAuthed(approve ? 'partner-approve' : 'partner-reject', { target_email, note });
+
+/** Builds the share link on the CURRENT domain the partner is using. */
 export const buildAffiliateLink = (code: string) =>
   `${window.location.origin}/?ref=${encodeURIComponent(code)}`;
+export const buildPartnerLink = buildAffiliateLink;
