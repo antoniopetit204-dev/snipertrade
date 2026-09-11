@@ -42,12 +42,8 @@ export const storeRef = (code: string) => {
   localStorage.setItem(REF_TS_KEY, String(Date.now()));
 };
 
-const invoke = async (action: string, body: Record<string, unknown> = {}) => {
-  const { data, error } = await supabase.functions.invoke(`affiliate?action=${action}`, { body });
-  if (error) throw error;
-  if ((data as any)?.error) throw new Error((data as any).error);
-  return data as any;
-};
+const invoke = async (action: string, body: Record<string, unknown> = {}) =>
+  invokeFn<any>(`affiliate?action=${action}`, body);
 
 /**
  * Authenticated call that survives refresh-token rotation: on Unauthorized it
