@@ -97,6 +97,14 @@ export const fetchAffiliateStats = () => invokeAuthed('stats');
 
 export const fetchAffiliateAdmin = () => invokeAuthed('admin-list');
 
-/** Builds the share link on the CURRENT domain the affiliate is using. */
+/** Partnership (formerly "affiliate") — deposit-first, admin-approved. */
+export const fetchPartnershipStats = fetchAffiliateStats;
+export const fetchPartnershipAdmin = fetchAffiliateAdmin;
+export const requestPartnership = () => invokeAuthed('partner-request');
+export const decidePartnership = (target_email: string, approve: boolean, note = '') =>
+  invokeAuthed(approve ? 'partner-approve' : 'partner-reject', { target_email, note });
+
+/** Builds the share link on the CURRENT domain the partner is using. */
 export const buildAffiliateLink = (code: string) =>
   `${window.location.origin}/?ref=${encodeURIComponent(code)}`;
+export const buildPartnerLink = buildAffiliateLink;
