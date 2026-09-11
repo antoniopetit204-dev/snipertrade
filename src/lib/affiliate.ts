@@ -1,5 +1,5 @@
 // Affiliate client helpers — link capture, click tracking, stats.
-import { supabase } from '@/integrations/supabase/client';
+import { invokeFn } from './fn';
 import { getRefreshToken } from './auth-email';
 
 const REF_KEY = 'hft_ref_code';
