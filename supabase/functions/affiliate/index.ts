@@ -162,6 +162,7 @@ Deno.serve(async (req) => {
         success: true,
         code: aff.code,
         rates,
+        partner,
         summary: {
           clicks: Number(aff.clicks || 0),
           signups: Number(aff.signups || 0),
