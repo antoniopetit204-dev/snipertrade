@@ -192,12 +192,27 @@ Deno.serve(async (req) => {
       const { data: me } = await sb.from('app_users').select('role').eq('email', email).maybeSingle();
       if (me?.role !== 'admin') return json({ error: 'Forbidden' }, 403);
 
-      const [{ data: affiliates }, { data: commissions }, { data: referrals }] = await Promise.all([
+      const [{ data: affiliates }, { data: commissions }, { data: referrals }, { data: requests }] = await Promise.all([
         sb.from('affiliates').select('*').order('total_earned', { ascending: false }).limit(500),
         sb.from('affiliate_commissions').select('*').order('created_at', { ascending: false }).limit(500),
         sb.from('referrals').select('*').order('created_at', { ascending: false }).limit(500),
+        sb.from('app_users')
+          .select('email, name, account_number, partner_status, partner_requested_at, partner_approved_at, partner_note')
+          .neq('partner_status', 'none').order('partner_requested_at', { ascending: false }).limit(500),
       ]);
-      return json({ success: true, affiliates: affiliates || [], commissions: commissions || [], referrals: referrals || [] });
+      // Attach lifetime deposits so admins can verify the qualifying deposit.
+      const emails = (requests || []).map((r: any) => r.email);
+      const { data: bals } = emails.length
+        ? await sb.from('user_balances').select('deriv_account, total_deposited').in('deriv_account', emails)
+        : { data: [] as any[] };
+      const depMap = new Map((bals || []).map((b: any) => [b.deriv_account, Number(b.total_deposited || 0)]));
+      return json({
+        success: true,
+        affiliates: affiliates || [],
+        commissions: commissions || [],
+        referrals: referrals || [],
+        requests: (requests || []).map((r: any) => ({ ...r, total_deposited: depMap.get(r.email) || 0 })),
+      });
     }
 
     return json({ error: 'Invalid action' }, 400);
