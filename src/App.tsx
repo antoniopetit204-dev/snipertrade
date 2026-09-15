@@ -18,6 +18,7 @@ import DashboardManualTrader from "./pages/DashboardManualTrader";
 import DashboardDeposit from "./pages/DashboardDeposit";
 import DashboardWithdraw from "./pages/DashboardWithdraw";
 import DashboardAffiliate from "./pages/DashboardAffiliate";
+import DashboardTransfer from "./pages/DashboardTransfer";
 import { ReferralCapture } from "./components/ReferralCapture";
 import Admin from "./pages/Admin";
 import Auth from "./pages/Auth";
