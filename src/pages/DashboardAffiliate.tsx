@@ -3,11 +3,17 @@ import { DashboardLayout } from '@/components/DashboardLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
-import { fetchAffiliateStats, buildAffiliateLink } from '@/lib/affiliate';
-import { Users, Copy, MousePointerClick, UserPlus, CheckCircle2, Coins, Share2, Link2 } from 'lucide-react';
+import { fetchPartnershipStats, buildPartnerLink, requestPartnership } from '@/lib/affiliate';
+import { Users, Copy, MousePointerClick, UserPlus, CheckCircle2, Coins, Share2, Link2, Lock } from 'lucide-react';
 
 interface Stats {
   code: string;
+  locked?: boolean;
+  partner: {
+    status: 'none' | 'pending' | 'approved' | 'rejected' | string;
+    note: string; account_number: string;
+    min_deposit: number; require_approval: boolean; total_deposited: number;
+  };
   rates: { enabled: boolean; l1: number; l2: number; l3: number; min_payout: number };
   summary: { clicks: number; signups: number; conversions: number; total_earned: number; pending: number };
   referrals: any[];
@@ -18,15 +24,33 @@ const DashboardAffiliate = () => {
   const { toast } = useToast();
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [applying, setApplying] = useState(false);
 
-  useEffect(() => {
-    fetchAffiliateStats()
+  const load = () => {
+    setLoading(true);
+    fetchPartnershipStats()
       .then(setStats)
-      .catch((e) => toast({ title: 'Could not load affiliate data', description: e.message, variant: 'destructive' }))
+      .catch((e) => toast({ title: 'Could not load partnership data', description: e.message, variant: 'destructive' }))
       .finally(() => setLoading(false));
-  }, []);
+  };
+  useEffect(load, []);
 
-  const link = stats ? buildAffiliateLink(stats.code) : '';
+  const apply = async () => {
+    setApplying(true);
+    try {
+      const r = await requestPartnership();
+      toast({
+        title: r.status === 'approved' ? 'You are now a partner ✓' : 'Application submitted',
+        description: r.status === 'approved' ? 'Your link is ready below.' : 'An administrator will review it shortly.',
+      });
+      load();
+    } catch (e) {
+      toast({ title: 'Could not apply', description: (e as Error).message, variant: 'destructive' });
+    } finally { setApplying(false); }
+  };
+
+  const link = stats ? buildPartnerLink(stats.code) : '';
+  const approved = stats?.partner?.status === 'approved';
 
   const copy = async (text: string, label: string) => {
     try {
@@ -44,18 +68,60 @@ const DashboardAffiliate = () => {
   };
 
   return (
-    <DashboardLayout title="Affiliate Program" icon={<Users className="h-5 w-5 text-primary" />}
+    <DashboardLayout title="Partnership" icon={<Users className="h-5 w-5 text-primary" />}
       subtitle="Earn commission on every trader you bring in">
       <div className="space-y-4 max-w-5xl mx-auto">
-        {loading && <p className="text-sm text-muted-foreground">Loading your affiliate dashboard…</p>}
+        {loading && <p className="text-sm text-muted-foreground">Loading your partnership dashboard…</p>}
 
-        {stats && (
+        {stats && !approved && (
+          <div className="bg-card border border-border rounded-xl p-5 space-y-3">
+            <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+              <Lock className="h-4 w-4 text-primary" /> Become a partner
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Partners earn commission on the first deposit of everyone they bring in —
+              Level 1 {stats.rates.l1}% · Level 2 {stats.rates.l2}% · Level 3 {stats.rates.l3}%.
+            </p>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="rounded-lg bg-background border border-border p-3">
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Required deposits</p>
+                <p className="font-mono text-foreground">KES {stats.partner.min_deposit.toFixed(2)}</p>
+              </div>
+              <div className="rounded-lg bg-background border border-border p-3">
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Your deposits</p>
+                <p className="font-mono text-foreground">KES {stats.partner.total_deposited.toFixed(2)}</p>
+              </div>
+            </div>
+            {stats.partner.status === 'pending' ? (
+              <p className="text-xs text-primary">Your application is under review. We'll notify you once it's approved.</p>
+            ) : (
+              <>
+                {stats.partner.status === 'rejected' && (
+                  <p className="text-xs text-loss">
+                    Your last application was declined.{stats.partner.note ? ` Reason: ${stats.partner.note}` : ''} You can apply again.
+                  </p>
+                )}
+                <Button onClick={apply} disabled={applying || stats.partner.total_deposited < stats.partner.min_deposit}>
+                  {applying ? 'Submitting…' : 'Apply for partnership'}
+                </Button>
+                {stats.partner.total_deposited < stats.partner.min_deposit && (
+                  <p className="text-[11px] text-muted-foreground">
+                    Deposit KES {(stats.partner.min_deposit - stats.partner.total_deposited).toFixed(2)} more to qualify.
+                  </p>
+                )}
+              </>
+            )}
+          </div>
+        )}
+
+        {stats && approved && (
           <>
             {!stats.rates.enabled && (
               <div className="p-3 rounded-lg bg-loss/10 border border-loss/30 text-loss text-sm">
-                The affiliate program is currently paused by the admin. Your link stays valid.
+                The partnership program is currently paused by the admin. Your link stays valid.
               </div>
             )}
+
 
             {/* Link + code */}
             <div className="bg-gradient-to-br from-primary/15 to-primary/5 border border-primary/30 rounded-xl p-4 space-y-3">

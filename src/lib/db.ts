@@ -33,6 +33,11 @@ export const fetchSettings = async (): Promise<AdminSettings | null> => {
       affiliateL2Percent: Number((data as any).affiliate_l2_percent ?? 3),
       affiliateL3Percent: Number((data as any).affiliate_l3_percent ?? 1),
       affiliateMinPayout: Number((data as any).affiliate_min_payout ?? 100),
+      partnerMinDeposit: Number((data as any).partner_min_deposit ?? 0),
+      partnerRequireApproval: (data as any).partner_require_approval ?? true,
+      transferEnabled: (data as any).transfer_enabled ?? true,
+      transferMin: Number((data as any).transfer_min ?? 100),
+      transferFeePercent: Number((data as any).transfer_fee_percent ?? 0),
   };
 };
 
@@ -60,6 +65,11 @@ export const updateSettings = async (settings: AdminSettings) => {
       affiliate_l2_percent: Number((settings as any).affiliateL2Percent ?? 3),
       affiliate_l3_percent: Number((settings as any).affiliateL3Percent ?? 1),
       affiliate_min_payout: Number((settings as any).affiliateMinPayout ?? 100),
+      partner_min_deposit: Number((settings as any).partnerMinDeposit ?? 0),
+      partner_require_approval: (settings as any).partnerRequireApproval ?? true,
+      transfer_enabled: (settings as any).transferEnabled ?? true,
+      transfer_min: Number((settings as any).transferMin ?? 100),
+      transfer_fee_percent: Number((settings as any).transferFeePercent ?? 0),
     } as any)
     .not('id', 'is', null);
   return !error;
