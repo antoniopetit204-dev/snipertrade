@@ -68,18 +68,60 @@ const DashboardAffiliate = () => {
   };
 
   return (
-    <DashboardLayout title="Affiliate Program" icon={<Users className="h-5 w-5 text-primary" />}
+    <DashboardLayout title="Partnership" icon={<Users className="h-5 w-5 text-primary" />}
       subtitle="Earn commission on every trader you bring in">
       <div className="space-y-4 max-w-5xl mx-auto">
-        {loading && <p className="text-sm text-muted-foreground">Loading your affiliate dashboard…</p>}
+        {loading && <p className="text-sm text-muted-foreground">Loading your partnership dashboard…</p>}
 
-        {stats && (
+        {stats && !approved && (
+          <div className="bg-card border border-border rounded-xl p-5 space-y-3">
+            <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+              <Lock className="h-4 w-4 text-primary" /> Become a partner
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Partners earn commission on the first deposit of everyone they bring in —
+              Level 1 {stats.rates.l1}% · Level 2 {stats.rates.l2}% · Level 3 {stats.rates.l3}%.
+            </p>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="rounded-lg bg-background border border-border p-3">
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Required deposits</p>
+                <p className="font-mono text-foreground">KES {stats.partner.min_deposit.toFixed(2)}</p>
+              </div>
+              <div className="rounded-lg bg-background border border-border p-3">
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Your deposits</p>
+                <p className="font-mono text-foreground">KES {stats.partner.total_deposited.toFixed(2)}</p>
+              </div>
+            </div>
+            {stats.partner.status === 'pending' ? (
+              <p className="text-xs text-primary">Your application is under review. We'll notify you once it's approved.</p>
+            ) : (
+              <>
+                {stats.partner.status === 'rejected' && (
+                  <p className="text-xs text-loss">
+                    Your last application was declined.{stats.partner.note ? ` Reason: ${stats.partner.note}` : ''} You can apply again.
+                  </p>
+                )}
+                <Button onClick={apply} disabled={applying || stats.partner.total_deposited < stats.partner.min_deposit}>
+                  {applying ? 'Submitting…' : 'Apply for partnership'}
+                </Button>
+                {stats.partner.total_deposited < stats.partner.min_deposit && (
+                  <p className="text-[11px] text-muted-foreground">
+                    Deposit KES {(stats.partner.min_deposit - stats.partner.total_deposited).toFixed(2)} more to qualify.
+                  </p>
+                )}
+              </>
+            )}
+          </div>
+        )}
+
+        {stats && approved && (
           <>
             {!stats.rates.enabled && (
               <div className="p-3 rounded-lg bg-loss/10 border border-loss/30 text-loss text-sm">
-                The affiliate program is currently paused by the admin. Your link stays valid.
+                The partnership program is currently paused by the admin. Your link stays valid.
               </div>
             )}
+
 
             {/* Link + code */}
             <div className="bg-gradient-to-br from-primary/15 to-primary/5 border border-primary/30 rounded-xl p-4 space-y-3">
