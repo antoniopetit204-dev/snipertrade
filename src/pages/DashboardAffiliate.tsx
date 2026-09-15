@@ -3,11 +3,17 @@ import { DashboardLayout } from '@/components/DashboardLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
-import { fetchAffiliateStats, buildAffiliateLink } from '@/lib/affiliate';
-import { Users, Copy, MousePointerClick, UserPlus, CheckCircle2, Coins, Share2, Link2 } from 'lucide-react';
+import { fetchPartnershipStats, buildPartnerLink, requestPartnership } from '@/lib/affiliate';
+import { Users, Copy, MousePointerClick, UserPlus, CheckCircle2, Coins, Share2, Link2, Lock } from 'lucide-react';
 
 interface Stats {
   code: string;
+  locked?: boolean;
+  partner: {
+    status: 'none' | 'pending' | 'approved' | 'rejected' | string;
+    note: string; account_number: string;
+    min_deposit: number; require_approval: boolean; total_deposited: number;
+  };
   rates: { enabled: boolean; l1: number; l2: number; l3: number; min_payout: number };
   summary: { clicks: number; signups: number; conversions: number; total_earned: number; pending: number };
   referrals: any[];
@@ -18,13 +24,30 @@ const DashboardAffiliate = () => {
   const { toast } = useToast();
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [applying, setApplying] = useState(false);
 
-  useEffect(() => {
-    fetchAffiliateStats()
+  const load = () => {
+    setLoading(true);
+    fetchPartnershipStats()
       .then(setStats)
-      .catch((e) => toast({ title: 'Could not load affiliate data', description: e.message, variant: 'destructive' }))
+      .catch((e) => toast({ title: 'Could not load partnership data', description: e.message, variant: 'destructive' }))
       .finally(() => setLoading(false));
-  }, []);
+  };
+  useEffect(load, []);
+
+  const apply = async () => {
+    setApplying(true);
+    try {
+      const r = await requestPartnership();
+      toast({
+        title: r.status === 'approved' ? 'You are now a partner ✓' : 'Application submitted',
+        description: r.status === 'approved' ? 'Your link is ready below.' : 'An administrator will review it shortly.',
+      });
+      load();
+    } catch (e) {
+      toast({ title: 'Could not apply', description: (e as Error).message, variant: 'destructive' });
+    } finally { setApplying(false); }
+  };
 
   const link = stats ? buildAffiliateLink(stats.code) : '';
 
