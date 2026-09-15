@@ -65,6 +65,11 @@ export const updateSettings = async (settings: AdminSettings) => {
       affiliate_l2_percent: Number((settings as any).affiliateL2Percent ?? 3),
       affiliate_l3_percent: Number((settings as any).affiliateL3Percent ?? 1),
       affiliate_min_payout: Number((settings as any).affiliateMinPayout ?? 100),
+      partner_min_deposit: Number((settings as any).partnerMinDeposit ?? 0),
+      partner_require_approval: (settings as any).partnerRequireApproval ?? true,
+      transfer_enabled: (settings as any).transferEnabled ?? true,
+      transfer_min: Number((settings as any).transferMin ?? 100),
+      transfer_fee_percent: Number((settings as any).transferFeePercent ?? 0),
     } as any)
     .not('id', 'is', null);
   return !error;
