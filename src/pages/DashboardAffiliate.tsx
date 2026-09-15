@@ -49,7 +49,8 @@ const DashboardAffiliate = () => {
     } finally { setApplying(false); }
   };
 
-  const link = stats ? buildAffiliateLink(stats.code) : '';
+  const link = stats ? buildPartnerLink(stats.code) : '';
+  const approved = stats?.partner?.status === 'approved';
 
   const copy = async (text: string, label: string) => {
     try {
