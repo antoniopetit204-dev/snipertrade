@@ -38,6 +38,11 @@ export interface AdminSettings {
   affiliateL2Percent?: number;
   affiliateL3Percent?: number;
   affiliateMinPayout?: number;
+  partnerMinDeposit?: number;
+  partnerRequireApproval?: boolean;
+  transferEnabled?: boolean;
+  transferMin?: number;
+  transferFeePercent?: number;
 }
 
 export interface Bot {
