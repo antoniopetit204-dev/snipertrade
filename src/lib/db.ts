@@ -33,6 +33,11 @@ export const fetchSettings = async (): Promise<AdminSettings | null> => {
       affiliateL2Percent: Number((data as any).affiliate_l2_percent ?? 3),
       affiliateL3Percent: Number((data as any).affiliate_l3_percent ?? 1),
       affiliateMinPayout: Number((data as any).affiliate_min_payout ?? 100),
+      partnerMinDeposit: Number((data as any).partner_min_deposit ?? 0),
+      partnerRequireApproval: (data as any).partner_require_approval ?? true,
+      transferEnabled: (data as any).transfer_enabled ?? true,
+      transferMin: Number((data as any).transfer_min ?? 100),
+      transferFeePercent: Number((data as any).transfer_fee_percent ?? 0),
   };
 };
 
