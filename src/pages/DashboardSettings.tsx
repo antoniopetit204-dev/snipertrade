@@ -34,6 +34,14 @@ export default function DashboardSettings() {
   return (
     <DashboardLayout title="Settings" icon={<SettingsIcon className="h-4 w-4 text-primary" />} subtitle="Manage your account preferences">
       <div className="max-w-2xl space-y-4">
+        <div className="bg-card border border-border rounded-lg p-4 sm:p-6">
+          <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Account</p>
+          <p className="text-sm text-foreground mt-1 truncate">{user?.email}</p>
+          {user?.accountNumber && (
+            <p className="font-mono font-bold tracking-widest text-primary mt-0.5">{user.accountNumber}</p>
+          )}
+        </div>
+
         <div className="bg-card border border-border rounded-lg p-4 sm:p-6 space-y-4">
           <h2 className="text-sm font-semibold flex items-center gap-2"><Mail className="h-4 w-4 text-primary" /> Email Address</h2>
           <div className="space-y-1.5">
