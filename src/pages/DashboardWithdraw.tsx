@@ -129,7 +129,7 @@ const DashboardWithdraw = () => {
           <p className="text-2xl sm:text-3xl font-bold font-mono text-foreground">
             KES {internalBalance.toFixed(2)}
           </p>
-          <p className="text-[10px] text-muted-foreground mt-1">Account: {account}</p>
+          <p className="text-[10px] text-muted-foreground mt-1 font-mono tracking-wider">Account No: {user?.accountNumber || account}</p>
           <p className="text-[10px] text-muted-foreground">Min withdrawal: KES {minWithdrawal}</p>
         </div>
 
