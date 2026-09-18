@@ -202,7 +202,7 @@ const Admin = () => {
     { value: 'requests', icon: Users, label: 'Requests' },
     { value: 'users', icon: Users, label: 'Users' },
     { value: 'ledger', icon: Wallet, label: 'Ledger' },
-    { value: 'affiliate', icon: Users, label: 'Affiliate' },
+    { value: 'affiliate', icon: Users, label: 'Partnership' },
     { value: 'smtp', icon: Mail, label: 'SMTP' },
     { value: 'emails', icon: FileText, label: 'Emails' },
     { value: 'seo', icon: AppWindow, label: 'SEO' },

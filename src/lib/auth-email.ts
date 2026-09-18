@@ -24,6 +24,7 @@ const persistSession = (data: any): User => {
     role: data.user.role === 'admin' ? 'admin' : 'user',
     verified: data.user.verified !== false,
     name: data.user.name,
+    accountNumber: data.user.account_number || getUser()?.accountNumber || '',
   };
   setUser(u);
   if (data.refresh_token) setRefreshToken(data.refresh_token);
