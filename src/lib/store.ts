@@ -71,6 +71,7 @@ export interface User {
   role: 'admin' | 'user';
   verified?: boolean;
   name?: string;
+  accountNumber?: string;
   derivAccounts?: DerivAccount[];
   activeAccount?: DerivAccount;
 }
