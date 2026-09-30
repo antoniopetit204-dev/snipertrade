@@ -16,14 +16,14 @@ const isIosSafari = () => {
   if (typeof navigator === 'undefined') return false;
   const ua = navigator.userAgent.toLowerCase();
   const ios = /iphone|ipad|ipod/.test(ua);
-  const safari = /safari/.test(ua) && !/crios|fxios|edgios/.test(ua);
-  return ios && safari;
+  const iPadOS = navigator.platform === 'MacIntel' && (navigator as any).maxTouchPoints > 1;
+  return ios || iPadOS;
 };
 
 export const useInstallPrompt = () => {
   const [deferredPrompt, setDeferredPrompt] = useState<DeferredInstallPrompt | null>(null);
   const [isInstalled, setIsInstalled] = useState(isStandaloneMode());
-  const [dismissed, setDismissed] = useState(() => localStorage.getItem(INSTALL_DISMISS_KEY) === '1');
+  const [dismissed, setDismissed] = useState(() => { const v = Number(localStorage.getItem(INSTALL_DISMISS_KEY) || 0); return v > 1 && Date.now() - v < 3 * 86400000; });
 
   useEffect(() => {
     const handleBeforeInstallPrompt = (event: Event) => {
@@ -47,7 +47,7 @@ export const useInstallPrompt = () => {
   }, []);
 
   const dismiss = useCallback(() => {
-    localStorage.setItem(INSTALL_DISMISS_KEY, '1');
+    localStorage.setItem(INSTALL_DISMISS_KEY, String(Date.now()));
     setDismissed(true);
   }, []);
 

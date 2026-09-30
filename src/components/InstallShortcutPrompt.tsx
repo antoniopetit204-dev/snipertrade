@@ -41,7 +41,7 @@ export const InstallShortcutPrompt = ({ variant = 'dashboard' }: InstallShortcut
           </h2>
           <p className="mt-1 text-xs text-muted-foreground">
             {showIosHint
-              ? 'On iPhone/iPad, tap Share in Safari, then choose Add to Home Screen.'
+              ? 'On iPhone/iPad: tap the Share button (square with arrow) in Safari or Chrome, scroll down, choose "Add to Home Screen", then tap Add.'
               : 'Add this dashboard to your home screen for a fast app-style launch on Android and iPhone.'}
           </p>
 

@@ -82,18 +82,10 @@ const DashboardAffiliate = () => {
               Partners earn commission on the first deposit of everyone they bring in —
               Level 1 {stats.rates.l1}% · Level 2 {stats.rates.l2}% · Level 3 {stats.rates.l3}%.
             </p>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="rounded-lg bg-background border border-border p-3">
-                <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Required deposits</p>
-                <p className="font-mono text-foreground">KES {stats.partner.min_deposit.toFixed(2)}</p>
-              </div>
-              <div className="rounded-lg bg-background border border-border p-3">
-                <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Your deposits</p>
-                <p className="font-mono text-foreground">KES {stats.partner.total_deposited.toFixed(2)}</p>
-              </div>
-            </div>
             {stats.partner.status === 'pending' ? (
               <p className="text-xs text-primary">Your application is under review. We'll notify you once it's approved.</p>
+            ) : stats.partner.total_deposited < stats.partner.min_deposit ? (
+              <p className="text-xs text-muted-foreground">You are not eligible for partnership yet.</p>
             ) : (
               <>
                 {stats.partner.status === 'rejected' && (
@@ -101,14 +93,9 @@ const DashboardAffiliate = () => {
                     Your last application was declined.{stats.partner.note ? ` Reason: ${stats.partner.note}` : ''} You can apply again.
                   </p>
                 )}
-                <Button onClick={apply} disabled={applying || stats.partner.total_deposited < stats.partner.min_deposit}>
+                <Button onClick={apply} disabled={applying}>
                   {applying ? 'Submitting…' : 'Apply for partnership'}
                 </Button>
-                {stats.partner.total_deposited < stats.partner.min_deposit && (
-                  <p className="text-[11px] text-muted-foreground">
-                    Deposit KES {(stats.partner.min_deposit - stats.partner.total_deposited).toFixed(2)} more to qualify.
-                  </p>
-                )}
               </>
             )}
           </div>
