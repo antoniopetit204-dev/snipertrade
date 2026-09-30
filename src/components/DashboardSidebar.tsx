@@ -66,9 +66,8 @@ export const DashboardSidebar = ({ onClose }: SidebarProps) => {
         )}
       </div>
 
-      {!collapsed && (user?.email || user?.activeAccount) && (
+      {!collapsed && (user?.accountNumber || user?.activeAccount) && (
         <div className="px-4 py-2 border-b border-border">
-          {user?.email && <p className="text-xs text-muted-foreground truncate">{user.email}</p>}
           {user?.accountNumber && (
             <p className="text-xs text-primary font-mono tracking-wider">{user.accountNumber}</p>
           )}
