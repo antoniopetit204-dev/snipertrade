@@ -1,60 +1,65 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { DashboardLayout } from '@/components/DashboardLayout';
-import { OpenPositions } from '@/components/OpenPositions';
-import { useDerivConnection } from '@/hooks/useDerivWS';
-import { derivWS } from '@/lib/deriv-ws';
-import { getUser } from '@/lib/store';
-import { Wallet, ArrowUpRight, ArrowDownRight } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { getUser, getAccountId } from '@/lib/store';
+import { fetchUserBalance, fetchManualTrades, type ManualTrade, type UserBalance } from '@/lib/balance';
+import { Wallet, RefreshCw, Loader2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 const DashboardPortfolio = () => {
   const user = getUser();
-  const { connected, authorized, balance, currency } = useDerivConnection();
-  const [statement, setStatement] = useState<any[]>([]);
-  const [openContracts, setOpenContracts] = useState<any[]>([]);
-  const [profitTable, setProfitTable] = useState<any[]>([]);
+  const account = getAccountId(user);
+  const [bal, setBal] = useState<UserBalance | null>(null);
+  const [trades, setTrades] = useState<ManualTrade[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const load = useCallback(async () => {
+    if (!account) { setLoading(false); return; }
+    setLoading(true);
+    try {
+      const [b, t] = await Promise.all([fetchUserBalance(account), fetchManualTrades(account, 100)]);
+      setBal(b);
+      setTrades(t);
+    } catch {} finally { setLoading(false); }
+  }, [account]);
 
   useEffect(() => {
-    if (!connected || !authorized) return;
-    const fetchData = async () => {
-      try {
-        const [stmtResp, portfolioResp, profitResp] = await Promise.allSettled([
-          derivWS.getStatement(50),
-          derivWS.getOpenContracts(),
-          derivWS.getProfitTable(50),
-        ]);
-        if (stmtResp.status === 'fulfilled' && stmtResp.value.statement?.transactions) {
-          setStatement(stmtResp.value.statement.transactions);
-        }
-        if (portfolioResp.status === 'fulfilled' && portfolioResp.value.portfolio?.contracts) {
-          setOpenContracts(portfolioResp.value.portfolio.contracts);
-        }
-        if (profitResp.status === 'fulfilled' && profitResp.value.profit_table?.transactions) {
-          setProfitTable(profitResp.value.profit_table.transactions);
-        }
-      } catch {}
-    };
-    fetchData();
-  }, [connected, authorized]);
+    load();
+    const i = setInterval(load, 15000);
+    const onFocus = () => load();
+    window.addEventListener('focus', onFocus);
+    return () => { clearInterval(i); window.removeEventListener('focus', onFocus); };
+  }, [load]);
 
   if (!user) return null;
 
-  const totalPnL = profitTable.reduce((s, t) => s + parseFloat(t.profit || 0), 0);
+  // Open positions = runs whose latest trade shows activity in the last 2 minutes (in-progress sessions)
+  const now = Date.now();
+  const activeRuns = new Set(
+    trades.filter(t => t.created_at && now - new Date(t.created_at).getTime() < 120000).map(t => t.run_id)
+  );
+  const totalPnL = trades.reduce((s, t) => s + Number(t.profit || 0), 0);
+  const wins = trades.filter(t => t.result === 'win').length;
 
   return (
-    <DashboardLayout title="Portfolio" icon={<Wallet className="h-5 w-5 text-primary" />}>
+    <DashboardLayout title="Wallet" icon={<Wallet className="h-5 w-5 text-primary" />}>
       <div className="space-y-4 sm:space-y-6">
-        {/* Balance Overview */}
+        <div className="flex items-center justify-between">
+          <p className="text-xs text-muted-foreground font-mono tracking-wider">Account No: {user.accountNumber || '—'}</p>
+          <Button variant="ghost" size="sm" onClick={load} className="h-7 px-2 text-xs">
+            {loading ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
+          </Button>
+        </div>
+
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
           <div className="bg-card border border-border rounded-lg p-4 sm:p-6 text-center">
             <p className="text-xs text-muted-foreground mb-1">Account Balance</p>
             <p className="text-2xl sm:text-3xl font-bold font-mono text-foreground">
-              {balance !== null ? `${balance.toFixed(2)}` : '—'} <span className="text-sm text-primary">{currency}</span>
+              {bal ? bal.balance.toFixed(2) : '—'} <span className="text-sm text-primary">KES</span>
             </p>
           </div>
           <div className="bg-card border border-border rounded-lg p-4 sm:p-6 text-center">
             <p className="text-xs text-muted-foreground mb-1">Open Positions</p>
-            <p className="text-2xl sm:text-3xl font-bold font-mono text-foreground">{openContracts.length}</p>
+            <p className="text-2xl sm:text-3xl font-bold font-mono text-foreground">{activeRuns.size}</p>
           </div>
           <div className="bg-card border border-border rounded-lg p-4 sm:p-6 text-center">
             <p className="text-xs text-muted-foreground mb-1">Total P&L (Recent)</p>
@@ -64,37 +69,49 @@ const DashboardPortfolio = () => {
           </div>
         </div>
 
-        <OpenPositions />
+        <div className="grid grid-cols-3 gap-3">
+          <div className="bg-card border border-border rounded-lg p-3 text-center">
+            <p className="text-[10px] text-muted-foreground">Deposited</p>
+            <p className="text-sm font-mono text-foreground">{(bal?.total_deposited || 0).toFixed(2)}</p>
+          </div>
+          <div className="bg-card border border-border rounded-lg p-3 text-center">
+            <p className="text-[10px] text-muted-foreground">Withdrawn</p>
+            <p className="text-sm font-mono text-foreground">{(bal?.total_withdrawn || 0).toFixed(2)}</p>
+          </div>
+          <div className="bg-card border border-border rounded-lg p-3 text-center">
+            <p className="text-[10px] text-muted-foreground">Trades / Wins</p>
+            <p className="text-sm font-mono text-foreground">{trades.length} / {wins}</p>
+          </div>
+        </div>
 
-        {/* Profit Table */}
         <div className="bg-card border border-border rounded-lg">
           <div className="px-3 sm:px-4 py-2 sm:py-3 border-b border-border">
             <h2 className="text-xs sm:text-sm font-semibold text-foreground">Trade History</h2>
           </div>
-          {profitTable.length > 0 ? (
+          {trades.length > 0 ? (
             <div className="overflow-x-auto">
               <table className="w-full text-xs sm:text-sm">
                 <thead>
                   <tr className="border-b border-border text-[10px] sm:text-xs text-muted-foreground uppercase tracking-wider">
-                    <th className="text-left px-3 sm:px-4 py-2">Date</th>
-                    <th className="text-left px-3 sm:px-4 py-2 hidden sm:table-cell">Contract</th>
-                    <th className="text-right px-3 sm:px-4 py-2">Buy</th>
-                    <th className="text-right px-3 sm:px-4 py-2">Sell</th>
+                    <th className="text-left px-3 sm:px-4 py-2">Time</th>
+                    <th className="text-left px-3 sm:px-4 py-2 hidden sm:table-cell">Bot</th>
+                    <th className="text-right px-3 sm:px-4 py-2">Stake</th>
                     <th className="text-right px-3 sm:px-4 py-2">P&L</th>
+                    <th className="text-right px-3 sm:px-4 py-2">Balance</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
-                  {profitTable.map((t: any, i: number) => (
-                    <tr key={i} className="hover:bg-accent/30">
+                  {trades.map((t, i) => (
+                    <tr key={t.id || i} className="hover:bg-accent/30">
                       <td className="px-3 sm:px-4 py-2 font-mono text-muted-foreground text-[10px] sm:text-xs whitespace-nowrap">
-                        {new Date(t.purchase_time * 1000).toLocaleDateString()}
+                        {t.created_at ? new Date(t.created_at).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : ''}
                       </td>
-                      <td className="px-3 sm:px-4 py-2 text-foreground hidden sm:table-cell truncate max-w-[150px]">{t.shortcode || t.contract_id}</td>
-                      <td className="px-3 sm:px-4 py-2 font-mono text-right text-foreground">{t.buy_price}</td>
-                      <td className="px-3 sm:px-4 py-2 font-mono text-right text-foreground">{t.sell_price}</td>
-                      <td className={`px-3 sm:px-4 py-2 font-mono text-right font-medium ${parseFloat(t.profit) >= 0 ? 'text-profit' : 'text-loss'}`}>
-                        {parseFloat(t.profit) >= 0 ? '+' : ''}{t.profit}
+                      <td className="px-3 sm:px-4 py-2 text-foreground hidden sm:table-cell truncate max-w-[150px]">{t.bot_name}</td>
+                      <td className="px-3 sm:px-4 py-2 font-mono text-right text-foreground">{Number(t.stake).toFixed(2)}</td>
+                      <td className={`px-3 sm:px-4 py-2 font-mono text-right font-medium ${Number(t.profit) >= 0 ? 'text-profit' : 'text-loss'}`}>
+                        {Number(t.profit) >= 0 ? '+' : ''}{Number(t.profit).toFixed(2)}
                       </td>
+                      <td className="px-3 sm:px-4 py-2 font-mono text-right text-muted-foreground">{Number(t.balance_after).toFixed(2)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -102,35 +119,10 @@ const DashboardPortfolio = () => {
             </div>
           ) : (
             <div className="py-8 text-center text-muted-foreground text-xs sm:text-sm">
-              {connected && authorized ? 'No trade history yet' : 'Connect & authorize to see your trade history'}
+              {loading ? 'Loading…' : 'No trades yet — run a bot from the Manual Trader.'}
             </div>
           )}
         </div>
-
-        {/* Statement */}
-        {statement.length > 0 && (
-          <div className="bg-card border border-border rounded-lg">
-            <div className="px-3 sm:px-4 py-2 sm:py-3 border-b border-border">
-              <h2 className="text-xs sm:text-sm font-semibold text-foreground">Account Statement</h2>
-            </div>
-            <div className="divide-y divide-border max-h-[300px] overflow-y-auto">
-              {statement.map((tx: any, i: number) => (
-                <div key={i} className="px-3 sm:px-4 py-2.5 flex items-center justify-between text-xs sm:text-sm">
-                  <div className="min-w-0">
-                    <p className="text-foreground truncate">{tx.action_type}</p>
-                    <p className="text-[10px] sm:text-xs text-muted-foreground">{new Date(tx.transaction_time * 1000).toLocaleString()}</p>
-                  </div>
-                  <div className="text-right shrink-0">
-                    <p className={`font-mono ${tx.amount >= 0 ? 'text-profit' : 'text-loss'}`}>
-                      {tx.amount >= 0 ? '+' : ''}{tx.amount}
-                    </p>
-                    <p className="text-[10px] text-muted-foreground font-mono">Bal: {tx.balance_after}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
       </div>
     </DashboardLayout>
   );
