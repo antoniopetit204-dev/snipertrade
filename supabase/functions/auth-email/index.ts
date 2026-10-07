@@ -147,14 +147,46 @@ function emailFooter(link: string, prefs: string, siteName: string, address: str
   </div>`;
 }
 
+// ── Cached config (avoid a DB hit per email under heavy traffic) ──
+let SMTP_CACHE: { at: number; data: any } | null = null;
+async function loadSmtpCached() {
+  if (SMTP_CACHE && Date.now() - SMTP_CACHE.at < 30_000) return SMTP_CACHE.data;
+  const data = await loadSmtp();
+  SMTP_CACHE = { at: Date.now(), data };
+  return data;
+}
+
+// ── Concurrency limiter: shared hosts drop connections when flooded ──
+const MAX_PARALLEL = 3;
+let active = 0;
+const waiters: Array<() => void> = [];
+async function acquire() {
+  if (active < MAX_PARALLEL) { active++; return; }
+  await new Promise<void>(r => waiters.push(r));
+  active++;
+}
+function release() { active--; const n = waiters.shift(); if (n) n(); }
+
+const isTransient = (m: string) =>
+  /(timed? ?out|ECONNRESET|ECONNREFUSED|EPIPE|connection|421|450|451|452|try again|temporar|too many)/i.test(m);
+
+// Spam filters penalise emoji / repeated punctuation in subjects.
+const cleanSubject = (s: string) =>
+  s.replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u2713\u2714]/gu, '')
+   .replace(/!{2,}/g, '!').replace(/\s{2,}/g, ' ').trim();
+
+const htmlToText = (h: string) =>
+  h.replace(/<style[\s\S]*?<\/style>/gi, '').replace(/<a [^>]*href="([^"]+)"[^>]*>(.*?)<\/a>/gi, '$2 ($1)')
+   .replace(/<br\s*\/?>/gi, '\n').replace(/<\/(p|div|h\d|tr)>/gi, '\n').replace(/<[^>]+>/g, '')
+   .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/\n{3,}/g, '\n\n').trim();
+
 async function sendMail(to: string, subject: string, html: string, text: string, templateKey = '') {
-  const smtp = await loadSmtp();
+  const smtp = await loadSmtpCached();
   if (!smtp || !smtp.enabled || !smtp.host) {
     await supabase.from('email_log').insert({ to_email: to, template_key: templateKey, subject, status: 'skipped', error: 'SMTP not configured' });
     return { ok: false, error: 'SMTP not configured' };
   }
 
-  // Honour unsubscribes for everything except security/transactional mail.
   if (!TRANSACTIONAL.has(templateKey)) {
     const { data: pref } = await supabase.from('user_email_preferences')
       .select('enabled').eq('email', to).maybeSingle();
@@ -164,59 +196,97 @@ async function sendMail(to: string, subject: string, html: string, text: string,
     }
   }
 
-  // Auto-correct TLS mode based on port (most shared hosts misconfigure this)
   const port = Number(smtp.port) || 587;
   const tlsImplicit = port === 465 ? true : port === 587 || port === 25 || port === 2525 ? false : Boolean(smtp.secure);
 
   const siteName = smtp.from_name || (await loadSiteName());
-  const fromName = smtp.from_name || siteName;
-  const fromEmail = smtp.from_email || smtp.username;
+  const fromName = String(smtp.from_name || siteName).replace(/["<>]/g, '');
+  // Alignment: From must share the authenticated mailbox's domain, otherwise
+  // SPF/DKIM/DMARC alignment fails and Gmail/Outlook route mail to spam.
+  const authUser = String(smtp.username || '');
+  let fromEmail = String(smtp.from_email || authUser);
+  const authDomain = authUser.includes('@') ? authUser.split('@')[1].toLowerCase() : '';
+  const fromDomainRaw = fromEmail.split('@')[1]?.toLowerCase() || '';
+  if (authDomain && fromDomainRaw && authDomain !== fromDomainRaw) fromEmail = authUser;
+  const fromDomain = fromEmail.split('@')[1] || 'localhost';
 
+  subject = cleanSubject(subject);
   const link = await unsubUrl(to);
   const prefs = `${siteUrl()}/dashboard/settings`;
-  const fullHtml = `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${subject}</title></head><body style="margin:0;background:#ffffff">${html}${emailFooter(link, prefs, siteName, `${siteName} · Sent to ${to}`)}</body></html>`;
-  const fullText = `${text || ''}\n\n---\nYou are receiving this because you have an account on ${siteName}.\nEmail preferences: ${prefs}\nUnsubscribe: ${link}`;
+  const isTx = TRANSACTIONAL.has(templateKey);
+  const footer = isTx
+    ? `<div style="max-width:560px;margin:24px auto 0;padding:16px 24px;border-top:1px solid #e5e5e5;font-family:Arial,sans-serif;font-size:11px;color:#888">This is an automated security message from ${siteName}. Sent to ${to}.</div>`
+    : emailFooter(link, prefs, siteName, `${siteName} · Sent to ${to}`);
+  const fullHtml = `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${subject}</title></head><body style="margin:0;padding:0;background:#ffffff;color:#111">${html}${footer}</body></html>`;
+  const plain = (text && text.trim()) || htmlToText(html);
+  const fullText = isTx
+    ? `${plain}\n\n--\n${siteName}`
+    : `${plain}\n\n--\nYou are receiving this because you have an account on ${siteName}.\nEmail preferences: ${prefs}\nUnsubscribe: ${link}`;
 
-  const client = new SMTPClient({
-    connection: {
-      hostname: smtp.host,
-      port,
-      tls: tlsImplicit,
-      auth: smtp.username ? { username: smtp.username, password: smtp.password } : undefined,
-    },
-    debug: { allowUnsecure: true, log: false, noStartTLS: !tlsImplicit && port !== 587 },
-    client: { warning: 'log' },
-  });
-
-  try {
-    await client.send({
-      from: `${fromName} <${fromEmail}>`,
-      to,
-      replyTo: fromEmail,
-      subject,
-      content: fullText,
-      html: fullHtml,
-      // Deliverability headers (RFC 8058 one-click unsubscribe + list identity)
-      headers: {
-        'List-Unsubscribe': `<${link}>, <mailto:${fromEmail}?subject=unsubscribe>`,
-        'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
-        'List-Id': `${siteName} notifications <notifications.${String(fromEmail).split('@')[1] || 'localhost'}>`,
-        'Auto-Submitted': 'auto-generated',
-        'X-Entity-Ref-ID': crypto.randomUUID(),
-        'X-Mailer': fromName,
-        'X-Priority': '3',
-        'MIME-Version': '1.0',
-      },
-    });
-    await supabase.from('email_log').insert({ to_email: to, template_key: templateKey, subject, status: 'sent' });
-    return { ok: true };
-  } catch (e: any) {
-    const msg = String(e?.message || e);
-    await supabase.from('email_log').insert({ to_email: to, template_key: templateKey, subject, status: 'failed', error: msg });
-    return { ok: false, error: msg };
-  } finally {
-    try { await client.close(); } catch {}
+  const headers: Record<string, string> = {
+    'Message-ID': `<${crypto.randomUUID()}@${fromDomain}>`,
+    'X-Entity-Ref-ID': crypto.randomUUID(),
+  };
+  if (!isTx) {
+    headers['List-Unsubscribe'] = `<${link}>, <mailto:${fromEmail}?subject=unsubscribe>`;
+    headers['List-Unsubscribe-Post'] = 'List-Unsubscribe=One-Click';
+    headers['List-Id'] = `${String(siteName).replace(/[<>]/g, '')} <notifications.${fromDomain}>`;
+  } else {
+    headers['Auto-Submitted'] = 'auto-generated';
   }
+
+  await acquire();
+  let lastErr = '';
+  try {
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const client = new SMTPClient({
+        connection: {
+          hostname: smtp.host,
+          port,
+          tls: tlsImplicit,
+          auth: smtp.username ? { username: smtp.username, password: smtp.password } : undefined,
+        },
+        debug: { allowUnsecure: true, log: false, noStartTLS: !tlsImplicit && port !== 587 },
+        client: { warning: 'ignore' },
+      });
+      try {
+        await client.send({ from: `"${fromName}" <${fromEmail}>`, to, replyTo: fromEmail, subject, content: fullText, html: fullHtml, headers });
+        await supabase.from('email_log').insert({ to_email: to, template_key: templateKey, subject, status: 'sent' });
+        return { ok: true };
+      } catch (e: any) {
+        lastErr = String(e?.message || e);
+        if (!isTransient(lastErr) || attempt === 2) break;
+        await new Promise(r => setTimeout(r, 600 * Math.pow(2, attempt) + Math.random() * 300));
+      } finally {
+        try { await client.close(); } catch {}
+      }
+    }
+  } finally {
+    release();
+  }
+  await supabase.from('email_log').insert({ to_email: to, template_key: templateKey, subject, status: 'failed', error: lastErr.slice(0, 500) });
+  return { ok: false, error: lastErr };
+}
+
+/** DNS deliverability check for the sending domain (SPF / DKIM / DMARC). */
+async function checkDeliverability(domain: string) {
+  const out: Record<string, string> = {};
+  try {
+    const txt = (await Deno.resolveDns(domain, 'TXT')).map(r => r.join(''));
+    out.spf = txt.find(t => t.startsWith('v=spf1')) || 'MISSING';
+  } catch { out.spf = 'MISSING'; }
+  try {
+    const d = (await Deno.resolveDns(`_dmarc.${domain}`, 'TXT')).map(r => r.join(''));
+    out.dmarc = d.find(t => t.startsWith('v=DMARC1')) || 'MISSING';
+  } catch { out.dmarc = 'MISSING'; }
+  for (const sel of ['default', 'mail', 'dkim', 'selector1', 'google', 'k1', 'x']) {
+    try {
+      const k = (await Deno.resolveDns(`${sel}._domainkey.${domain}`, 'TXT')).map(r => r.join(''));
+      if (k.some(t => t.includes('p='))) { out.dkim = `found (selector "${sel}")`; break; }
+    } catch { /* next */ }
+  }
+  out.dkim = out.dkim || 'NOT FOUND';
+  return out;
 }
 
 
