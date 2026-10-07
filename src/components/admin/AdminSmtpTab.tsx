@@ -30,7 +30,12 @@ export default function AdminSmtpTab() {
     setTesting(true);
     try {
       const r = await sendTestEmail(testTo);
-      toast({ title: r.ok ? 'Test sent ✓' : 'Test failed', description: r.error || '', variant: r.ok ? 'default' : 'destructive' });
+      const d: any = (r as any).dns || {};
+      const missing = ['spf', 'dkim', 'dmarc'].filter(k => !d[k] || /MISSING|NOT FOUND/.test(d[k]));
+      const dnsNote = (r as any).domain
+        ? (missing.length ? ` Inbox risk: ${missing.join(', ').toUpperCase()} not set on ${(r as any).domain}. Enable them in your hosting's Email Deliverability page.` : ` SPF, DKIM and DMARC look good on ${(r as any).domain}.`)
+        : '';
+      toast({ title: r.ok ? 'Test sent' : 'Test failed', description: (r.error || '') + dnsNote, variant: r.ok && !missing.length ? 'default' : 'destructive' });
     } catch (e: any) { toast({ title: 'Failed', description: e.message, variant: 'destructive' }); }
     setTesting(false);
   };
