@@ -768,7 +768,10 @@ Deno.serve(async (req) => {
       const r = await sendMail(to, 'SMTP Test from ' + (await loadSiteName()),
         '<p>If you received this, your SMTP is configured correctly. ✓</p>',
         'SMTP test successful.', 'test');
-      return json(r, r.ok ? 200 : 500);
+      const smtp = await loadSmtpCached();
+      const dom = String(smtp?.from_email || smtp?.username || '').split('@')[1] || '';
+      const dns = dom ? await checkDeliverability(dom) : {};
+      return json({ ...r, domain: dom, dns });
     }
 
     if (action === 'send-template') {
