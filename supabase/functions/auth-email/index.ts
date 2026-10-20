@@ -385,6 +385,7 @@ Deno.serve(async (req) => {
 
   // ───────── Public unsubscribe / email preference centre ─────────
   if (action === 'unsub-status' || action === 'unsubscribe' || action === 'unsub-prefs') {
+    if (action !== 'unsub-status' && req.method !== 'POST') return json({ error: 'Use POST to change email preferences.' }, 405);
     const email = String(body?.email || url.searchParams.get('email') || '').trim().toLowerCase();
     const token = String(body?.token || url.searchParams.get('token') || '');
     if (!email || !token) return json({ error: 'Invalid unsubscribe link' }, 400);
@@ -766,6 +767,9 @@ Deno.serve(async (req) => {
     }
 
     if (action === 'send-test' || action === 'send-template') {
+      const sendLimit = await checkRateLimit(`email-send:${ip || 'unknown'}`, 'email-send', 5, 10);
+      if (!sendLimit.allowed) return fail('Too many email sending attempts. Please wait 10 minutes.', 'RATE_LIMITED');
+      await recordAttempt(`email-send:${ip || 'unknown'}`, 'email-send', false, ip);
       const code = String(body.admin_code || '');
       if (!/^\d{6}$/.test(code)) return fail('Verify the email security code before sending.', 'ADMIN_CODE_REQUIRED');
       const { data: consumed, error: otpError } = await supabase.from('admin_otps')
