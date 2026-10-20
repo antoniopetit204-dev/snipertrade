@@ -67,9 +67,10 @@ export const updateProfile = (
 export const requestPasswordReset = (email: string) => invoke('forgot-password', { email });
 export const verifyResetToken = (token: string) => invoke('verify-token', { token });
 export const resetPassword = (token: string, password: string) => invoke('reset-password', { token, password });
-export const sendTestEmail = (to: string) => invoke('send-test', { to });
-export const sendTemplateEmail = (to: string, template: string, vars: Record<string, string> = {}) =>
-  invoke('send-template', { to, template, vars });
+export const requestEmailSendCode = () => invoke('admin-otp-request', { purpose: 'email_send' });
+export const sendTestEmail = (to: string, admin_code: string) => invoke('send-test', { to, admin_code });
+export const sendTemplateEmail = (to: string, template: string, vars: Record<string, string> = {}, admin_code = '') =>
+  invoke('send-template', { to, template, vars, admin_code });
 
 // Claim welcome bonus (server-authoritative)
 export const claimBonus = async (deriv_account: string) => {

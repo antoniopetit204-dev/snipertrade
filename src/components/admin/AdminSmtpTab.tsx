@@ -4,7 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Mail, Send } from 'lucide-react';
-import { fetchSmtp, updateSmtp, sendTestEmail } from '@/lib/auth-email';
+import { fetchSmtp, updateSmtp, sendTestEmail, requestEmailSendCode } from '@/lib/auth-email';
 import { useToast } from '@/hooks/use-toast';
 
 const DEFAULT = { host: '', port: 587, secure: false, username: '', password: '', from_email: '', from_name: '', enabled: false };
@@ -15,6 +15,16 @@ export default function AdminSmtpTab() {
   const [testTo, setTestTo] = useState('');
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
+  const [sendCode, setSendCode] = useState('');
+  const [requestingCode, setRequestingCode] = useState(false);
+  const requestCode = async () => {
+    setRequestingCode(true);
+    try {
+      const result = await requestEmailSendCode();
+      toast({ title: result.sent ? 'Security code sent' : 'Could not send code', description: result.error || result.masked, variant: result.sent ? 'default' : 'destructive' });
+    } catch (error: any) { toast({ title: 'Could not send code', description: error.message, variant: 'destructive' }); }
+    finally { setRequestingCode(false); }
+  };
 
   useEffect(() => { fetchSmtp().then(d => { if (d) setCfg(d); }); }, []);
 
@@ -29,11 +39,12 @@ export default function AdminSmtpTab() {
     if (!testTo) return toast({ title: 'Enter recipient', variant: 'destructive' });
     setTesting(true);
     try {
-      const r = await sendTestEmail(testTo);
+      const r = await sendTestEmail(testTo, sendCode);
+      setSendCode('');
       const d: any = (r as any).dns || {};
       const missing = ['spf', 'dkim', 'dmarc'].filter(k => !d[k] || /MISSING|NOT FOUND/.test(d[k]));
       const dnsNote = (r as any).domain
-        ? (missing.length ? ` Inbox risk: ${missing.join(', ').toUpperCase()} not set on ${(r as any).domain}. Enable them in your hosting's Email Deliverability page.` : ` SPF, DKIM and DMARC look good on ${(r as any).domain}.`)
+        ? (missing.length ? ` Inbox risk: ${missing.join(', ').toUpperCase()} could not be verified on ${(r as any).domain}. Check your email provider's domain settings; DKIM may use a different selector.` : ` SPF, DKIM and DMARC records were found on ${(r as any).domain}. This does not confirm message authentication or inbox placement.`)
         : '';
       toast({ title: r.ok ? 'Test sent' : 'Test failed', description: (r.error || '') + dnsNote, variant: r.ok && !missing.length ? 'default' : 'destructive' });
     } catch (e: any) { toast({ title: 'Failed', description: e.message, variant: 'destructive' }); }
@@ -83,9 +94,13 @@ export default function AdminSmtpTab() {
 
       <div className="border-t border-border pt-4 space-y-2">
         <Label className="text-xs">Send test email</Label>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" onClick={requestCode} disabled={requestingCode}>{requestingCode ? 'Sending code...' : 'Request security code'}</Button>
+          <Input aria-label="Email security code" inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={sendCode} onChange={event => setSendCode(event.target.value.replace(/\D/g, ''))} placeholder="Security code" className={`${inputClass} w-40`} />
+        </div>
         <div className="flex gap-2">
           <Input type="email" value={testTo} onChange={e => setTestTo(e.target.value)} placeholder="test@example.com" className={inputClass} />
-          <Button variant="outline" onClick={test} disabled={testing}>
+          <Button variant="outline" onClick={test} disabled={testing || sendCode.length !== 6}>
             <Send className="h-3 w-3 mr-1" /> {testing ? 'Sending...' : 'Test'}
           </Button>
         </div>

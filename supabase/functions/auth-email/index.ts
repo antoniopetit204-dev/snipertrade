@@ -6,6 +6,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
 import bcrypt from 'npm:bcryptjs@2.4.3';
 import { SMTPClient } from 'https://deno.land/x/denomailer@1.6.0/mod.ts';
 import { ensureAffiliate, attributeSignup } from '../_shared/affiliate.ts';
+import { accountEmailCopy, accountEmailHtml, safeMailSubject, isMailbox, isHardBounce, MailSendLimiter } from '../_shared/email-policy.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -121,8 +122,7 @@ async function loadTemplate(key: string) {
 
 // Origin of the current request — used so every link in an email points at the
 // domain the user is actually using (custom domain, preview or localhost).
-let CURRENT_ORIGIN = '';
-const siteUrl = () => CURRENT_ORIGIN || 'https://hifrequencytrade.lovable.app';
+const siteUrl = (origin = '') => origin || 'https://hifrequencytrade.lovable.app';
 
 /** Deterministic, unguessable unsubscribe token (no extra table needed). */
 async function unsubToken(email: string) {
@@ -131,8 +131,8 @@ async function unsubToken(email: string) {
   const digest = await crypto.subtle.digest('SHA-256', data);
   return Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('').slice(0, 40);
 }
-const unsubUrl = async (email: string) =>
-  `${siteUrl()}/unsubscribe?e=${encodeURIComponent(email)}&t=${await unsubToken(email)}`;
+const unsubUrl = async (email: string, origin: string) =>
+  `${siteUrl(origin)}/unsubscribe?e=${encodeURIComponent(email)}&t=${await unsubToken(email)}`;
 
 // Security/transactional mail is always delivered, even to unsubscribed users.
 const TRANSACTIONAL = new Set([
@@ -157,30 +157,28 @@ async function loadSmtpCached() {
 }
 
 // ── Concurrency limiter: shared hosts drop connections when flooded ──
-const MAX_PARALLEL = 3;
-let active = 0;
-const waiters: Array<() => void> = [];
-async function acquire() {
-  if (active < MAX_PARALLEL) { active++; return; }
-  await new Promise<void>(r => waiters.push(r));
-  active++;
-}
-function release() { active--; const n = waiters.shift(); if (n) n(); }
+const sendLimiter = new MailSendLimiter();
 
 const isTransient = (m: string) =>
   /(timed? ?out|ECONNRESET|ECONNREFUSED|EPIPE|connection|421|450|451|452|try again|temporar|too many)/i.test(m);
 
 // Spam filters penalise emoji / repeated punctuation in subjects.
-const cleanSubject = (s: string) =>
-  s.replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u2713\u2714]/gu, '')
-   .replace(/!{2,}/g, '!').replace(/\s{2,}/g, ' ').trim();
+const cleanSubject = safeMailSubject;
 
 const htmlToText = (h: string) =>
   h.replace(/<style[\s\S]*?<\/style>/gi, '').replace(/<a [^>]*href="([^"]+)"[^>]*>(.*?)<\/a>/gi, '$2 ($1)')
    .replace(/<br\s*\/?>/gi, '\n').replace(/<\/(p|div|h\d|tr)>/gi, '\n').replace(/<[^>]+>/g, '')
    .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/\n{3,}/g, '\n\n').trim();
 
-async function sendMail(to: string, subject: string, html: string, text: string, templateKey = '') {
+async function sendMail(to: string, subject: string, html: string, text: string, templateKey = '', origin = '') {
+  subject = cleanSubject(subject);
+  html = accountEmailHtml(html);
+  text = accountEmailCopy(text);
+  if (!isMailbox(to)) return { ok: false, error: 'Enter one valid recipient email address.' };
+  const { data: bounced, error: bounceError } = await supabase.from('email_log').select('id')
+    .eq('to_email', to).eq('status', 'failed').like('error', 'HARD_BOUNCE:%').limit(1);
+  if (bounceError) return { ok: false, error: 'Email delivery checks are unavailable. Please try again shortly.' };
+  if (bounced?.length) return { ok: false, error: 'This mailbox previously rejected delivery. Please use a valid email address or contact support.' };
   const smtp = await loadSmtpCached();
   if (!smtp || !smtp.enabled || !smtp.host) {
     await supabase.from('email_log').insert({ to_email: to, template_key: templateKey, subject, status: 'skipped', error: 'SMTP not configured' });
@@ -189,7 +187,7 @@ async function sendMail(to: string, subject: string, html: string, text: string,
 
   if (!TRANSACTIONAL.has(templateKey)) {
     const { data: pref } = await supabase.from('user_email_preferences')
-      .select('enabled').eq('email', to).maybeSingle();
+      .select('enabled').eq('identifier', to).maybeSingle();
     if (pref && pref.enabled === false) {
       await supabase.from('email_log').insert({ to_email: to, template_key: templateKey, subject, status: 'skipped', error: 'recipient unsubscribed' });
       return { ok: false, error: 'recipient unsubscribed' };
@@ -199,8 +197,8 @@ async function sendMail(to: string, subject: string, html: string, text: string,
   const port = Number(smtp.port) || 587;
   const tlsImplicit = port === 465 ? true : port === 587 || port === 25 || port === 2525 ? false : Boolean(smtp.secure);
 
-  const siteName = smtp.from_name || (await loadSiteName());
-  const fromName = String(smtp.from_name || siteName).replace(/["<>]/g, '');
+  const siteName = accountEmailCopy(smtp.from_name || (await loadSiteName()));
+  const fromName = cleanSubject(siteName).replace(/["<>]/g, '') || 'HFT';
   // Alignment: From must share the authenticated mailbox's domain, otherwise
   // SPF/DKIM/DMARC alignment fails and Gmail/Outlook route mail to spam.
   const authUser = String(smtp.username || '');
@@ -208,11 +206,12 @@ async function sendMail(to: string, subject: string, html: string, text: string,
   const authDomain = authUser.includes('@') ? authUser.split('@')[1].toLowerCase() : '';
   const fromDomainRaw = fromEmail.split('@')[1]?.toLowerCase() || '';
   if (authDomain && fromDomainRaw && authDomain !== fromDomainRaw) fromEmail = authUser;
+  if (!isMailbox(fromEmail)) return { ok: false, error: 'Configure a valid sender email address before sending.' };
   const fromDomain = fromEmail.split('@')[1] || 'localhost';
 
   subject = cleanSubject(subject);
-  const link = await unsubUrl(to);
-  const prefs = `${siteUrl()}/dashboard/settings`;
+  const link = await unsubUrl(to, origin);
+  const prefs = `${siteUrl(origin)}/dashboard/settings`;
   const isTx = TRANSACTIONAL.has(templateKey);
   const footer = isTx
     ? `<div style="max-width:560px;margin:24px auto 0;padding:16px 24px;border-top:1px solid #e5e5e5;font-family:Arial,sans-serif;font-size:11px;color:#888">This is an automated security message from ${siteName}. Sent to ${to}.</div>`
@@ -226,16 +225,20 @@ async function sendMail(to: string, subject: string, html: string, text: string,
   const headers: Record<string, string> = {
     'Message-ID': `<${crypto.randomUUID()}@${fromDomain}>`,
     'X-Entity-Ref-ID': crypto.randomUUID(),
+    'X-Auto-Response-Suppress': 'All',
+    'Auto-Submitted': 'auto-generated',
   };
   if (!isTx) {
-    headers['List-Unsubscribe'] = `<${link}>, <mailto:${fromEmail}?subject=unsubscribe>`;
+    const oneClick = `${Deno.env.get('SUPABASE_URL')}/functions/v1/auth-email?action=unsubscribe&email=${encodeURIComponent(to)}&token=${await unsubToken(to)}`;
+    headers['List-Unsubscribe'] = `<${oneClick}>, <mailto:${fromEmail}?subject=unsubscribe>`;
     headers['List-Unsubscribe-Post'] = 'List-Unsubscribe=One-Click';
     headers['List-Id'] = `${String(siteName).replace(/[<>]/g, '')} <notifications.${fromDomain}>`;
   } else {
     headers['Auto-Submitted'] = 'auto-generated';
   }
 
-  await acquire();
+  try { await sendLimiter.acquire(); }
+  catch { return { ok: false, error: 'Email service is busy. Please try again shortly.' }; }
   let lastErr = '';
   try {
     for (let attempt = 0; attempt < 3; attempt++) {
@@ -246,7 +249,7 @@ async function sendMail(to: string, subject: string, html: string, text: string,
           tls: tlsImplicit,
           auth: smtp.username ? { username: smtp.username, password: smtp.password } : undefined,
         },
-        debug: { allowUnsecure: true, log: false, noStartTLS: !tlsImplicit && port !== 587 },
+        debug: { allowUnsecure: false, log: false, noStartTLS: false },
         client: { warning: 'ignore' },
       });
       try {
@@ -262,9 +265,9 @@ async function sendMail(to: string, subject: string, html: string, text: string,
       }
     }
   } finally {
-    release();
+    sendLimiter.release();
   }
-  await supabase.from('email_log').insert({ to_email: to, template_key: templateKey, subject, status: 'failed', error: lastErr.slice(0, 500) });
+  await supabase.from('email_log').insert({ to_email: to, template_key: templateKey, subject, status: 'failed', error: `${isHardBounce(lastErr) ? 'HARD_BOUNCE:' : ''}${lastErr}`.slice(0, 500) });
   return { ok: false, error: lastErr };
 }
 
@@ -310,7 +313,7 @@ const FALLBACK_TPL: Record<string, { subject: string; html: string; text: string
   },
   bonus_approved: {
     subject: 'Your {{site_name}} bonus has been approved',
-    html: `<div style="font-family:Arial,sans-serif;max-width:560px;margin:auto;padding:24px"><h2>Bonus approved 🎉</h2><p>Hi {{name}}, your welcome bonus of {{amount}} has been approved and credited to your trading balance.</p></div>`,
+    html: `<div style="font-family:Arial,sans-serif;max-width:560px;margin:auto;padding:24px"><h2>Account credit approved</h2><p>Hi {{name}}, your welcome credit of {{amount}} has been approved and credited to your account balance.</p></div>`,
     text: 'Your welcome bonus of {{amount}} has been approved and credited.',
   },
   password_reset: {
@@ -336,12 +339,12 @@ const FALLBACK_TPL: Record<string, { subject: string; html: string; text: string
 };
 
 async function sendTemplated(to: string, key: string, vars: Record<string, string>) {
-  const siteName = await loadSiteName();
+  const siteName = accountEmailCopy(await loadSiteName());
   const merged = { site_name: siteName, ...vars };
   const dbTpl = await loadTemplate(key);
   const tpl = (dbTpl && dbTpl.enabled !== false && dbTpl.subject) ? dbTpl : FALLBACK_TPL[key];
   if (!tpl) return { ok: false, error: 'template missing: ' + key };
-  return sendMail(to, render(tpl.subject, merged), render(tpl.html, merged), render(tpl.text || '', merged), key);
+  return sendMail(to, render(tpl.subject, merged), render(tpl.html, merged), render(tpl.text || '', merged), key, vars.site_url || '');
 }
 
 async function shouldNotify(email: string, key: 'notify_login' | 'notify_trades' | 'notify_deposits' | 'notify_withdrawals') {
@@ -379,17 +382,16 @@ Deno.serve(async (req) => {
   // Origin is always derived from the caller's window so tokens/links keep the
   // same domain the user is actually on (custom domain, preview, or localhost).
   const reqOrigin = String(body?.origin || req.headers.get('origin') || '').replace(/\/+$/, '');
-  CURRENT_ORIGIN = reqOrigin;
 
   // ───────── Public unsubscribe / email preference centre ─────────
   if (action === 'unsub-status' || action === 'unsubscribe' || action === 'unsub-prefs') {
-    const email = String(body?.email || '').trim().toLowerCase();
-    const token = String(body?.token || '');
+    const email = String(body?.email || url.searchParams.get('email') || '').trim().toLowerCase();
+    const token = String(body?.token || url.searchParams.get('token') || '');
     if (!email || !token) return json({ error: 'Invalid unsubscribe link' }, 400);
     if (token !== await unsubToken(email)) return json({ error: 'Invalid or expired unsubscribe link' }, 400);
 
     const { data: existing } = await supabase.from('user_email_preferences')
-      .select('*').eq('email', email).maybeSingle();
+      .select('*').eq('identifier', email).maybeSingle();
 
     if (action === 'unsub-status') {
       return json({
@@ -412,10 +414,11 @@ Deno.serve(async (req) => {
           marketing: !!body?.prefs?.marketing,
         };
 
-    await supabase.from('user_email_preferences').upsert(
+    const { error: preferenceError } = await supabase.from('user_email_preferences').upsert(
       { identifier: existing?.identifier || email, email, ...patch, updated_at: new Date().toISOString() },
       { onConflict: 'identifier' },
     );
+    if (preferenceError) return json({ error: 'Could not save your email preferences. Please try again.' }, 500);
     return json({ ok: true, email, prefs: patch });
   }
 
@@ -623,7 +626,7 @@ Deno.serve(async (req) => {
 
       await recordAttempt(identifier, 'login', true, ip);
       if (await shouldNotify(user.email, 'notify_login')) {
-        sendTemplated(user.email, 'login_alert', { name: user.name || user.email, time: new Date().toUTCString() }).catch(() => {});
+        sendTemplated(user.email, 'login_alert', { name: user.name || user.email, time: new Date().toUTCString(), site_url: origin }).catch(() => {});
       }
       const session = await createSession(user.id, user.email, ua, ip);
       return json({ user: publicUser(user), ...session });
@@ -673,7 +676,7 @@ Deno.serve(async (req) => {
         const verifyUrl = `${origin}/auth?verify=${token}`;
         await sendTemplated(email, 'email_verification', { name: user.name || email, verify_url: verifyUrl, site_url: origin });
       }
-      await recordAttempt(email, 'resend-verification', true, ip);
+      await recordAttempt(email, 'resend-verification', false, ip);
       return json({ ok: true });
     }
 
@@ -690,7 +693,7 @@ Deno.serve(async (req) => {
         const resetUrl = `${origin}/reset-password?token=${token}`;
         await sendTemplated(email, 'password_reset', { name: user.name || email, reset_url: resetUrl, site_url: origin });
       }
-      await recordAttempt(email, 'forgot-password', true, ip);
+      await recordAttempt(email, 'forgot-password', false, ip);
       return json({ ok: true });
     }
 
@@ -762,12 +765,21 @@ Deno.serve(async (req) => {
       return json({ ok: true });
     }
 
+    if (action === 'send-test' || action === 'send-template') {
+      const code = String(body.admin_code || '');
+      if (!/^\d{6}$/.test(code)) return fail('Verify the email security code before sending.', 'ADMIN_CODE_REQUIRED');
+      const { data: consumed, error: otpError } = await supabase.from('admin_otps')
+        .update({ used: true }).eq('purpose', 'email_send').eq('code', code).eq('used', false)
+        .gt('expires_at', new Date().toISOString()).select('id');
+      if (otpError || !consumed?.length) return fail('The email security code is incorrect or expired.', 'ADMIN_CODE_INVALID');
+    }
+
     if (action === 'send-test') {
       const to = String(body.to || '');
       if (!to) return json({ error: 'recipient required' }, 400);
-      const r = await sendMail(to, 'SMTP Test from ' + (await loadSiteName()),
-        '<p>If you received this, your SMTP is configured correctly. ✓</p>',
-        'SMTP test successful.', 'test');
+      const r = await sendMail(to, 'Email delivery check - ' + (await loadSiteName()),
+        '<p>This is your requested email delivery check. No action is required.</p>',
+        'This is your requested email delivery check. No action is required.', 'test', reqOrigin);
       const smtp = await loadSmtpCached();
       const dom = String(smtp?.from_email || smtp?.username || '').split('@')[1] || '';
       const dns = dom ? await checkDeliverability(dom) : {};
@@ -778,6 +790,11 @@ Deno.serve(async (req) => {
       const to = String(body.to || '');
       const key = String(body.template || '');
       const vars = body.vars || {};
+      if (!/^[a-z_]{1,60}$/.test(key) || !vars || typeof vars !== 'object' || Array.isArray(vars)
+        || Object.values(vars).some(value => typeof value !== 'string' || value.length > 2000)) {
+        return fail('Check the email template and its values before sending.', 'INVALID_EMAIL');
+      }
+      vars.site_url = reqOrigin;
       const r = await sendTemplated(to, key, vars);
       return json(r);
     }
